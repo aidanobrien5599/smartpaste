@@ -15,10 +15,11 @@
 (() => {
   const FIELD_SELECTOR =
     'input:not([type]), input[type="text"], input[type="email"], ' +
-    'input[type="tel"], input[type="url"], input[type="search"], textarea';
+    'input[type="tel"], input[type="url"], input[type="search"], textarea, select';
   const MIN_FIELDS = 2;
   const answers = new WeakMap(); // field element -> resolved answer
   const cycle = new WeakMap(); // field element -> index into alternatives
+  let known = []; // [{element, result}] for the autofill button
   let scanning = false;
   let lastSignature = "";
 
@@ -71,10 +72,23 @@
     return rect.width > 0 && rect.height > 0;
   }
 
+  /** A dropdown carries its own answer set, so send it along with the label. */
+  function selectOptions(element) {
+    if (element.tagName !== "SELECT") return null;
+    return [...element.options]
+      .map((o) => o.textContent.trim())
+      .filter((t) => t && !/^(?:select|choose|please select|--)/i.test(t))
+      .slice(0, 60);
+  }
+
   function collectFields() {
     return [...document.querySelectorAll(FIELD_SELECTOR)]
       .filter(visible)
-      .map((element) => ({ element, label: labelFor(element) }))
+      .map((element) => ({
+        element,
+        label: labelFor(element),
+        options: selectOptions(element),
+      }))
       .filter((f) => f.label.length >= 2);
   }
 
@@ -92,7 +106,7 @@
     try {
       const reply = await chrome.runtime.sendMessage({
         type: "answer-fields",
-        labels: fields.map((f) => f.label),
+        fields: fields.map((f) => ({ label: f.label, options: f.options })),
       });
       if (!reply || !reply.ok) {
         if (reply && reply.error) note(reply.error, true);
@@ -104,8 +118,10 @@
           mark(fields[i].element, result);
         }
       });
-      const ready = reply.results.filter((r) => r.status !== "none").length;
-      if (ready) note(`${ready} field${ready === 1 ? "" : "s"} ready — press ⌘V`);
+      known = fields
+        .map((f, i) => ({ element: f.element, result: reply.results[i] }))
+        .filter((f) => f.result && f.result.status !== "none");
+      showButton(known.length);
     } catch (error) {
       // An extension reload orphans this script; staying quiet is correct.
     } finally {
@@ -121,6 +137,16 @@
    * the native setter and dispatching an input event is what React listens for.
    */
   function setValue(field, value) {
+    if (field.tagName === "SELECT") {
+      const match = [...field.options].find(
+        (o) => o.textContent.trim() === value
+      );
+      if (!match) return false;
+      field.value = match.value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    }
     const prototype =
       field instanceof HTMLTextAreaElement
         ? HTMLTextAreaElement.prototype
@@ -129,6 +155,23 @@
     setter.call(field, value);
     field.dispatchEvent(new Event("input", { bubbles: true }));
     field.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+
+  /** Fill everything the model was confident about, leaving the rest alone. */
+  function fillPage() {
+    let filled = 0;
+    let skipped = 0;
+    for (const { element, result } of known) {
+      if (result.status !== "auto") { skipped++; continue; }
+      if (element.value && element.value.trim()) { skipped++; continue; }
+      if (setValue(element, result.value)) filled++;
+    }
+    note(
+      skipped
+        ? `filled ${filled}, left ${skipped} for you`
+        : `filled ${filled}`
+    );
   }
 
   function onKeyDown(event) {
@@ -191,6 +234,25 @@
   }
 
   /* ----------------------------------------------------------------- start */
+
+  /* ---------------------------------------------------------------- button */
+
+  function showButton(count) {
+    document.querySelector(".smartpaste-button")?.remove();
+    if (!count) return;
+    const button = document.createElement("button");
+    button.className = "smartpaste-button";
+    button.textContent = `Autofill ${count} field${count === 1 ? "" : "s"}`;
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      fillPage();
+    });
+    document.body.appendChild(button);
+  }
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === "fill-page") fillPage();
+  });
 
   document.addEventListener("keydown", onKeyDown, true);
 

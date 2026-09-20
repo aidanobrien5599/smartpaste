@@ -5,7 +5,8 @@
   "description": "\u2318V pastes the answer the field is asking for, chosen from your own resume by Jev.",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "https://api.typesafe.ai/*"

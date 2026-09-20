@@ -7,7 +7,7 @@
  * not hallucinate. Jev locates; this file transcribes.
  */
 
-import { NONE } from "./snippets.js";
+import { NONE, isStructured, valueOf } from "./profile.js";
 
 // Above AUTO, Cmd-V pastes silently. Below MENU we offer nothing at all and
 // let the keystroke fall through to an ordinary paste.
@@ -99,8 +99,17 @@ const EXTRACTORS = [
     matcher(URL)],
 ];
 
-/** Pull the exact value out of a snippet that holds more than the field wants. */
-export function refine(label, snippet) {
+/**
+ * Pull the exact value out of an option.
+ *
+ * A labelled profile field is already exactly what the box wants, so it is
+ * returned untouched -- no regex can improve a value you typed yourself, and
+ * every regex can spoil one. Extraction applies only to unlabelled resume
+ * lines, where the option is a whole sentence containing the answer.
+ */
+export function refine(label, option) {
+  if (isStructured(option)) return valueOf(option);
+  const snippet = option;
   const low = label.toLowerCase();
   for (const [keywords, extract] of EXTRACTORS) {
     if (keywords.some((w) => low.includes(w))) {
@@ -116,16 +125,16 @@ export function refine(label, snippet) {
  * One Jev answer -> what Cmd-V should do. `alternatives` lets a second Cmd-V
  * cycle to the next most likely snippet instead of needing any menu.
  */
-export function resolve(label, answer, snippets) {
+export function resolve(label, answer, options) {
   const probabilities = answer.probabilities || {};
   const ranked = Object.entries(probabilities)
-    .filter(([k]) => k !== NONE && k in snippets)
+    .filter(([k]) => k !== NONE && k in options)
     .sort((a, b) => b[1] - a[1])
-    .map(([k, p]) => ({ value: refine(label, snippets[k]), p }));
+    .map(([k, p]) => ({ value: refine(label, options[k]), p }));
 
   const choice = answer.choice;
   const confidence = Number(answer.confidence ?? 0);
-  if (choice === NONE || !(choice in snippets)) {
+  if (choice === NONE || !(choice in options)) {
     return { label, status: "none", value: null, confidence, alternatives: [] };
   }
   const certainty = Math.min(Number(probabilities[choice] ?? confidence), confidence);
@@ -135,7 +144,7 @@ export function resolve(label, answer, snippets) {
   return {
     label,
     status: certainty >= AUTO ? "auto" : "pick",
-    value: refine(label, snippets[choice]),
+    value: refine(label, options[choice]),
     confidence: certainty,
     alternatives: ranked.slice(0, 4),
   };

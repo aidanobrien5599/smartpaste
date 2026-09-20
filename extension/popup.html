@@ -17,14 +17,18 @@
   a { display: inline-block; margin-top: 6px; color: inherit; font-size: 12.5px; }
   kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line);
         border-radius: 3px; padding: 1px 4px; }
+  button { width: 100%; margin: 0 0 10px; padding: 9px; border: 0; border-radius: 7px;
+           background: var(--fg); color: var(--bg); font-size: 13px; font-weight: 600;
+           cursor: pointer; }
 </style>
 </head>
 <body>
   <h1>smartpaste</h1>
-  <p>Click a field and press <kbd>⌘V</kbd>. Press it again to cycle to the next
-  likely answer.</p>
-  <div class="row"><span>resume snippets</span><b id="snippets">—</b></div>
-  <div class="row"><span>extra answers</span><b id="supplementary">—</b></div>
+  <p>Click <b>Autofill</b>, or press <kbd>⌘V</kbd> in a single field. ⌘V again
+  cycles to the next likely answer.</p>
+  <button id="fill">Autofill this page</button>
+  <div class="row"><span>profile answers</span><b id="profile">—</b></div>
+  <div class="row"><span>extra lines</span><b id="extra">—</b></div>
   <div class="row"><span>api key</span><b id="key">—</b></div>
   <a href="#" id="open-options">Open settings →</a>
 <script src="popup.js"></script>

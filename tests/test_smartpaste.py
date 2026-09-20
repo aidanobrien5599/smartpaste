@@ -413,3 +413,39 @@ class TestDoctor(unittest.TestCase):
         findings = doctor.audit(text, ["mailto:aidan@example.com",
                                        "https://linkedin.com/in/aidanobrien5599"])
         self.assertTrue(all(f.level == doctor.OK for f in findings), findings)
+
+
+class TestGlyphStripping(unittest.TestCase):
+    """Icon-font debris sits mid-line after a separator, not just at line start."""
+
+    def _strip(self, text):
+        from smartpaste.source import _strip_glyphs
+
+        return _strip_glyphs(text)
+
+    def test_strips_debris_after_a_pipe_separator(self):
+        self.assertEqual(
+            self._strip("a@b.com|/♀nednLinkedIn|/gtbGithub|/g♀bePortfolio"),
+            "a@b.com|LinkedIn|Github|Portfolio",
+        )
+
+    def test_strips_debris_welded_to_a_phone_number(self):
+        self.assertEqual(self._strip("/ne908-216-0389"), "908-216-0389")
+
+    def test_strips_unmapped_cid_glyphs(self):
+        self.assertEqual(self._strip("(cid:211) 908-216-0389"), "908-216-0389")
+
+    def test_keeps_a_slash_that_is_really_a_slash(self):
+        for intact in (
+            "and/or Thing",
+            "GPA: 3.9/4.00",
+            "TCP/IP and CI/CD Pipelines",
+            "Next.js/React Frontend",
+            "automating reporting w/ an AWS + SQL cron job",
+            "https://www.linkedin.com/in/aidanobrien5599",
+        ):
+            self.assertEqual(self._strip(intact), intact)
+
+    def test_normalizes_ligatures_so_keywords_are_searchable(self):
+        self.assertEqual(self._strip("identiﬁes and reﬂects"),
+                         "identifies and reflects")

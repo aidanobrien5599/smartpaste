@@ -31,3 +31,20 @@ input[data-smartpaste="pick"],
 textarea[data-smartpaste="pick"] {
   box-shadow: inset 2px 0 0 #c98a00;
 }
+
+.smartpaste-button {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147483647;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #1f2937;
+  color: #fff;
+  font: 600 13px/1 ui-sans-serif, -apple-system, system-ui, sans-serif;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.3);
+  cursor: pointer;
+}
+
+.smartpaste-button:hover { background: #111827; }

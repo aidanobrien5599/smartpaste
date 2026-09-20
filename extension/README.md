@@ -1,27 +1,56 @@
 # smartpaste — Chrome extension
 
-⌘V pastes the answer the field is asking for, chosen from your own resume.
+Click **Autofill**, or press **⌘V** in a single field, and Jev picks the entry
+from your profile that answers it.
 
-Jev never writes anything. It picks which of your lines contains the answer,
-and code extracts the substring. If no line of yours answers the field, ⌘V does
-an ordinary paste instead — it never invents a value and never eats the
-keystroke.
+Jev never writes anything. It only chooses. If your profile does not answer a
+field, the field is left alone and ⌘V falls through to an ordinary paste — it
+never invents a value and never eats the keystroke.
+
+## Why a form and not a resume
+
+The first version parsed your resume PDF into snippets and let Jev pick among
+them. It was unreliable, and the reason is worth stating: a parsed resume line
+is an **unlabelled fragment**. Adding a bare `June 2027` for a start date stole
+the answer to *Expected graduation date*, because nothing said which was which.
+Wrapped bullets arrived as half-sentences. Icon fonts arrived as `/gtbGithub`.
+
+A profile field carries its own name into the question, so Jev matches on the
+label rather than inferring from content — and the value you typed is returned
+**verbatim**, with no regex between it and the box. Measured on the same form:
+parsed resume 13–16 of 19 fields with several at 0.75–0.89; structured profile
+**21 of 21, every one at 0.99–1.00, in 0.81s**.
+
+The resume box is still there as *Extra lines*, for essay answers that want a
+real bullet quoted back. It is optional.
+
+## Dropdowns
+
+A `<select>` gets a different question: not "which profile entry answers this"
+but "which of **these** options should be selected", with the select's own
+option list as the choices. "Yes" and "I am authorized to work in the US" are
+the same answer in different words, and only the dropdown knows which words it
+accepts.
 
 ## Install
 
 1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** →
    choose this `extension/` folder.
 2. Click the extension icon → **Open settings**.
-3. Paste your **API key** (`console.typesafe.ai/keys`) and the **text of your
-   resume**, then fill in the answers a resume never contains.
+3. Paste your **API key** (`console.typesafe.ai/keys`), then fill in the
+   profile form — 43 fields across identity, location, links, education, work
+   authorization, logistics, demographics and written answers. Blank fields are
+   simply never offered. ⌘S saves.
 
 ## Use
 
-Open any application form, click a field, press ⌘V.
+Open any application form. A pill appears bottom-right: **Autofill N fields**.
+Click it and every high-confidence field is filled at once — fields you have
+already typed in are never overwritten, and anything below the confidence bar
+is left for you.
 
-A green left-edge marker means high confidence; amber means it is worth a look.
-**Press ⌘V again** in the same field to cycle to the next most likely answer —
-that is how a low-confidence pick gets corrected, with no menu.
+For one-offs, click a field and press **⌘V**. Press it **again** in the same
+field to cycle to the next most likely answer.
 
 ## How it works
 
@@ -46,5 +75,9 @@ weakest stage by a wide margin. Here the page simply says so.
 - React tracks its own value on the DOM node, so `el.value = x` reverts on
   blur. Insertion goes through the native setter and dispatches an `input`
   event, which is what React listens for.
-- `refine()` here is a port of `smartpaste/answer.py`. Both are tested against
-  the same cases; if you change one, change the other.
+- `refine()` now applies only to unlabelled *Extra lines*. Labelled profile
+  values bypass it entirely — no regex can improve a value you typed yourself,
+  and every regex can spoil one.
+- The Python CLI still uses the older resume-parsing path. `sp doctor` and
+  `sp triage` have no browser equivalent and remain useful; `sp` itself is
+  superseded by this.

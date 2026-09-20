@@ -43,13 +43,14 @@
                      border: 1px solid var(--line); }
   .status { font-size: 13px; color: var(--ok); margin-top: 10px; min-height: 20px; }
   .status.warn { color: var(--warn); }
-  .snippets { max-height: 260px; overflow: auto; border: 1px solid var(--line);
-              border-radius: 7px; margin-top: 12px; }
-  .snippets div { padding: 5px 11px; font: 12px/1.5 ui-monospace, Menlo, monospace;
-                  border-bottom: 1px solid var(--line); color: var(--dim);
-                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .snippets div:last-child { border-bottom: 0; }
   .hint { font-size: 12.5px; color: var(--dim); margin-top: 6px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .grid.one { grid-template-columns: 1fr; }
+  .bar { position: sticky; bottom: 0; margin-top: 28px; padding: 14px 0;
+         background: linear-gradient(transparent, var(--bg) 22%);
+         display: flex; align-items: center; gap: 14px; }
+  .bar button { margin: 0; }
+  textarea.short { min-height: 78px; }
   code { font: 12px ui-monospace, Menlo, monospace; background: var(--bg);
          padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
 </style>
@@ -57,9 +58,10 @@
 <body>
 <main>
   <h1>smartpaste</h1>
-  <p class="lede">⌘V pastes the answer the field is asking for, picked from your
-  own resume. Nothing is generated — if no line of yours answers the field, ⌘V
-  does an ordinary paste instead.</p>
+  <p class="lede">Fill this in once. On any application, click
+  <b>Autofill</b> or press <b>⌘V</b> in a field and Jev picks the entry that
+  answers it. Nothing is generated — if your profile does not answer a field,
+  it is left alone.</p>
 
   <h2>API key</h2>
   <section>
@@ -72,26 +74,22 @@
     <div class="status" id="key-status"></div>
   </section>
 
-  <h2>Your resume</h2>
+  <div id="groups"></div>
+
+  <h2>Extra lines (optional)</h2>
   <section>
-    <p class="hint">Paste the text of your resume. It is split into atomic
-    snippets — one per line, bullet, and <code>|</code> separator — and Jev
-    picks among them. Nothing is sent anywhere until you use a form.</p>
-    <textarea id="resume" placeholder="AIDAN O'BRIEN&#10;aidan@example.com | 908-216-0389&#10;&#10;EDUCATION&#10;University of Wisconsin - Madison&#10;…"></textarea>
-    <button id="save-resume">Split &amp; save</button>
-    <div class="status" id="resume-status"></div>
-    <div class="snippets" id="snippet-list" hidden></div>
+    <p class="hint">Anything above is a labelled answer and is used verbatim.
+    This box is for unlabelled extras — resume bullets you might want quoted
+    back in an essay question. One per line. Leave it empty if you like; the
+    form above is what makes the picks reliable.</p>
+    <textarea id="extra" placeholder="• Drove $15M+ in projected savings by leading a UX-focused A/B test…&#10;• Shipped an OAuth-secured MCP server…"></textarea>
+    <div class="status" id="extra-status"></div>
   </section>
 
-  <h2>What a resume never contains</h2>
-  <section>
-    <p class="hint">Applications always ask these and your resume never says
-    them. Write each as a complete statement — a bare "June 2027" competes with
-    your graduation date and will sometimes win.</p>
-    <div id="supplementary"></div>
-    <button id="save-supplementary">Save answers</button>
-    <div class="status" id="supplementary-status"></div>
-  </section>
+  <div class="bar">
+    <button id="save">Save profile</button>
+    <span class="status" id="save-status"></span>
+  </div>
 </main>
 <script type="module" src="options.js"></script>
 </body>

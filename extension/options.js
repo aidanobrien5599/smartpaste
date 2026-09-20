@@ -1,4 +1,4 @@
-import { snippetsFromResume, SUPPLEMENTARY } from "./lib/snippets.js";
+import { GROUPS } from "./lib/schema.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -7,55 +7,58 @@ function say(node, text, warn = false) {
   node.className = "status" + (warn ? " warn" : "");
 }
 
-/** Resume snippets plus the supplementary answers, as one option set. */
-function combine(resumeSnippets, supplementary) {
-  const merged = { ...resumeSnippets };
-  Object.values(supplementary)
-    .filter(Boolean)
-    .forEach((value, i) => {
-      merged[`x${String(i + 1).padStart(3, "0")}`] = value;
-    });
-  return merged;
-}
+function renderGroups(profile) {
+  const host = $("groups");
+  for (const group of GROUPS) {
+    const heading = document.createElement("h2");
+    heading.textContent = group.title;
+    const section = document.createElement("section");
+    const grid = document.createElement("div");
+    grid.className = "grid" + (group.long ? " one" : "");
 
-async function persistSnippets() {
-  const { resumeText = "", supplementary = {} } = await chrome.storage.local.get([
-    "resumeText",
-    "supplementary",
-  ]);
-  const resumeSnippets = resumeText ? snippetsFromResume(resumeText) : {};
-  const snippets = combine(resumeSnippets, supplementary);
-  await chrome.storage.local.set({ snippets });
-  return { resumeSnippets, snippets };
-}
-
-function renderSnippets(snippets) {
-  const list = $("snippet-list");
-  list.innerHTML = "";
-  Object.entries(snippets).forEach(([key, value]) => {
-    const row = document.createElement("div");
-    row.textContent = `${key}  ${value}`;
-    list.appendChild(row);
-  });
-  list.hidden = !Object.keys(snippets).length;
-}
-
-function renderSupplementary(values) {
-  const host = $("supplementary");
-  host.innerHTML = "";
-  for (const [name, example] of SUPPLEMENTARY) {
-    const label = document.createElement("label");
-    label.className = "field";
-    label.textContent = name.replace(/_/g, " ");
-    label.htmlFor = `sup-${name}`;
-    const input = document.createElement("input");
-    input.type = "text";
-    input.id = `sup-${name}`;
-    input.dataset.name = name;
-    input.placeholder = example;
-    input.value = values[name] || "";
-    host.append(label, input);
+    for (const [key, label, placeholder] of group.fields) {
+      const wrap = document.createElement("div");
+      const tag = document.createElement("label");
+      tag.className = "field";
+      tag.textContent = label;
+      tag.htmlFor = `f-${key}`;
+      const input = group.long
+        ? document.createElement("textarea")
+        : document.createElement("input");
+      if (group.long) input.className = "short";
+      else input.type = "text";
+      input.id = `f-${key}`;
+      input.dataset.key = key;
+      input.placeholder = placeholder || "";
+      input.value = profile[key] || "";
+      wrap.append(tag, input);
+      grid.appendChild(wrap);
+    }
+    section.appendChild(grid);
+    host.append(heading, section);
   }
+}
+
+function collect() {
+  const profile = {};
+  document.querySelectorAll("[data-key]").forEach((input) => {
+    const value = input.value.trim();
+    if (value) profile[input.dataset.key] = value;
+  });
+  return profile;
+}
+
+async function save() {
+  const profile = collect();
+  const extraText = $("extra").value;
+  await chrome.storage.local.set({ profile, extraText });
+  const extras = extraText.split(/\r?\n/).filter((l) => l.trim().length >= 8).length;
+  const total = Object.keys(profile).length;
+  say(
+    $("save-status"),
+    `Saved — ${total} labelled answer${total === 1 ? "" : "s"}` +
+      (extras ? ` and ${extras} extra line${extras === 1 ? "" : "s"}.` : ".")
+  );
 }
 
 $("save-key").addEventListener("click", async () => {
@@ -65,45 +68,21 @@ $("save-key").addEventListener("click", async () => {
   say($("key-status"), "Saved.");
 });
 
-$("save-resume").addEventListener("click", async () => {
-  const resumeText = $("resume").value;
-  if (resumeText.trim().length < 80) {
-    return say($("resume-status"), "That does not look like a resume.", true);
-  }
-  await chrome.storage.local.set({ resumeText });
-  const { resumeSnippets, snippets } = await persistSnippets();
-  renderSnippets(snippets);
-  say(
-    $("resume-status"),
-    `${Object.keys(resumeSnippets).length} snippets from your resume, ` +
-      `${Object.keys(snippets).length} options in total.`
-  );
-});
+$("save").addEventListener("click", save);
 
-$("save-supplementary").addEventListener("click", async () => {
-  const supplementary = {};
-  document.querySelectorAll("#supplementary input").forEach((input) => {
-    if (input.value.trim()) supplementary[input.dataset.name] = input.value.trim();
-  });
-  await chrome.storage.local.set({ supplementary });
-  const { snippets } = await persistSnippets();
-  renderSnippets(snippets);
-  const blank = SUPPLEMENTARY.length - Object.keys(supplementary).length;
-  say(
-    $("supplementary-status"),
-    blank
-      ? `Saved. ${blank} still blank — those fields will fall through to a normal ⌘V.`
-      : "Saved. All of them answered.",
-    Boolean(blank)
-  );
+// Ctrl/Cmd-S saves, because a form this long invites losing work.
+document.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key === "s") {
+    event.preventDefault();
+    save();
+  }
 });
 
 (async function load() {
-  const { apiKey = "", resumeText = "", supplementary = {}, snippets = {} } =
-    await chrome.storage.local.get(["apiKey", "resumeText", "supplementary", "snippets"]);
+  const { apiKey = "", profile = {}, extraText = "" } =
+    await chrome.storage.local.get(["apiKey", "profile", "extraText"]);
   $("key").value = apiKey;
-  $("resume").value = resumeText;
-  renderSupplementary(supplementary);
-  renderSnippets(snippets);
+  renderGroups(profile);
+  $("extra").value = extraText;
   if (apiKey) say($("key-status"), "Key stored.");
 })();
