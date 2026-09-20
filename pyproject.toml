@@ -5,6 +5,9 @@ description = "Fill a job application from your own resume, using Jev to pick an
 requires-python = ">=3.10"
 dependencies = []
 
+[project.optional-dependencies]
+pdf = ["pypdf>=4", "pdfminer.six>=20240706"]
+
 [project.scripts]
 sp = "smartpaste.cli:main"
 

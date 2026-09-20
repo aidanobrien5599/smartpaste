@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import textwrap
 
-from . import answer, clipboard, fill, jev, profile, source, triage
+from . import answer, clipboard, doctor, fill, jev, profile, source, triage
 
 DIM, BOLD, GREEN, YELLOW, RED, OFF = (
     "\033[2m", "\033[1m", "\033[32m", "\033[33m", "\033[31m", "\033[0m",
@@ -33,9 +34,17 @@ def cmd_init(args):
     for i, (name, value) in enumerate(supplementary.items(), 1):
         if value:
             merged[f"x{i:03d}"] = value
+    existing_profile = {}
+    try:
+        existing_profile = profile.load()
+    except (FileNotFoundError, ValueError):
+        pass
     path = profile.save(
         {"snippets": merged, "supplementary": supplementary,
-         "triage": triage.DEFAULT_CRITERIA, "network": {}}
+         "triage": existing_profile.get("triage", triage.DEFAULT_CRITERIA),
+         "network": existing_profile.get("network", {}),
+         "resume_path": os.path.abspath(os.path.expanduser(args.file)) if args.file
+         else existing_profile.get("resume_path")}
     )
     print(f"{GREEN}✓{OFF} {len(snippets)} snippets from your resume → {path}")
     blank = [name for name, value in supplementary.items() if not value]
@@ -98,6 +107,39 @@ def cmd_fill(args):
     print(summary + f" → copied as a block\n")
 
 
+_LEVEL = {doctor.OK: f"{GREEN}✓{OFF}", doctor.WARN: f"{YELLOW}!{OFF}",
+          doctor.FAIL: f"{RED}✗{OFF}"}
+
+
+def cmd_doctor(args):
+    path = args.file
+    if not path:
+        try:
+            path = profile.load().get("resume_path")
+        except (FileNotFoundError, ValueError):
+            path = None
+    if not path or not os.path.exists(os.path.expanduser(path or "")):
+        sys.exit("Which resume? Pass `sp doctor --file resume.pdf`.")
+    path = os.path.expanduser(path)
+
+    findings = doctor.inspect(path)
+    print(f"\n  {BOLD}{os.path.basename(path)}{OFF}  {DIM}as a parser sees it{OFF}\n")
+    for f in findings:
+        print(f"  {_LEVEL[f.level]} {f.check:<14} {f.message}")
+        if f.fix:
+            for line in textwrap.wrap(f.fix, 68):
+                print(f"      {DIM}{line}{OFF}")
+    bad = [f for f in findings if f.level != doctor.OK]
+    if not bad:
+        print(f"\n{GREEN}✓{OFF} nothing a parser would trip on\n")
+    else:
+        fails = sum(1 for f in bad if f.level == doctor.FAIL)
+        summary = f"{len(bad)} thing(s) to look at"
+        if fails:
+            summary = f"{RED}{fails} serious{OFF}, " + summary
+        print(f"\n  {summary}\n")
+
+
 def cmd_triage(args):
     prof = profile.load()
     posting = clipboard.read()
@@ -141,12 +183,17 @@ def main(argv=None):
         "--file", help="read the resume from a .pdf/.txt/.md instead of the clipboard"
     )
     sub.add_parser("triage", help="score a copied job posting")
+    doc = sub.add_parser("doctor", help="check what an ATS will see in your resume")
+    doc.add_argument("--file", help="the resume to check (default: the one init used)")
     args = parser.parse_args(argv)
 
-    handler = {"init": cmd_init, "triage": cmd_triage}.get(args.command, cmd_fill)
+    handler = {"init": cmd_init, "triage": cmd_triage, "doctor": cmd_doctor}.get(
+        args.command, cmd_fill
+    )
     try:
         handler(args)
-    except (jev.JevError, source.SourceError, FileNotFoundError, ValueError) as exc:
+    except (jev.JevError, source.SourceError, RuntimeError,
+            FileNotFoundError, ValueError) as exc:
         sys.exit(f"{RED}✗{OFF} {exc}")
 
 

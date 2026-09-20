@@ -88,6 +88,34 @@ Cold-applying into a posting that draws thousands is the expensive mistake this
 is meant to catch, so a high applicant volume routes to *warm intro* rather
 than *apply*, and a known contact at the company always does.
 
+## Doctor
+
+`sp doctor` reads your resume the way a parser does and reports what does not
+survive the trip. A resume that looks right in Preview can arrive at an ATS
+with its links missing or its contact line scrambled, and nothing tells you —
+the rejection looks like any other rejection.
+
+```
+$ sp doctor
+  AIDAN_OBRIEN_RESUME.pdf  as a parser sees it
+
+  ✓ text layer     4355 characters extracted
+  ✓ contact        email and phone both in the text
+  ✗ email link     the mailto link points to aob59922@gmail.com but the
+                   page reads aidanobrien5599@gmail.com
+  ! links          4 link(s) exist only as annotations: linkedin.com/…
+  ✓ sections       all standard headings present
+  ! glyphs         3 icon glyph(s) extract as junk
+```
+
+That `✗` is a real finding from the first run: a typo in an `\href` had been
+shipping in every PDF for three months, sending anyone who clicked the email
+icon to an inbox that does not exist. It is invisible in a PDF viewer, because
+the visible text is correct and only the link target is wrong.
+
+It uses **pdfminer.six**, not pypdf, deliberately — pypdf's weaker layout
+analysis invents problems that no real parser has (see below).
+
 ## Setup
 
 ```bash
@@ -148,4 +176,10 @@ was asked.
   verdict from 0.05 to 0.96 on the same posting. The model is calibrated
   against the context you give it; give it none and the number is meaningless.
 - **macOS only** (`pbpaste`/`pbcopy`).
+- **Do not judge a PDF by pypdf.** Building this, pypdf produced
+  `AIDANO'BRIEN`, `MadisonSep 2023` and `Drove$15M+in`, which looked like a
+  badly broken resume. pdfminer.six extracts all three correctly. The damage
+  was the library's, not the document's, and the repairs in `source.py` exist
+  only to cope with it. `sp doctor` uses pdfminer so its verdict reflects what
+  an ATS actually sees.
 - **Text-only.** File upload fields are detected and then correctly declined.

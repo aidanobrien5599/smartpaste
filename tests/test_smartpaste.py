@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from smartpaste import answer, fields, fill, jev, profile, triage
+from smartpaste import answer, doctor, fields, fill, jev, profile, triage
 
 RESUME = """
 AIDAN O'BRIEN
@@ -342,3 +342,74 @@ class TestGlyphResidue(unittest.TestCase):
 
         for intact in ("https://github.com/aidanobrien5599", "GPA: 3.9/4.00"):
             self.assertEqual(_repair(intact), intact)
+
+
+class TestDoctor(unittest.TestCase):
+    TEXT = (
+        "AIDAN O'BRIEN\naidan@example.com | 908-216-0389 | LinkedIn | Github\n"
+        "EDUCATION\nUniversity of Wisconsin - Madison\n"
+        "EXPERIENCE\nSoftware Engineer Intern\nNetflix\n"
+        "PROJECTS\nBadgerBase\nSKILLS\nPython, TypeScript\n" + "x" * 200
+    )
+
+    def _level(self, findings, check):
+        return next(f.level for f in findings if f.check == check)
+
+    def test_a_scanned_pdf_fails_on_the_text_layer(self):
+        self.assertEqual(doctor.check_text_layer("  ").level, doctor.FAIL)
+
+    def test_a_mailto_pointing_elsewhere_is_a_failure(self):
+        finding = doctor.check_email_link(
+            "reach me at aidan@example.com", ["mailto:typo@example.com"]
+        )
+        self.assertEqual(finding.level, doctor.FAIL)
+        self.assertIn("typo@example.com", finding.message)
+
+    def test_a_matching_mailto_passes(self):
+        self.assertEqual(
+            doctor.check_email_link(
+                "aidan@example.com", ["mailto:aidan@example.com"]
+            ).level,
+            doctor.OK,
+        )
+
+    def test_a_link_absent_from_the_text_is_flagged(self):
+        finding = doctor.check_link_visibility(
+            self.TEXT, ["https://www.linkedin.com/in/aidanobrien5599"]
+        )
+        self.assertEqual(finding.level, doctor.WARN)
+        self.assertIn("linkedin.com/in/aidanobrien5599", finding.message)
+
+    def test_a_link_printed_as_text_passes(self):
+        text = self.TEXT + "\nlinkedin.com/in/aidanobrien5599"
+        self.assertEqual(
+            doctor.check_link_visibility(
+                text, ["https://www.linkedin.com/in/aidanobrien5599"]
+            ).level,
+            doctor.OK,
+        )
+
+    def test_a_missing_experience_heading_is_a_failure(self):
+        self.assertEqual(
+            doctor.check_sections(self.TEXT.replace("EXPERIENCE", "WHAT I DID")).level,
+            doctor.FAIL,
+        )
+
+    def test_a_missing_skills_heading_is_only_a_warning(self):
+        self.assertEqual(
+            doctor.check_sections(self.TEXT.replace("SKILLS", "STACK")).level,
+            doctor.WARN,
+        )
+
+    def test_unmapped_glyphs_are_reported(self):
+        self.assertEqual(doctor.check_glyphs("(cid:211) 908-216-0389").level, doctor.WARN)
+        self.assertEqual(doctor.check_glyphs("908-216-0389").level, doctor.OK)
+
+    def test_contact_details_lost_to_an_icon_font_are_flagged(self):
+        self.assertEqual(doctor.check_contact("no way to reach me").level, doctor.WARN)
+
+    def test_a_clean_resume_raises_nothing(self):
+        text = self.TEXT + "\nlinkedin.com/in/aidanobrien5599"
+        findings = doctor.audit(text, ["mailto:aidan@example.com",
+                                       "https://linkedin.com/in/aidanobrien5599"])
+        self.assertTrue(all(f.level == doctor.OK for f in findings), findings)
