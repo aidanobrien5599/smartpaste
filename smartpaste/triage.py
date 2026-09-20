@@ -28,8 +28,14 @@ def questions(criteria):
             }
         ),
         "sponsorship_blocked": jev.noul(
-            "This posting requires citizenship, a security clearance, or "
-            "otherwise excludes the applicant's work authorization."
+            {
+                "applicant": criteria,
+                "ask": "This posting would exclude THIS applicant on work "
+                "authorization grounds -- for example it requires a "
+                "citizenship or clearance they do not have, or it refuses "
+                "sponsorship and they need it. A posting that refuses "
+                "sponsorship does NOT exclude an applicant who needs none.",
+            }
         ),
         "stage": jev.choice(
             "What stage is the hiring company at",

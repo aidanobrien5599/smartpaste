@@ -91,11 +91,20 @@ than *apply*, and a known contact at the company always does.
 ## Setup
 
 ```bash
-export TYPESAFE_API_KEY=...          # https://console.typesafe.ai/keys
-ln -s "$PWD/bin/sp" ~/.local/bin/sp  # or: pipx install -e .
+ln -s "$PWD/bin/sp" ~/.local/bin/sp
+python3 -m venv .venv && .venv/bin/pip install -e . pypdf   # pypdf is optional
+printf 'TYPESAFE_API_KEY=apikey_...\n' > ~/.config/smartpaste/env
+chmod 600 ~/.config/smartpaste/env                          # or just export it
 
-pbcopy < resume.txt && sp init       # build your snippet library
+sp init --file ~/Desktop/resume.pdf   # or copy the text and: sp init
 ```
+
+`sp init --file` reads `.pdf`, `.txt` and `.md`. PDFs need two repairs, both
+handled: a resume's links live in **annotations**, never in the text layer, so
+they are parsed separately — without that, `github.com/...` is lost and only an
+icon glyph remains. And PDF kerning drops spaces, producing `AIDANO'BRIEN` and
+`MadisonSep 2023`, which are repaired without touching `PostgreSQL` or
+`Next.js`.
 
 `sp init` writes `~/.config/smartpaste/profile.json` (mode 600) and lists the
 fields a resume never contains but applications always ask for — work
@@ -108,20 +117,35 @@ in and re-run `sp init`. Add contacts under `network` to sharpen triage:
 
 Then, on any application: select the page text, copy, `sp`.
 
+A fill **overwrites the clipboard** with its answers, so re-running reads those
+back. `sp --again` re-runs against the last form instead.
+
 ## Tests
 
 ```bash
 python3 -m unittest discover -s tests
 ```
 
-27 tests, no network — the API client is injected, so every stage is testable
+39 tests, no network — the API client is injected, so every stage is testable
 against recorded answer shapes.
+
+They did not, however, catch the bugs that mattered. Five of the six real
+defects surfaced only by running it against an actual PDF and an actual form,
+and every one lived in a seam: a regex whose length bound excluded real inputs,
+a PDF's text layer losing what its annotations held, and — the worst one —
+the detection call passing the *resume* as context while asking whether a line
+of the *form* was a field. That last one collapsed detection from 21 fields to
+6, and no unit test could have seen it, because the mock answered whatever it
+was asked.
 
 ## Known rough edges
 
-- **Field detection is the weakest stage.** The Noul filter sits at 0.5, and
-  borderline rows like `LinkedIn Profile` or `Resume/CV` fall on either side of
-  it between runs. Lowering the threshold trades false negatives for a few
-  junk rows, which are cheap — an extra question costs tokens, not latency.
+- **Free-text essay fields are only as good as your blurbs.** "Tell us about a
+  project you're proud of" resolves to whatever you wrote into `supplementary`;
+  with nothing there it correctly declines. This is a selection tool, so it can
+  only ever hand back prose you wrote yourself.
+- **Triage criteria matter.** `needs_sponsorship` swings the work-authorization
+  verdict from 0.05 to 0.96 on the same posting. The model is calibrated
+  against the context you give it; give it none and the number is meaningless.
 - **macOS only** (`pbpaste`/`pbcopy`).
 - **Text-only.** File upload fields are detected and then correctly declined.
