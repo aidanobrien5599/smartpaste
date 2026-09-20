@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "smartpaste",
+  "version": "0.1.0",
+  "description": "\u2318V pastes the answer the field is asking for, chosen from your own resume by Jev.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://api.typesafe.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "smartpaste"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.greenhouse.io/*",
+        "https://*.lever.co/*",
+        "https://*.ashbyhq.com/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://*.workable.com/*",
+        "https://*.smartrecruiters.com/*",
+        "https://*.jobvite.com/*",
+        "https://*.bamboohr.com/*",
+        "https://*.rippling.com/*",
+        "https://*.dover.com/*",
+        "https://*.paylocity.com/*",
+        "https://*.icims.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ]
+}

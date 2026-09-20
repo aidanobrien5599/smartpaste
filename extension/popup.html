@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --bg:#fbfaf8; --fg:#1a1a18; --dim:#6b6b64; --line:#e3e0d8; --ok:#1f7a3d; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16161a; --fg:#eceae5; --dim:#96948c; --line:#2e2e34; --ok:#4ba86a; }
+  }
+  body { width: 250px; margin: 0; padding: 14px; background: var(--bg); color: var(--fg);
+         font: 13px/1.5 ui-sans-serif, -apple-system, system-ui, sans-serif; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  p { margin: 0 0 10px; color: var(--dim); font-size: 12.5px; }
+  .row { display: flex; justify-content: space-between; padding: 3px 0;
+         font: 12px ui-monospace, Menlo, monospace; }
+  .row b { font-weight: 600; color: var(--ok); }
+  a { display: inline-block; margin-top: 6px; color: inherit; font-size: 12.5px; }
+  kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line);
+        border-radius: 3px; padding: 1px 4px; }
+</style>
+</head>
+<body>
+  <h1>smartpaste</h1>
+  <p>Click a field and press <kbd>⌘V</kbd>. Press it again to cycle to the next
+  likely answer.</p>
+  <div class="row"><span>resume snippets</span><b id="snippets">—</b></div>
+  <div class="row"><span>extra answers</span><b id="supplementary">—</b></div>
+  <div class="row"><span>api key</span><b id="key">—</b></div>
+  <a href="#" id="open-options">Open settings →</a>
+<script src="popup.js"></script>
+</body>
+</html>
