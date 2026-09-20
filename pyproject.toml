@@ -1,0 +1,16 @@
+[project]
+name = "smartpaste"
+version = "0.1.0"
+description = "Fill a job application from your own resume, using Jev to pick and code to extract."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+sp = "smartpaste.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["smartpaste"]
