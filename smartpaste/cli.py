@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
-from . import answer, clipboard, fill, jev, profile, triage
+from . import answer, clipboard, fill, jev, profile, source, triage
 
 DIM, BOLD, GREEN, YELLOW, RED, OFF = (
     "\033[2m", "\033[1m", "\033[32m", "\033[33m", "\033[31m", "\033[0m",
@@ -20,9 +21,7 @@ def _truncate(text, width):
 
 
 def cmd_init(args):
-    resume = clipboard.read()
-    if len(resume.strip()) < 80:
-        sys.exit("Clipboard does not look like a resume. Copy it and re-run `sp init`.")
+    resume = source.resume_text(args.file)
     snippets = profile.snippets_from_resume(resume)
     existing = {}
     try:
@@ -48,11 +47,26 @@ def cmd_init(args):
         )
 
 
+LAST_FORM = os.path.join(profile.CONFIG_DIR, "last_form.txt")
+
+
 def cmd_fill(args):
     prof = profile.load()
-    form = clipboard.read()
-    if not form.strip():
-        sys.exit("Clipboard is empty. Copy the application page's text first.")
+    if args.again:
+        try:
+            with open(LAST_FORM) as handle:
+                form = handle.read()
+        except OSError:
+            sys.exit("No previous form to re-run.")
+    else:
+        form = clipboard.read()
+        if not form.strip():
+            sys.exit("Clipboard is empty. Copy the application page's text first.")
+        # The run below overwrites the clipboard with its own answers, so keep
+        # the form to make `sp --again` possible.
+        os.makedirs(profile.CONFIG_DIR, exist_ok=True)
+        with open(LAST_FORM, "w") as handle:
+            handle.write(form)
     results = fill.fill(form, prof, model=args.model)
     if not results:
         sys.exit("Found no form fields in the clipboard text.")
@@ -114,15 +128,23 @@ def main(argv=None):
         prog="sp", description="Fill a job application from your own resume."
     )
     parser.add_argument("--model", default=jev.DEFAULT_MODEL)
+    parser.set_defaults(file=None)
+    parser.add_argument(
+        "--again", action="store_true",
+        help="re-run on the last form, since a fill overwrites the clipboard",
+    )
     sub = parser.add_subparsers(dest="command")
-    sub.add_parser("init", help="build your snippet library from a copied resume")
+    init = sub.add_parser("init", help="build your snippet library from your resume")
+    init.add_argument(
+        "--file", help="read the resume from a .pdf/.txt/.md instead of the clipboard"
+    )
     sub.add_parser("triage", help="score a copied job posting")
     args = parser.parse_args(argv)
 
     handler = {"init": cmd_init, "triage": cmd_triage}.get(args.command, cmd_fill)
     try:
         handler(args)
-    except (jev.JevError, FileNotFoundError, ValueError) as exc:
+    except (jev.JevError, source.SourceError, FileNotFoundError, ValueError) as exc:
         sys.exit(f"{RED}✗{OFF} {exc}")
 
 

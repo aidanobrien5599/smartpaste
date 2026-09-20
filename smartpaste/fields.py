@@ -50,6 +50,19 @@ def looks_like_label(line):
     return len(line) <= 80
 
 
+# File-upload fields. No snippet can answer them, so asking only invites a
+# low-confidence guess at something the applicant must attach by hand.
+_FILE_FIELDS = ("resume", "cv", "cover letter", "transcript", "portfolio file",
+                "upload", "attachment")
+
+
+def is_file_field(label):
+    low = label.casefold()
+    if "portfolio" in low and "file" not in low:
+        return False
+    return any(word in low for word in _FILE_FIELDS)
+
+
 def candidate_labels(form_text, limit=MAX_CANDIDATES):
     """Heuristic first pass over pasted page text."""
     found = []
@@ -59,7 +72,7 @@ def candidate_labels(form_text, limit=MAX_CANDIDATES):
         if not looks_like_label(label):
             continue
         key = label.casefold()
-        if key in seen:
+        if key in seen or is_file_field(label):
             continue
         seen.add(key)
         found.append(label)

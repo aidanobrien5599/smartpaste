@@ -30,8 +30,10 @@ def fill(form_text, prof, model=jev.DEFAULT_MODEL, _ask=None):
     candidates = fields.candidate_labels(form_text)
     if not candidates:
         return []
+    # Detection judges lines of the form, so the form is the context -- passing
+    # the resume here asks the model to rate a form line against a CV.
     confirmed = fields.keep_confirmed(
-        candidates, ask(state, fields.confirm_questions(candidates), model=model)
+        candidates, ask(form_text, fields.confirm_questions(candidates), model=model)
     )
     if not confirmed:
         return []

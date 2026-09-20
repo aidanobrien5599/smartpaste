@@ -40,12 +40,29 @@ def noul(instructions):
     return {"type": "noul", "instructions": instructions}
 
 
+KEY_FILE = os.path.expanduser("~/.config/smartpaste/env")
+
+
+def _key_from_file(path=KEY_FILE):
+    """Read TYPESAFE_API_KEY from the config file, so it need not live in .zshrc."""
+    try:
+        with open(path) as handle:
+            for line in handle:
+                name, _, value = line.strip().partition("=")
+                if name.strip() == "TYPESAFE_API_KEY":
+                    return value.strip().strip("\"'")
+    except OSError:
+        return ""
+    return ""
+
+
 def api_key():
-    key = os.environ.get("TYPESAFE_API_KEY", "").strip()
+    key = os.environ.get("TYPESAFE_API_KEY", "").strip() or _key_from_file()
     if not key:
         raise MissingKey(
-            "TYPESAFE_API_KEY is not set. Get a key at "
-            "https://console.typesafe.ai/keys and export it in your shell."
+            "No TYPESAFE_API_KEY. Get a key at https://console.typesafe.ai/keys, "
+            f"then either export it or put it in {KEY_FILE} as\n"
+            "  TYPESAFE_API_KEY=apikey_..."
         )
     return key
 

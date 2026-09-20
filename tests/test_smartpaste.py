@@ -149,6 +149,11 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(answer.refine("Expected graduation date", line), "May 2027")
         self.assertEqual(answer.refine("Degree", line), "BS Computer Science")
 
+    def test_graduation_date_takes_the_end_of_a_date_range(self):
+        line = "University of Wisconsin - Madison Sep 2023 - May 2027"
+        self.assertEqual(answer.refine("Expected graduation date", line), "May 2027")
+        self.assertEqual(answer.refine("Start date", line), "Sep 2023")
+
     def test_refine_falls_back_to_the_whole_snippet_when_nothing_matches(self):
         self.assertEqual(answer.refine("First name", "555-0142"), "555-0142")
         self.assertEqual(answer.refine("Email", "no address here"), "no address here")
@@ -170,6 +175,20 @@ class TestBatching(unittest.TestCase):
 
 class TestFillOrchestration(unittest.TestCase):
     FORM = "First name *\nEmail *\nSalary expectation\n"
+
+    def test_detection_is_asked_against_the_form_not_the_resume(self):
+        states = []
+
+        def fake_ask(state, questions, model=None):
+            states.append(state)
+            if any(k.startswith("is_field_") for k in questions):
+                return {k: {"noul": 1.0} for k in questions}
+            return {k: {"choice": profile.NONE, "probabilities": {profile.NONE: 1.0},
+                        "confidence": 1.0} for k in questions}
+
+        fill.fill(self.FORM, {"snippets": {"s001": "x"}}, _ask=fake_ask)
+        self.assertEqual(states[0], self.FORM)
+        self.assertEqual(states[1], {"resume_snippets": {"s001": "x"}})
 
     def test_two_calls_detect_then_answer(self):
         prof = {"snippets": {"s001": "Aidan O'Brien", "s002": "aob@example.com"}}
@@ -243,3 +262,69 @@ class TestTriageRouting(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestPdfRepair(unittest.TestCase):
+    def test_strips_icon_font_glyphs(self):
+        from smartpaste.source import _repair
+
+        self.assertEqual(_repair(" 908-216-0389"), "908-216-0389")
+        self.assertEqual(_repair("♀ Portfolio"), "Portfolio")
+
+    def test_restores_the_space_before_a_glued_date(self):
+        from smartpaste.source import _repair
+
+        self.assertEqual(
+            _repair("University of Wisconsin - MadisonSep 2023 - May 2027"),
+            "University of Wisconsin - Madison Sep 2023 - May 2027",
+        )
+        self.assertEqual(
+            _repair("Software Engineer InternMay 2026"),
+            "Software Engineer Intern May 2026",
+        )
+
+    def test_restores_the_space_inside_a_glued_caps_name(self):
+        from smartpaste.source import _repair
+
+        self.assertEqual(_repair("AIDANO’BRIEN"), "AIDAN O’BRIEN")
+
+    def test_leaves_camelcase_technology_names_alone(self):
+        from smartpaste.source import _repair
+
+        intact = "Next.js, PostgreSQL, JavaScript, GitHub, PyTorch, MySQL"
+        self.assertEqual(_repair(intact), intact)
+
+
+class TestInstitutionAndGpa(unittest.TestCase):
+    EDU = "University of Wisconsin - Madison Sep 2023 - May 2027"
+    DEG = "B.S. Computer Science GPA: 3.9/4.00"
+
+    def test_school_drops_the_attendance_range(self):
+        self.assertEqual(
+            answer.refine("School", self.EDU), "University of Wisconsin - Madison"
+        )
+
+    def test_degree_drops_the_gpa_tail(self):
+        self.assertEqual(answer.refine("Degree", self.DEG), "B.S. Computer Science")
+        self.assertEqual(answer.refine("Discipline", self.DEG), "B.S. Computer Science")
+
+    def test_gpa_is_extracted_as_a_number(self):
+        self.assertEqual(answer.refine("Current GPA", self.DEG), "3.9/4.00")
+
+    def test_a_present_range_is_also_stripped(self):
+        self.assertEqual(
+            answer.refine("University", "Netflix Los Gatos Jun 2025 - Present"),
+            "Netflix Los Gatos",
+        )
+
+
+class TestFileFields(unittest.TestCase):
+    def test_upload_fields_are_never_offered(self):
+        labels = fields.candidate_labels(
+            "Resume/CV *\nCover letter\nUpload transcript\nEmail *\n"
+        )
+        self.assertEqual(labels, ["Email"])
+
+    def test_a_portfolio_url_is_still_a_normal_field(self):
+        self.assertFalse(fields.is_file_field("Portfolio"))
+        self.assertTrue(fields.is_file_field("Portfolio file"))

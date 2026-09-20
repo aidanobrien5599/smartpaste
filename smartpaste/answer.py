@@ -38,10 +38,21 @@ _DATE = re.compile(rf"(?:{_MONTHS})\.?\s+\d{{4}}|\d{{1,2}}/\d{{4}}|\b(?:19|20)\d
 # Clauses a resume appends to a degree that a "Degree" field does not want.
 _DEGREE_TAIL = re.compile(
     r"\s*[,;(]?\s*\b(?:expected|expecting|anticipated|graduating|grad(?:uation)?|"
-    r"class of|in progress)\b.*$",
+    r"class of|in progress|gpa)\b.*$",
+    re.I,
+)
+_GPA = re.compile(r"\d\.\d+\s*(?:/\s*\d(?:\.\d+)?)?")
+# A resume glues the attendance range onto the institution: "Madison Sep 2023 - May 2027".
+_TRAILING_RANGE = re.compile(
+    rf"\s*(?:{_MONTHS})\.?\s*\d{{4}}\s*(?:[-\u2012-\u2015]\s*"
+    rf"(?:(?:{_MONTHS})\.?\s*)?(?:\d{{4}}|present|current)\s*)?$",
     re.I,
 )
 _NAME_SUFFIX = frozenset({"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "phd", "ph.d."})
+
+
+# A date range reads "Sep 2023 - May 2027": the graduation is the end of it.
+_END_DATE_WORDS = ("graduation", "grad date", "completion", "end", "expected")
 
 
 def _looks_like_a_name(snippet):
@@ -58,32 +69,43 @@ def _name_parts(snippet):
     return parts
 
 
-def _first_name(snippet):
+def _first_name(snippet, label):
     return _name_parts(snippet)[0] if _looks_like_a_name(snippet) else None
 
 
-def _last_name(snippet):
+def _last_name(snippet, label):
     return _name_parts(snippet)[-1] if _looks_like_a_name(snippet) else None
 
 
-def _full_name(snippet):
+def _full_name(snippet, label):
     return " ".join(_name_parts(snippet)) if _looks_like_a_name(snippet) else None
 
 
 def _matcher(pattern, min_digits=0):
-    def extract(snippet):
-        for match in pattern.finditer(snippet):
-            value = match.group(0).strip().rstrip(".,;")
-            if min_digits and sum(c.isdigit() for c in value) < min_digits:
-                continue
-            return value
-        return None
+    def extract(snippet, label):
+        found = [
+            value
+            for match in pattern.finditer(snippet)
+            for value in [match.group(0).strip().rstrip(".,;")]
+            if not min_digits or sum(c.isdigit() for c in value) >= min_digits
+        ]
+        if not found:
+            return None
+        # "Sep 2023 - May 2027" answers a graduation date with its last value.
+        if pattern is _DATE and any(word in label for word in _END_DATE_WORDS):
+            return found[-1]
+        return found[0]
 
     return extract
 
 
-def _degree(snippet):
-    trimmed = _DEGREE_TAIL.sub("", snippet).strip().rstrip(",;")
+def _degree(snippet, label):
+    trimmed = _DEGREE_TAIL.sub("", snippet).strip().rstrip(",;-")
+    return trimmed or None
+
+
+def _institution(snippet, label):
+    trimmed = _TRAILING_RANGE.sub("", snippet).strip().rstrip(",;-")
     return trimmed or None
 
 
@@ -99,7 +121,9 @@ _EXTRACTORS = (
         ("graduation", "grad date", "start date", "available", "date"),
         _matcher(_DATE),
     ),
-    (("degree", "major", "field of study"), _degree),
+    (("gpa", "grade point"), _matcher(_GPA)),
+    (("degree", "major", "discipline", "field of study"), _degree),
+    (("school", "university", "college", "institution"), _institution),
     (
         ("website", "url", "link", "portfolio", "github", "linkedin", "twitter"),
         _matcher(_URL),
@@ -112,7 +136,7 @@ def refine(label, snippet):
     low = label.casefold()
     for keywords, extract in _EXTRACTORS:
         if any(word in low for word in keywords):
-            value = extract(snippet)
+            value = extract(snippet, low)
             if value:
                 return value
             break
