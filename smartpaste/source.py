@@ -25,6 +25,9 @@ _MONTHS = (
 _GLUED_DATE = re.compile(rf"(?<=[a-z])(?=(?:{_MONTHS})\b)")
 # ...and inside all-caps names: "AIDANO'BRIEN" -> "AIDAN O'BRIEN".
 _GLUED_NAME = re.compile(r"(?<=[A-Z]{2})(?=[A-Z][\u2019'][A-Z])")
+# What is left of an icon glyph once the font mapping is gone: a slash and a
+# few stray lowercase letters welded to the real value ("/gtbGithub").
+_GLYPH_RESIDUE = re.compile(r"(?:^|(?<=\s))/\s?[a-z]{1,5}(?=[A-Z0-9])")
 
 
 def _repair(text):
@@ -32,6 +35,7 @@ def _repair(text):
     lines = []
     for line in text.splitlines():
         line = _GLYPHS.sub(" ", line)
+        line = _GLYPH_RESIDUE.sub("", line)
         line = _GLUED_DATE.sub(" ", line)
         line = _GLUED_NAME.sub(" ", line)
         lines.append(re.sub(r"[ \t]{2,}", " ", line).strip())

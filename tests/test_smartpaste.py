@@ -328,3 +328,17 @@ class TestFileFields(unittest.TestCase):
     def test_a_portfolio_url_is_still_a_normal_field(self):
         self.assertFalse(fields.is_file_field("Portfolio"))
         self.assertTrue(fields.is_file_field("Portfolio file"))
+
+
+class TestGlyphResidue(unittest.TestCase):
+    def test_strips_icon_font_residue_welded_to_a_value(self):
+        from smartpaste.source import _repair
+
+        self.assertEqual(_repair("/gtbGithub"), "Github")
+        self.assertEqual(_repair("/ne908-216-0389"), "908-216-0389")
+
+    def test_leaves_real_paths_and_urls_alone(self):
+        from smartpaste.source import _repair
+
+        for intact in ("https://github.com/aidanobrien5599", "GPA: 3.9/4.00"):
+            self.assertEqual(_repair(intact), intact)

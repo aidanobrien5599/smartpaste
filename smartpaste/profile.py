@@ -23,7 +23,9 @@ NONE = "__none__"
 _SPLIT = re.compile(r"\s*(?:[|•·▪●‣]|\s[–—]\s)\s*")
 _BULLET_PREFIX = re.compile(r"^\s*(?:[-*•·▪●‣]|\d+[.)])\s+")
 
-# Fields a resume never contains but applications always ask for.
+# Fields a resume never contains but applications always ask for. Phrase each
+# answer as a complete statement -- these become Choice options alongside every
+# resume line, and a bare "June 2027" cannot be told apart from a grad date.
 SUPPLEMENTARY = {
     "work_auth": "",
     "sponsorship": "",
@@ -31,6 +33,15 @@ SUPPLEMENTARY = {
     "pronouns": "",
     "why_us": "",
     "salary_expectation": "",
+}
+
+EXAMPLES = {
+    "work_auth": "Yes, I am legally authorized to work in the United States",
+    "sponsorship": "No, I will not require visa sponsorship now or in the future",
+    "start_date": "Available to start full-time in June 2027",
+    "pronouns": "he/him",
+    "why_us": "Two or three sentences you are happy to reuse",
+    "salary_expectation": "Negotiable / open to discussion",
 }
 
 

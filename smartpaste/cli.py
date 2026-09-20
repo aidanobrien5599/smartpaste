@@ -42,9 +42,11 @@ def cmd_init(args):
     if blank:
         print(
             f"\n{DIM}A resume never contains these, but applications always ask.\n"
-            f"Fill them in {path} and re-run `sp init`:{OFF}\n  "
-            + "\n  ".join(blank)
+            f"Fill them in {path} and re-run `sp init`. Write each as a complete\n"
+            f"statement -- a bare \"June 2027\" competes with your graduation date:{OFF}"
         )
+        for name in blank:
+            print(f"  {name:<20} {DIM}e.g. {profile.EXAMPLES.get(name, '')}{OFF}")
 
 
 LAST_FORM = os.path.join(profile.CONFIG_DIR, "last_form.txt")
