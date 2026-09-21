@@ -97,3 +97,33 @@ test("Present and Now are dates only at the end of a range", () => {
   assert.deepEqual(parseDates("Aug 2024 – Present"), { start: "Aug 2024", end: "Present" });
   assert.deepEqual(splitPieces("Mar 2022 – Now, Remote"), ["Mar 2022 – Now", "Remote"]);
 });
+
+test("company suffixes stay with their company", () => {
+  assert.deepEqual(splitPieces("Stripe, Inc., San Francisco, CA"), ["Stripe, Inc.", "San Francisco, CA"]);
+  assert.deepEqual(splitPieces("MercadoApps S.A., Buenos Aires"), ["MercadoApps S.A.", "Buenos Aires"]);
+});
+
+test("Class of 2017 is one date", () => {
+  assert.deepEqual(splitPieces("INSEAD, Class of 2017"), ["INSEAD", "Class of 2017"]);
+  assert.deepEqual(parseDates("Class of 2017"), { start: "", end: "2017" });
+});
+
+test("assemble: a title holding a comma stays one title and one entry", () => {
+  const roles = assemble([
+    { text: "Global Dynamics Inc.", label: "company", index: 1 },
+    { text: "Senior Director", label: "title", index: 2 },
+    { text: "International Business Development", label: "title", index: 2 },
+    { text: "Jan 2022 – Present", label: "dates", index: 3 },
+  ], "experience");
+  assert.equal(roles.length, 1);
+  assert.equal(roles[0].title, "Senior Director, International Business Development");
+});
+
+test("headingCandidates: a heading starts with a capital", () => {
+  assert.deepEqual(headingCandidates(["career.", "Career"]).map((c) => c.text), ["Career"]);
+});
+
+test("headingCandidates: look past a leading icon", () => {
+  const got = headingCandidates(["[BRIEFCASE] Work History", "\u{1F4BC} Experience", "[GRADUATION] Education"]).map((c) => c.text);
+  assert.equal(got.length, 3);
+});

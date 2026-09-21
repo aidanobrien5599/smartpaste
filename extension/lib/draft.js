@@ -74,14 +74,14 @@ const ONE_DATE =
 // are words: "Momentum Solutions (now Apex Systems)" was being cut at "now".
 const RANGE_END = `(?:${ONE_DATE}|(?<![A-Za-z])(?:Present|Current|Now|Today)(?![A-Za-z]))`;
 const DATE_RANGE = new RegExp(
-  `(?:Expected\\s+|Graduat(?:ed|ing|ion):?\\s+)?${ONE_DATE}(?:\\s*(?:[-\\u2012-\\u2015]|to|until)\\s*${RANGE_END})?`,
+  `(?:Expected\\s+|Class\\s+of\\s+|Graduat(?:ed|ing|ion):?\\s+)?${ONE_DATE}(?:\\s*(?:[-\\u2012-\\u2015]|to|until)\\s*${RANGE_END})?`,
   "gi"
 );
 const DATE_SPLIT = new RegExp(`\\s*(?:[-\\u2012-\\u2015]|\\bto\\b|\\buntil\\b)\\s*(?=${RANGE_END})`, "i");
 
 /** "May 2026 – August 2026" -> { start, end }. A lone date is an end date. */
 export function parseDates(text) {
-  const clean = text.replace(/^(?:Expected|Graduat(?:ed|ing|ion):?)\s+/i, "").trim();
+  const clean = text.replace(/^(?:Expected|Class\s+of|Graduat(?:ed|ing|ion):?)\s+/i, "").trim();
   const parts = clean.split(DATE_SPLIT).map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) return { start: parts[0], end: parts[parts.length - 1] };
   return { start: "", end: parts[0] || "" };
@@ -112,6 +112,10 @@ export function headingCandidates(lines) {
       if (!t || isBullet(t) || t.length > 42) return false;
       if (/@|\d{3}|https?:|www\./i.test(t)) return false;
       if (t.split(/\s+/).length > 5) return false;
+      // A heading starts with a capital; "career." is a wrapped sentence's tail.
+      // Look past a leading icon first: "[BRIEFCASE] Work History", "💼 Work".
+      const word = t.replace(/^(?:\[[A-Z_ ]+\]\s*|[^\p{L}]+)/u, "");
+      if (!/^[A-Z\u00c0-\u00de]/.test(word)) return false;
       const letters = t.replace(/[^A-Za-zÀ-ɏ]/g, "");
       const shouting = letters.length >= 4 && letters === letters.toUpperCase();
       return shouting || SECTION_WORDS.test(t) || /:\s*$/.test(text);
@@ -148,6 +152,11 @@ export function sectionise(lines, headingKinds) {
 }
 
 // ------------------------------------------------------------------ pieces
+
+// "Stripe, Inc." is one company. Split at the comma, the suffix was labelled a
+// second company and opened a phantom entry, shifting every later role.
+const COMPANY_SUFFIX =
+  /^(?:Inc|Incorporated|LLC|L\.L\.C|Ltd|Limited|Corp|Corporation|Co|Company|PLC|LLP|LP|GmbH|AG|SE|SA|S\.A|SAS|S\.A\.S|SARL|BV|B\.V|NV|N\.V|AB|AS|A\/S|Oy|KK|K\.K|Pty(?: Ltd)?|Pvt(?: Ltd)?|SpA|S\.p\.A|Srl|S\.r\.l)\.?$/i;
 
 const PLACE_CODE =
   /^(?:[A-Z]{2}|UK|U\.K\.|USA|U\.S\.A?\.|US|UAE|India|Canada|Germany|France|Spain|Italy|Ireland|Australia|Singapore|Japan|China|Netherlands|Switzerland|Sweden|Remote)$/;
@@ -193,6 +202,10 @@ export function splitPieces(line) {
     piece = piece.replace(/^[\s|\u2022\u00b7\u2014\u2013;,]+|[\s|\u2022\u00b7\u2014\u2013;,]+$/g, "");
     if (!piece) continue;
     const prev = pieces[pieces.length - 1];
+    if (prev && COMPANY_SUFFIX.test(piece)) {
+      pieces[pieces.length - 1] = `${prev}, ${piece}`;
+      continue;
+    }
     // Put a city's state or country back: "Towson" + "MD".
     if (prev && PLACE_CODE.test(piece) && /^[A-Z][A-Za-z.' -]+$/.test(prev) && prev.split(" ").length <= 3) {
       pieces[pieces.length - 1] = `${prev}, ${piece}`;
@@ -238,14 +251,24 @@ export function assemble(pieces, kind) {
     entry = { description: [] };
     entries.push(entry);
   };
-  for (const { text, label, bullet } of pieces) {
+  let last = null; // the previous labelled piece: { field, line }
+  for (const { text, label, bullet, index } of pieces) {
     if (bullet || label === "description" || label === "detail") {
       if (!entry) open();
       if (label !== "detail") entry.description.push(text);
+      last = null;
       continue;
     }
     const field = FIELD[label];
     if (!field) continue;
+    // Two neighbouring pieces of one line with the same label are one field
+    // that held a comma: "Senior Director" + "International Business
+    // Development". Without this the second opened a phantom entry.
+    if (entry && last && last.field === field && index !== undefined && last.line === index) {
+      entry[field] = `${entry[field]}, ${text}`;
+      continue;
+    }
+    last = { field, line: index };
     const collides = entry && (entry[field] !== undefined ||
       (HEAD.has(label) && entry.description.length > 0));
     if (!entry || collides) open();
