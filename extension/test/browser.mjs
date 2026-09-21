@@ -70,7 +70,8 @@ export async function launch() {
   const stub = readFileSync(join(FIXTURES, "stub.js"), "utf8");
   const content = readFileSync(CONTENT, "utf8");
 
-  async function open(fixture) {
+  /** `scripts`: extra sources to inject before the page, after the stub. */
+  async function open(fixture, { scripts = [], smartpaste = true } = {}) {
     const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" })).json();
     const socket = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
@@ -80,7 +81,8 @@ export async function launch() {
     // (and the fixture) commit typed values on blur.
     await session.send("Emulation.setFocusEmulationEnabled", { enabled: true });
     await session.send("Page.addScriptToEvaluateOnNewDocument", { source: stub });
-    await session.send("Page.addScriptToEvaluateOnNewDocument", { source: content });
+    for (const source of scripts) await session.send("Page.addScriptToEvaluateOnNewDocument", { source });
+    if (smartpaste) await session.send("Page.addScriptToEvaluateOnNewDocument", { source: content });
     await session.send("Page.navigate", { url: `${origin}/${fixture}` });
 
     const page = {

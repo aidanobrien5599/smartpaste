@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Autofill stopwatch",
+  "version": "0.1.0",
+  "description": "Times any autofill tool from page load: when the form appears, first and last field filled. For benchmarking only.",
+  "permissions": ["storage"],
+  "action": { "default_popup": "popup.html", "default_title": "Autofill stopwatch" },
+  "content_scripts": [
+    { "matches": ["http://*/*", "https://*/*"], "js": ["stopwatch.js"], "run_at": "document_start" }
+  ]
+}

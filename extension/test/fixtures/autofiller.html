@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>Apply - two steps</title>
+<body style="font:14px system-ui;max-width:600px;margin:30px auto">
+<!-- For the stopwatch: the form appears 600ms after load (a slow app), the
+     page prefills one field itself, and a "tool" fills the rest on its own
+     at +300/+500/+800ms. "Next" swaps in step 2 400ms after the click, and
+     the tool fills that at +200/+400ms. -->
+<div id="form"></div>
+<script>
+const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+function step1() {
+  document.getElementById("form").innerHTML = `
+    <label for="email">Email</label><input id="email" value="from-the-account@example.com">
+    <label for="first">First name</label><input id="first">
+    <label for="last">Last name</label><input id="last">
+    <label for="phone">Phone</label><input id="phone">
+    <button id="next" type="button">Next</button>`;
+  setTimeout(() => set("first", "Aidan"), 300);
+  setTimeout(() => set("last", "O'Brien"), 500);
+  setTimeout(() => set("phone", "9082160389"), 800);
+  document.getElementById("next").addEventListener("click", () => {
+    document.getElementById("form").innerHTML = "";
+    setTimeout(() => {
+      document.getElementById("form").innerHTML = `
+        <label for="school">School</label><input id="school">
+        <label for="degree">Degree</label><input id="degree">`;
+      setTimeout(() => set("school", "UW-Madison"), 200);
+      setTimeout(() => set("degree", "BS"), 400);
+    }, 400);
+  });
+}
+setTimeout(step1, 600);
+</script></body>
