@@ -130,3 +130,10 @@ test("unwrap: text alone joins only a line that starts mid-sentence", () => {
     "and a Redis caching layer."].join("\n")).split("\n");
   assert.equal(out.length, 1);
 });
+
+test("buildOptions: a phone number implies a mobile device type unless one is given", () => {
+  assert.equal(buildOptions({ phone: "908-216-0389" }).phone_type.value, "Mobile");
+  assert.equal(buildOptions({ phone: "908-216-0389", phone_type: "Home" }).phone_type.value, "Home");
+  assert.equal(buildOptions({ email: "a@b.co" }).phone_type, undefined);
+  assert.equal(buildOptions({ phone: "1" }).phone_type.field, "Phone device type");
+});

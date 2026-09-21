@@ -19,6 +19,7 @@ export const GROUPS = [
       ["pronouns", "Pronouns", "he/him"],
       ["email", "Email", "you@gmail.com"],
       ["phone", "Phone", "908-216-0389"],
+      ["phone_type", "Phone device type", "Mobile"],
     ],
   },
   {

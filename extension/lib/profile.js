@@ -130,6 +130,9 @@ function derived(profile) {
       out.last_name = parts[parts.length - 1];
     }
   }
+  // Workday requires a device type next to any phone number. Unsaid, it is
+  // almost always a mobile; a value you enter wins over this guess.
+  if (has("phone") && !has("phone_type")) out.phone_type = "Mobile";
   if (!has("location") && has("city")) {
     out.location = [get("city"), get("state")].filter(Boolean).join(", ");
   }

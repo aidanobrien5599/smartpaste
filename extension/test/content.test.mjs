@@ -167,10 +167,12 @@ test("fill: Greenhouse comboboxes pick by meaning, scoped to their own menu", { 
     assert.equal(choice.options.length, 4);
     // "Start typing..." has no options until typed into.
     assert.equal(await page.eval(text("#loc-value")), "Madison, Wisconsin, United States");
-    // Each is a quick open-read-click: no fixed sleeps, no waiting for a
-    // type-first menu to open by itself (that was 1.5s of Figma's 2.4s).
-    const slow = (await page.eval("window.__smartpasteTest.timeline")).filter((t) => t.ms > 250);
-    assert.deepEqual(slow, []);
+    // Each is a quick open-read-click with no fixed sleeps. The location box
+    // shows no menu until its 400ms search returns; waiting 1.5s for one to
+    // open by itself first was most of Figma's 2.0s.
+    const times = Object.fromEntries((await page.eval("window.__smartpasteTest.timeline")).map((t) => [t.field, t.ms]));
+    assert.ok(times["When do you expect to graduate?"] < 250, JSON.stringify(times));
+    assert.ok(times["Location (City)"] < 900, JSON.stringify(times));
   }));
 
 test("fill: Ashby toggle buttons", { skip }, () =>

@@ -8,10 +8,11 @@
   <input id="grad" class="select__input" role="combobox" aria-controls="grad-menu" aria-labelledby="grad-label" type="text">
   <div class="select__single-value" id="grad-value"></div></div>
 <div id="grad-menu"></div>
-<div class="select__control"><label for="loc" id="loc-label">Current Location</label>
-  <input id="loc" class="select__input" role="combobox" aria-controls="loc-menu" placeholder="Start typing..." type="text">
-  <div class="select__single-value" id="loc-value"></div></div>
-<div id="loc-menu"></div>
+<!-- Figma's Location (City): no aria-controls, no "Start typing" hint, and
+     its menu is a sibling that appears only once a (400ms) search returns. -->
+<div class="select__container"><label for="loc" id="loc-label">Location (City)</label>
+  <div class="select__control"><input id="loc" class="select__input" role="combobox" type="text">
+  <div class="select__single-value" id="loc-value"></div></div></div>
 <div id="decoy" role="listbox"></div>
 <script>
 const decoy = document.getElementById("decoy");
@@ -31,5 +32,25 @@ function combo(id, all, needsTyping) {
   input.addEventListener("input", () => render(input.value));
 }
 combo("grad", ["Fall 2026", "Spring 2027", "Fall 2027", "Spring 2028"], false);
-combo("loc", ["Madison, Wisconsin, United States", "Madison, Alabama, United States"], true);
+const locations = ["Madison, Wisconsin, United States", "Town of Madison, Wisconsin, United States", "Madison, Alabama, United States"];
+(() => {
+  const input = document.getElementById("loc"), container = input.closest(".select__container");
+  let timer;
+  input.addEventListener("input", () => {
+    container.querySelector(".select__menu")?.remove();
+    clearTimeout(timer);
+    const q = input.value.split(",")[0].trim().toLowerCase();
+    if (!q) return;
+    timer = setTimeout(() => {
+      const menu = document.createElement("div"); menu.className = "select__menu";
+      const list = document.createElement("div"); list.className = "select__menu-list"; menu.appendChild(list);
+      for (const o of locations.filter((l) => l.toLowerCase().includes(q))) {
+        const d = document.createElement("div"); d.setAttribute("role", "option"); d.textContent = o;
+        d.addEventListener("click", () => { document.getElementById("loc-value").textContent = o; input.value = ""; menu.remove(); });
+        list.appendChild(d);
+      }
+      container.appendChild(menu);
+    }, 400);
+  });
+})();
 </script></body>

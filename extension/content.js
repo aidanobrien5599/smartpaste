@@ -539,15 +539,32 @@
    * Options can also load asynchronously -- a school list arrives well after
    * the menu opens -- so this polls rather than sleeping once.
    */
-  async function menuOptions(field, timeout = 2500) {
-    const deadline = Date.now() + timeout;
-    while (Date.now() < deadline) {
-      const id = field.getAttribute("aria-controls");
-      const list = id && document.getElementById(id);
-      const nodes = list ? [...list.querySelectorAll('[role="option"]')] : [];
+  /**
+   * A combobox's menu: by aria-controls, or else React Select's sibling
+   * menu. Figma's location box has no aria-controls at all, so looking only
+   * there never saw its menu and sat out every timeout.
+   */
+  function menuFor(field) {
+    const id = field.getAttribute("aria-controls");
+    return (id && document.getElementById(id)) ||
+      field.closest(SELECT_SHELL)?.parentElement?.querySelector('[class*="select__menu"]') || null;
+  }
+
+  // Opening a menu shows it at once, even if its options are still loading
+  // (a school list). Nothing at all after this long means it will not open
+  // until typed into.
+  const OPENS_WITHIN = 300;
+
+  async function menuOptions(field, timeout = 2500, { opening = false } = {}) {
+    const started = Date.now();
+    while (Date.now() - started < timeout) {
+      const menu = menuFor(field);
+      const nodes = menu ? [...menu.querySelectorAll('[role="option"]')] : [];
       if (nodes.length) return nodes;
       // An open menu saying "No options" is an answer, not a slow load.
-      if (menuNotice(field)) return [];
+      const notice = menuNotice(field);
+      if (notice && !/loading|searching/i.test(notice)) return [];
+      if (opening && !menu && Date.now() - started > OPENS_WITHIN) return [];
       await sleep(25);
     }
     return [];
@@ -614,7 +631,7 @@
     fire(field, "click");
 
     // A type-first menu is empty when opened: waiting on it only costs time.
-    let nodes = needsTyping(field) ? [] : await menuOptions(field, 1500);
+    let nodes = needsTyping(field) ? [] : await menuOptions(field, 1500, { opening: true });
     let texts = nodes.map((n) => n.textContent.trim());
     const exact = () => texts.findIndex((t) => normalize(t) === normalize(want));
 
