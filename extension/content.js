@@ -47,7 +47,8 @@
   const QUESTION_TEXT = '.application-label, legend, [class*="question-label"]';
   const FIELD_SELECTOR =
     'input:not([type]), input[type="text"], input[type="email"], ' +
-    'input[type="tel"], input[type="url"], input[type="search"], textarea, select';
+    'input[type="tel"], input[type="url"], input[type="search"], ' +
+    'input[type="date"], textarea, select';
   const MIN_FIELDS = 2;
   const answers = new WeakMap(); // field element -> resolved answer
   const asked = new WeakSet(); // fields sent to Jev, answered or not
@@ -591,6 +592,7 @@
     }
     if (isCombobox(field)) return setCombobox(field, value); // async
     if (field.tagName === "SELECT") return setSelect(field, value); // async
+    value = formatForField(field, value);
     const prototype =
       field instanceof HTMLTextAreaElement
         ? HTMLTextAreaElement.prototype
@@ -1172,15 +1174,49 @@
 
   const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-  /** "May 2027", "05/2027", "2027-05", "2027" -> {month, year}. */
+  /**
+   * "May 2027", "05/2027", "2027-05", "2027", and with a day: "09/21/2026",
+   * "2026-09-21", "Sep 21, 2026" -> {year, month, day}.
+   */
   function dateParts(value) {
     const text = String(value || "");
     const year = text.match(/\b(19|20)\d{2}\b/);
     if (!year) return null;
+    const full = text.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-]((?:19|20)\d{2})\b/) || // MM/DD/YYYY
+      text.match(/\b((?:19|20)\d{2})-(\d{1,2})-(\d{1,2})\b/); // YYYY-MM-DD
+    if (full) {
+      const [month, day] = full[3].length === 4 ? [full[1], full[2]] : [full[2], full[3]];
+      if (Number(month) <= 12 && Number(day) <= 31) return { year: year[0], month: Number(month), day: Number(day) };
+    }
     const named = text.match(/\b([A-Za-z]{3})[a-z]*\.?\b/g)?.map((w) => MONTH_NAMES.indexOf(w.slice(0, 3).toLowerCase())).find((i) => i >= 0);
     const numeric = text.match(/\b(\d{1,2})[/.-](?:19|20)\d{2}\b/) || text.match(/\b(?:19|20)\d{2}[/.-](\d{1,2})\b/);
     const month = named !== undefined && named >= 0 ? named + 1 : numeric ? Number(numeric[1]) : null;
-    return { year: year[0], month: month && month <= 12 ? month : null };
+    const day = named !== undefined && named >= 0 ? text.match(/\b[A-Za-z]{3}[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b,?/)?.[1] : null;
+    return {
+      year: year[0],
+      month: month && month <= 12 ? month : null,
+      day: day && Number(day) <= 31 ? Number(day) : null,
+    };
+  }
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  /**
+   * A date in the shape the field asks for. A box that says MM/DD/YYYY (in
+   * its placeholder or label) gets exactly that, a native date input gets
+   * YYYY-MM-DD, and anything else keeps the profile's own wording.
+   */
+  function formatForField(field, value) {
+    if (field.tagName !== "INPUT") return value;
+    const hint = `${field.placeholder || ""} ${field.getAttribute("aria-label") || ""} ${labelFor(field)}`;
+    const shape = field.type === "date" ? "YYYY-MM-DD"
+      : (hint.match(/\b(MM\/DD\/YYYY|DD\/MM\/YYYY|MM\/YYYY|YYYY-MM-DD|MM-DD-YYYY)\b/i) || [])[1]?.toUpperCase();
+    if (!shape) return value;
+    const parts = dateParts(value);
+    if (!parts || !parts.month) return value;
+    const [y, m, d] = [parts.year, pad(parts.month), pad(parts.day || 1)];
+    return { "MM/DD/YYYY": `${m}/${d}/${y}`, "DD/MM/YYYY": `${d}/${m}/${y}`, "MM/YYYY": `${m}/${y}`,
+      "YYYY-MM-DD": `${y}-${m}-${d}`, "MM-DD-YYYY": `${m}-${d}-${y}` }[shape];
   }
 
   /** A Workday date: separate month / day / year boxes. */
@@ -1193,7 +1229,7 @@
     const year = box("Year");
     if (month && !parts.month) return false; // "Present", or a year alone
     if (month) { await typeLikeAPerson(month, String(parts.month).padStart(2, "0")); month.blur(); }
-    if (day) { await typeLikeAPerson(day, "01"); day.blur(); }
+    if (day) { await typeLikeAPerson(day, pad(parts.day || 1)); day.blur(); }
     if (year) { await typeLikeAPerson(year, parts.year); year.blur(); }
     return Boolean(year ? year.value : month?.value);
   }
@@ -1642,7 +1678,7 @@
   // Tests (extension/test/content.test.mjs) reach the pure helpers here.
   // The flag is only ever set by the test stub, never by a real page.
   if (window.__smartpasteTest) {
-    Object.assign(window.__smartpasteTest, { dateParts, localMatch, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize, setPrompt });
+    Object.assign(window.__smartpasteTest, { dateParts, formatForField, localMatch, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize, setPrompt });
   }
 
   // The manifest runs this at document_idle, but an injected or early copy can

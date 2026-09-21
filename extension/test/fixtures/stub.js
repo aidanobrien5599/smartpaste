@@ -12,6 +12,7 @@ window.__model = window.__model || {};
 const ANSWERS = [
   [/hear about/i, "LinkedIn"],
   [/first see this job/i, "Career Site"],
+  [/^date$/i, "09/21/2026"], [/available start/i, "May 15, 2027"],
   [/address line 1/i, "123 State St"], [/^city$/i, "Madison"], [/postal code/i, "53703"],
   [/^country$/i, "United States"],
   [/^(first name)$/i, "Aidan"], [/^last name$/i, "O'Brien"],

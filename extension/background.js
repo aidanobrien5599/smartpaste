@@ -37,7 +37,17 @@ async function loadOptions() {
     "profile",
     "extraText",
   ]);
-  return { apiKey, profile, options: buildOptions(profile, extraText) };
+  const options = buildOptions(profile, extraText);
+  // A "Date" beside a signature wants today's date, which no profile holds.
+  // Worded for that field: plain "Today's date" lost "Date signed" to the
+  // escape option, while start and graduation dates keep their own answers.
+  const now = new Date();
+  options.today = {
+    field: "Today's date (for a 'Date' or 'Date signed' field next to a signature)",
+    value: [now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, "0")).join("/") +
+      `/${now.getFullYear()}`,
+  };
+  return { apiKey, profile, options };
 }
 
 // A normal answer takes well under a second, but the API occasionally leaves a

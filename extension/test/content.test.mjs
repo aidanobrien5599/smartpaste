@@ -39,20 +39,42 @@ test("dateParts reads the date shapes a profile holds", { skip }, () =>
   withPage("contact.html", async (page) => {
     const parts = await page.eval(() => {
       const { dateParts } = window.__smartpasteTest;
-      return ["May 2026", "September 2023", "Sept. 2023", "05/2027", "2027-05", "2027", "Present", "Spring 2027", ""]
-        .map((v) => dateParts(v));
+      return ["May 2026", "September 2023", "Sept. 2023", "05/2027", "2027-05", "2027", "Present", "Spring 2027", "",
+        "09/21/2026", "2026-09-21", "Sep 21, 2026", "May 2nd, 2027"].map((v) => dateParts(v));
     });
     assert.deepEqual(parts, [
-      { year: "2026", month: 5 },
-      { year: "2023", month: 9 },
-      { year: "2023", month: 9 },
-      { year: "2027", month: 5 },
-      { year: "2027", month: 5 },
-      { year: "2027", month: null },
+      { year: "2026", month: 5, day: null },
+      { year: "2023", month: 9, day: null },
+      { year: "2023", month: 9, day: null },
+      { year: "2027", month: 5, day: null },
+      { year: "2027", month: 5, day: null },
+      { year: "2027", month: null, day: null },
       null,
-      { year: "2027", month: null }, // a season is not a month; left for the user
+      { year: "2027", month: null, day: null }, // a season is not a month; left for the user
       null,
+      { year: "2026", month: 9, day: 21 },
+      { year: "2026", month: 9, day: 21 },
+      { year: "2026", month: 9, day: 21 },
+      { year: "2027", month: 5, day: 2 },
     ]);
+  }));
+
+test("formatForField: a date in the shape the box asks for", { skip }, () =>
+  withPage("contact.html", async (page) => {
+    const out = await page.eval(() => {
+      const { formatForField } = window.__smartpasteTest;
+      const input = (attrs) => Object.assign(document.createElement("input"), attrs);
+      return [
+        formatForField(input({ placeholder: "MM/DD/YYYY" }), "09/21/2026"),
+        formatForField(input({ placeholder: "MM/DD/YYYY" }), "May 2026"),
+        formatForField(input({ placeholder: "DD/MM/YYYY" }), "Sep 21, 2026"),
+        formatForField(input({ placeholder: "MM/YYYY" }), "May 2027"),
+        formatForField(input({ type: "date" }), "09/21/2026"),
+        formatForField(input({ placeholder: "MM/DD/YYYY" }), "Present"),
+        formatForField(input({ placeholder: "Your name" }), "May 2026"),
+      ];
+    });
+    assert.deepEqual(out, ["09/21/2026", "05/01/2026", "21/09/2026", "05/2027", "2026-09-21", "Present", "May 2026"]);
   }));
 
 test("localMatch: exact, or the one option that starts with the answer", { skip }, () =>
@@ -153,6 +175,10 @@ test("fill: Greenhouse text, selects, React revert, and documents", { skip }, ()
     assert.equal(await page.eval(value("#gpa")), "3.9");
     assert.equal(await page.eval(value("#auth")), "Yes");
     assert.equal(await page.eval(value("#spon")), "No");
+    // "Date" beside a signature gets today's date, in the box's own shape;
+    // a native date picker gets YYYY-MM-DD.
+    assert.equal(await page.eval(value("#signed")), "09/21/2026");
+    assert.equal(await page.eval(value("#available")), "2027-05-15");
     // Revealed by the Hispanic answer mid-fill, then filled in a follow-up.
     assert.equal(await page.eval(value("#hispanic")), "No");
     await page.waitFor("document.getElementById('race')?.value", 5000);
