@@ -516,28 +516,19 @@
   async function typeLikeAPerson(field, text) {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
     const key = (type, ch) => {
-      const event = new KeyboardEvent(type, {
-        key: ch, code: /\d/.test(ch) ? `Digit${ch}` : /[a-z]/i.test(ch) ? `Key${ch.toUpperCase()}` : "",
-        bubbles: true, cancelable: true,
-      });
+      const event = new KeyboardEvent(type, { key: ch, bubbles: true, cancelable: true });
       const code = ch.toUpperCase().charCodeAt(0);
       Object.defineProperty(event, "keyCode", { get: () => code });
       Object.defineProperty(event, "which", { get: () => code });
       field.dispatchEvent(event);
-      return event.defaultPrevented;
     };
     field.focus();
     setter.call(field, "");
     for (const ch of text) {
-      // As a keyboard does: a page that takes the key itself (Workday's
-      // month / year spinbuttons, which block keydown and keep their own
-      // value) gets no character inserted on top. Inserting it anyway
-      // doubled every digit -- "05" became "0055", no month at all.
-      const taken = key("keydown", ch) | key("keypress", ch);
-      if (!taken) {
-        setter.call(field, field.value + ch);
-        field.dispatchEvent(new InputEvent("input", { bubbles: true, data: ch, inputType: "insertText" }));
-      }
+      key("keydown", ch);
+      key("keypress", ch);
+      setter.call(field, field.value + ch);
+      field.dispatchEvent(new InputEvent("input", { bubbles: true, data: ch, inputType: "insertText" }));
       key("keyup", ch);
       await sleep(8);
     }
@@ -1346,26 +1337,10 @@
     const day = box("Day");
     const year = box("Year");
     if (month && !parts.month) return false; // "Present", or a year alone
-    // Type each box, then read it back. A box that did not take the typing
-    // gets its value set outright, the way a paste would.
-    const put = async (input, text) => {
-      if (!input) return true;
-      await typeLikeAPerson(input, text);
-      if (Number(input.value) !== Number(text)) {
-        input.focus();
-        nativeSet(input, text);
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      input.blur();
-      await sleep(30);
-      return Number(input.value) === Number(text);
-    };
-    const ok = [
-      await put(month, pad(parts.month || 1)),
-      await put(day, pad(parts.day || 1)),
-      await put(year, parts.year),
-    ];
-    return ok.every(Boolean);
+    if (month) { await typeLikeAPerson(month, String(parts.month).padStart(2, "0")); month.blur(); }
+    if (day) { await typeLikeAPerson(day, pad(parts.day || 1)); day.blur(); }
+    if (year) { await typeLikeAPerson(year, parts.year); year.blur(); }
+    return Boolean(year ? year.value : month?.value);
   }
 
   function isFilled(entry) {

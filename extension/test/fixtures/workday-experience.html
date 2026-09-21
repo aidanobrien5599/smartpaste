@@ -139,23 +139,6 @@ const BUILD = {
     text(`ed${n}-gpa`, "Overall Result (GPA)") + year(`ed${n}-from`, "From") + year(`ed${n}-to`, "To (Actual or Expected)"),
   "Websites": (n) => `<div data-automation-id="formField-url"><label for="web${n}">URL</label><input type="text" id="web${n}" data-automation-id="website"></div>`,
 };
-// Workday's month / year boxes are spinbuttons that take digits on keydown
-// themselves (and block the default), keep their own value, and re-read any
-// value set from outside through their change handler -- where a doubled
-// "0055" is no month at all, and the box empties.
-function spin(input) {
-  const width = input.getAttribute("aria-label") === "Year" ? 4 : 2;
-  let buf = "";
-  const valid = (v) => v === "" || (width === 2 ? /^(0?[1-9]|1[0-2])$/.test(v) || v === "0" : /^\d{1,4}$/.test(v));
-  input.addEventListener("keydown", (e) => {
-    if (!/^\d$/.test(e.key)) return;
-    e.preventDefault();
-    buf = (buf + e.key).slice(-width);
-    input.value = buf;
-  });
-  input.addEventListener("input", () => { buf = valid(input.value) ? input.value : ""; input.value = buf; });
-  input.addEventListener("blur", () => { input.value = buf; if (buf) window.__model[input.dataset.k] = buf.padStart(width, "0"); });
-}
 window.__added = {};
 document.querySelectorAll('[role="group"][aria-labelledby$="-section"]').forEach((section) => {
   const name = section.getAttribute("aria-labelledby").replace(/-section$/, "");
@@ -172,8 +155,7 @@ document.querySelectorAll('[role="group"][aria-labelledby$="-section"]').forEach
       const panel = section.querySelector(`[aria-labelledby="${name}-${n}-panel"]`);
       panel.querySelectorAll("button[aria-haspopup=listbox]").forEach((b) => listbox(b, "degree"));
       panel.querySelectorAll("input[data-uxi-widget-type=selectinput]").forEach((i) => prompt(i, `school${n}`, "school"));
-      panel.querySelectorAll("input[role=spinbutton]").forEach(spin);
-      panel.querySelectorAll("input[type=text]:not([role=spinbutton]), textarea").forEach((i) => { if (!i.dataset.uxiWidgetType) commitOnBlur(i, i.id || i.dataset.k); });
+      panel.querySelectorAll("input[type=text], textarea").forEach((i) => { if (!i.dataset.uxiWidgetType) commitOnBlur(i, i.id || i.dataset.k); });
       panel.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => { window.__model[c.id] = c.checked; }));
     }, 150);
   });
