@@ -198,6 +198,7 @@ test("fill: a whole Workday page", { skip }, () =>
         // search prompts: one found by search, one by its category
         source: "LinkedIn Jobs", school: "University of Wisconsin - Madison",
         // plain inputs, committed on blur
+        "address--addressLine1": "123 State St", "address--city": "Madison", "address--postalCode": "53703",
         "name--legalName--firstName": "Aidan", "name--legalName--lastName": "O'Brien",
         "emailAddress--emailAddress": "aidanobrien5599@gmail.com", "phoneNumber--phoneNumber": "9082160389",
         "workExperience-1--jobTitle": "Software Engineer Intern", "workExperience-1--companyName": "Netflix",
@@ -207,8 +208,8 @@ test("fill: a whole Workday page", { skip }, () =>
         resume: "resume.pdf",
         dates: ["05", "2026", "2027"], radio: "pw-no",
       });
-    // 18 filled; the "broken" prompt never takes a click and is left for you.
-    assert.match(summary, /^filled 18 in [0-9.]+s, attached 1 file, left 1 for you(?: · slowest: .*)?$/);
+    // 21 filled; the "broken" prompt never takes a click and is left for you.
+    assert.match(summary, /^filled 21 in [0-9.]+s, attached 1 file, left 1 for you(?: · slowest: .*)?$/);
     assert.equal(await page.eval("document.querySelectorAll('.pop').length"), 0, "a menu was left open");
     // Only menus with no plain match go to Jev: "United States" is the one
     // country starting with it, "LinkedIn" the one source. Degree and gender
@@ -265,7 +266,7 @@ test("fill: a picker whose clicks never take is given up on, not retried for age
     assert.ok(asks <= 2, `asked Jev ${asks} times about one picker`);
   }));
 
-test("an Email Address field is not mistaken for a location autocomplete", { skip }, () =>
+test("only real autocompletes are waited on: not Email, Address, City or Postal Code", { skip }, () =>
   withPage("form.html", async (page) => {
     const verdicts = await page.eval(() => {
       const { looksLikeAutocomplete } = window.__smartpasteTest;
@@ -278,12 +279,18 @@ test("an Email Address field is not mistaken for a location autocomplete", { ski
       return {
         email: field('<label for="t1">Email Address</label><input id="t1" type="text">'),
         emailType: field('<label for="t2">Address</label><input id="t2" type="email">'),
-        street: field('<label for="t3">Street Address</label><input id="t3" type="text">'),
-        city: field('<label for="t4">City</label><input id="t4" type="text">'),
+        street: field('<label for="t3">Address Line 1</label><input id="addressSection_addressLine1" type="text">'),
+        city: field('<label for="t4">City</label><input id="addressSection_city" type="text">'),
+        postal: field('<label for="t5">Postal Code</label><input id="addressSection_postalCode" type="text">'),
+        lever: field('<label>Current location<input name="location" type="text"></label>'),
+        aria: field('<label for="t6">Town</label><input id="t6" aria-autocomplete="list" type="text">'),
       };
     });
-    // Treating it as one typed it slowly, then waited 3s for suggestions.
-    assert.deepEqual(verdicts, { email: false, emailType: false, street: true, city: true });
+    // Each false positive typed slowly, then waited 3s for suggestions that
+    // never come: 9.5s of a 10.2s Workday fill (Address, City, Postal Code).
+    assert.deepEqual(verdicts, {
+      email: false, emailType: false, street: false, city: false, postal: false, lever: true, aria: true,
+    });
   }));
 
 /* ----------------------------------------------------------------- Cmd-V */

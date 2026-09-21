@@ -405,18 +405,23 @@
     }
   }
 
-  const AUTOCOMPLETE_HINT = /location|city|address|hometown/i;
+  // A name hint is only for autocompletes that do not say so (Lever's
+  // "Current location"). "Address", "City", "Postal code" are plain boxes on
+  // Workday -- guessing otherwise waited 3s on each for suggestions.
+  const AUTOCOMPLETE_HINT = /location|hometown/i;
   const SUGGESTION_BOX =
     '[role="listbox"], [class*="dropdown-results"], [class*="suggest"], ' +
     '[class*="autocomplete"], [class*="typeahead"], [class*="pac-container"]';
   const NOT_A_SUGGESTION = /^(?:no .* found|no items|loading|searching)/i;
 
   function looksLikeAutocomplete(field) {
-    if (field.getAttribute("aria-autocomplete")) return true;
+    if (field.getAttribute("aria-autocomplete") || field.getAttribute("list")) return true;
     // "Email Address" is not a place, and waiting on it for suggestions that
     // never come cost three seconds a form.
     if (field.type === "email" || /e-?mail/i.test(labelFor(field))) return false;
-    const hints = [field.name, field.id, field.className, labelFor(field)].join(" ");
+    // Label and name only: ids and classes carry section names
+    // ("addressSection_postalCode") that say nothing about the widget.
+    const hints = [field.name, labelFor(field)].join(" ");
     return AUTOCOMPLETE_HINT.test(hints);
   }
 
@@ -446,8 +451,8 @@
   async function setAutocomplete(field, value) {
     await typeLikeAPerson(field, value);
     let items = [];
-    for (let i = 0; i < 20 && !items.length; i++) {
-      await sleep(150);
+    for (let i = 0; i < 12 && !items.length; i++) {
+      await sleep(100);
       items = suggestionsNear(field);
     }
     if (!items.length) return Boolean(field.value);

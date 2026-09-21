@@ -104,6 +104,12 @@ function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__mod
  <input type="text" id="name--legalName--firstName" data-automation-id="legalNameSection_firstName"></div>
 <div data-automation-id="formField-legalName--lastName"><label for="name--legalName--lastName">Last Name<abbr>*</abbr></label>
  <input type="text" id="name--legalName--lastName"></div>
+<div data-automation-id="formField-addressLine1"><label for="address--addressLine1">Address Line 1<abbr>*</abbr></label>
+ <input type="text" id="address--addressLine1" data-automation-id="addressSection_addressLine1"></div>
+<div data-automation-id="formField-city"><label for="address--city">City<abbr>*</abbr></label>
+ <input type="text" id="address--city" data-automation-id="addressSection_city"></div>
+<div data-automation-id="formField-postalCode"><label for="address--postalCode">Postal Code<abbr>*</abbr></label>
+ <input type="text" id="address--postalCode" data-automation-id="addressSection_postalCode"></div>
 <div data-automation-id="formField-email"><label for="emailAddress--emailAddress">Email Address<abbr>*</abbr></label>
  <input type="text" id="emailAddress--emailAddress"></div>
 <div data-automation-id="formField-phoneType"><label for="phoneNumber--phoneType">Phone Device Type<abbr>*</abbr></label>
@@ -152,7 +158,7 @@ listbox(document.getElementById("gender"),"gender");
 prompt(document.getElementById("source--source"),"source","source");
 prompt(document.getElementById("education-1--school"),"school","school");
 prompt(document.getElementById("referral--referral"),"referral","broken");
-for (const id of ["name--legalName--firstName","name--legalName--lastName","emailAddress--emailAddress","phoneNumber--phoneNumber","workExperience-1--jobTitle","workExperience-1--companyName","workExperience-2--jobTitle","workExperience-2--companyName"]) commitOnBlur(document.getElementById(id),id);
+for (const id of ["address--addressLine1","address--city","address--postalCode","name--legalName--firstName","name--legalName--lastName","emailAddress--emailAddress","phoneNumber--phoneNumber","workExperience-1--jobTitle","workExperience-1--companyName","workExperience-2--jobTitle","workExperience-2--companyName"]) commitOnBlur(document.getElementById(id),id);
 document.querySelectorAll('[data-automation-id^="dateSection"]').forEach((el,i)=>commitOnBlur(el,"date"+i+"_"+el.dataset.automationId));
 document.querySelector('[data-automation-id="file-upload-input-ref"]').addEventListener("change",e=>{window.__model.resume=e.target.files[0]?.name});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closePops()});
