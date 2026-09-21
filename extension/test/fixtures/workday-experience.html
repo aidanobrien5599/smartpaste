@@ -106,8 +106,11 @@ function prompt(input, key, source){
 // Text inputs commit to the model on blur only, like Workday.
 function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__model[key]=input.value})}
 </script>
-<div role="group" aria-labelledby="Work-Experience-section"><h3 id="Work-Experience-section">Work Experience</h3>
-  <div class="panels"></div><button type="button" data-automation-id="add-button" aria-label="Add Work Experience">Add</button></div>
+<!-- Work Experience as live notes describe it: entries are
+     data-automation-id="workExperience-N", each field's id starts
+     "workExperience-N--", and the Add button is known by its aria-label. -->
+<div data-automation-id="workExperienceSection"><h3>Work Experience</h3>
+  <div class="panels"></div><button type="button" aria-label="Add Work Experience">Add</button></div>
 <div role="group" aria-labelledby="Education-section"><h3 id="Education-section">Education</h3>
   <div class="panels"></div><button type="button" data-automation-id="add-button" aria-label="Add Education">Add</button></div>
 <div role="group" aria-labelledby="Websites-section"><h3 id="Websites-section">Websites</h3>
@@ -122,15 +125,16 @@ function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__mod
 
 <script>
 // Month / Year boxes marked only by aria-label, as on this step.
-const monthYear = (id, label) => `<div data-automation-id="formField-${id}"><label>${label}</label>
-  <div class="date"><input type="text" role="spinbutton" aria-label="Month" placeholder="MM" data-k="${id}-m"><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y"></div></div>`;
+const monthYear = (id, label, stem) => `<div data-automation-id="formField-${id}"><label>${label}</label>
+  <div class="date" data-automation-id="dateInputWrapper"><input type="text" role="spinbutton" aria-label="Month" placeholder="MM" data-k="${id}-m" ${stem ? `id="${stem}-dateSectionMonth-input"` : ""}><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y" ${stem ? `id="${stem}-dateSectionYear-input"` : ""}></div></div>`;
 const year = (id, label) => `<div data-automation-id="formField-${id}"><label>${label}</label>
   <div class="date"><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y"></div></div>`;
-const text = (id, label, tag) => `<div data-automation-id="formField-${id}"><label for="${id}">${label}</label><${tag||"input"} type="text" id="${id}"></${tag||"input"}></div>`;
+const text = (id, label, tag, key) => `<div data-automation-id="formField-${id}"><label for="${id}">${label}</label><${tag||"input"} type="text" id="${id}" ${key ? `data-k="${key}"` : ""}></${tag||"input"}></div>`;
 const BUILD = {
-  "Work-Experience": (n) => text(`we${n}-title`, "Job Title") + text(`we${n}-company`, "Company") + text(`we${n}-location`, "Location") +
+  "Work-Experience": (n) => text(`workExperience-${n}--jobTitle`, "Job Title", null, `we${n}-title`) + text(`workExperience-${n}--companyName`, "Company", null, `we${n}-company`) + text(`workExperience-${n}--location`, "Location", null, `we${n}-location`) +
     `<div data-automation-id="formField-currentlyWorkHere"><label><input type="checkbox" data-automation-id="currentlyWorkHere" id="we${n}-current"> I currently work here</label></div>` +
-    monthYear(`we${n}-from`, "From") + monthYear(`we${n}-to`, "To") + text(`we${n}-desc`, "Role Description", "textarea"),
+    monthYear(`we${n}-from`, "From", `workExperience-${n}--startDate`) + monthYear(`we${n}-to`, "To", `workExperience-${n}--endDate`) +
+    text(`workExperience-${n}--roleDescription`, "Role Description", "textarea", `we${n}-desc`),
   "Education": (n) => `<div data-automation-id="formField-school"><label for="ed${n}-school">School or University</label>
       <div data-automation-id="multiSelectContainer"><div data-automation-id="selectedItemList"><p>0 items selected</p></div>
       <div data-automation-id="multiselectInputContainer"><input type="text" id="ed${n}-school" data-uxi-widget-type="selectinput" data-automation-id="searchBox" placeholder="Search"></div></div></div>
@@ -157,23 +161,37 @@ function spin(input) {
   input.addEventListener("blur", () => { input.value = buf; if (buf) window.__model[input.dataset.k] = buf.padStart(width, "0"); });
 }
 window.__added = {};
-document.querySelectorAll('[role="group"][aria-labelledby$="-section"]').forEach((section) => {
-  const name = section.getAttribute("aria-labelledby").replace(/-section$/, "");
+document.querySelectorAll('[role="group"][aria-labelledby$="-section"], [data-automation-id="workExperienceSection"]').forEach((section) => {
+  const byId = section.dataset.automationId === "workExperienceSection";
+  const name = byId ? "Work-Experience" : section.getAttribute("aria-labelledby").replace(/-section$/, "");
   const add = section.querySelector("button");
   add.addEventListener("click", () => {
-    const n = section.querySelectorAll(".panels > [role=group]").length + 1;
+    const n = section.querySelectorAll(".panels > div").length + 1;
     window.__added[name] = n;
     // a moment later, as Workday's panels arrive
     setTimeout(() => {
-      section.querySelector(".panels").insertAdjacentHTML("beforeend",
-        `<div role="group" aria-labelledby="${name}-${n}-panel"><h4 id="${name}-${n}-panel">${name.replace("-", " ")} ${n}</h4>${BUILD[name](n)}</div>`);
+      section.querySelector(".panels").insertAdjacentHTML("beforeend", byId
+        ? `<h4>${name.replace("-", " ")} ${n}</h4><div data-automation-id="workExperience-${n}">${BUILD[name](n)}</div>`
+        : `<div role="group" aria-labelledby="${name}-${n}-panel"><h4 id="${name}-${n}-panel">${name.replace("-", " ")} ${n}</h4>${BUILD[name](n)}</div>`);
       add.setAttribute("aria-label", `Add Another ${name.replace("-", " ")}`);
       add.textContent = "Add Another";
-      const panel = section.querySelector(`[aria-labelledby="${name}-${n}-panel"]`);
+      const panel = byId ? section.querySelector(`[data-automation-id="workExperience-${n}"]`) : section.querySelector(`[aria-labelledby="${name}-${n}-panel"]`);
       panel.querySelectorAll("button[aria-haspopup=listbox]").forEach((b) => listbox(b, "degree"));
       panel.querySelectorAll("input[data-uxi-widget-type=selectinput]").forEach((i) => prompt(i, `school${n}`, "school"));
       panel.querySelectorAll("input[role=spinbutton]").forEach(spin);
-      panel.querySelectorAll("input[type=text]:not([role=spinbutton]), textarea").forEach((i) => { if (!i.dataset.uxiWidgetType) commitOnBlur(i, i.id || i.dataset.k); });
+      panel.querySelectorAll("input[type=text]:not([role=spinbutton]), textarea").forEach((i) => { if (!i.dataset.uxiWidgetType) commitOnBlur(i, i.dataset.k || i.id); });
+      // The live date widget re-renders on every change: its boxes are
+      // replaced by new elements with the same ids, keeping their values.
+      panel.querySelectorAll('[data-automation-id="dateInputWrapper"]').forEach((wrap) => {
+        wrap.addEventListener("change", () => setTimeout(() => {
+          for (const old of [...wrap.querySelectorAll("input")]) {
+            const fresh = old.cloneNode(true);
+            fresh.value = old.value;
+            spin(fresh);
+            old.replaceWith(fresh);
+          }
+        }, 0));
+      });
       panel.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => { window.__model[c.id] = c.checked; }));
     }, 150);
   });

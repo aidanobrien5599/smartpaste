@@ -223,8 +223,21 @@
     const group = element.closest('[role="group"][aria-labelledby]');
     const heading = group && document.getElementById(group.getAttribute("aria-labelledby"));
     const text = heading ? clean(heading.textContent) : "";
-    return /\d/.test(text) && text.length < 60 ? `${text}: ` : "";
+    if (/\d/.test(text) && text.length < 60) return `${text}: `;
+    // Otherwise the entry's own ids name it: "workExperience-2--startDate-…"
+    // or a container marked data-automation-id="workExperience-2".
+    const input = element.matches("input, textarea, select, button") ? element : element.querySelector("input, textarea, select, button");
+    const byId = (input?.id || "").match(/^([a-zA-Z]+)-(\d+)--/);
+    const box = element.closest('[data-automation-id]:is([data-automation-id^="workExperience-"], [data-automation-id^="education-"], [data-automation-id^="websitePanelSet-"], [data-automation-id^="certification-"], [data-automation-id^="language-"])');
+    const byBox = box?.getAttribute("data-automation-id").match(/^([a-zA-Z]+)-(\d+)$/);
+    const [, stem, n] = byId || byBox || [];
+    if (!stem) return "";
+    const name = ENTRY_NAMES[stem] || stem.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
+    return `${name} ${n}: `;
   }
+
+  const ENTRY_NAMES = { workExperience: "Work Experience", education: "Education", websitePanelSet: "Websites",
+    webAddress: "Websites", certification: "Certifications", language: "Languages" };
 
   /** A listbox button's question. Its aria-label also holds its current value. */
   function listboxLabel(button) {
@@ -1333,25 +1346,44 @@
     const parts = dateParts(value);
     if (!parts) return false;
     const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"], input[aria-label="${name}"]`);
-    const month = box("Month");
-    const day = box("Day");
-    const year = box("Year");
+    // Workday's date widget re-renders on every change: a box held from
+    // before is no longer on the page, and a value set on it goes nowhere.
+    // Its ids are stable ("workExperience-1--startDate-dateSectionYear-input"),
+    // so each box is found again by id at the moment it is set.
+    const finder = (name) => {
+      const first = box(name);
+      if (!first) return null;
+      const id = first.id;
+      return () => (id && document.getElementById(id)) || (first.isConnected ? first : box(name));
+    };
+    const month = finder("Month");
+    const day = finder("Day");
+    const year = finder("Year");
     if (month && !parts.month) return false; // "Present", or a year alone
     // Each box gets its whole value at once, as a paste would, then change
     // and blur -- what Simplify's Workday rules do too. Typing digit by digit
     // lost dates: Workday's spinbuttons take digits on keydown themselves,
     // so typed digits arrived twice ("05" as "0055", no month at all).
-    const put = (input, text) => {
-      if (!input) return;
-      input.focus();
-      nativeSet(input, text);
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      input.blur();
+    const put = async (find, text) => {
+      if (!find) return true;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const input = find();
+        if (!input) return false;
+        input.focus();
+        nativeSet(input, text);
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        input.blur();
+        await sleep(20); // let a re-render land before reading back
+        if (Number(find()?.value) === Number(text)) return true;
+      }
+      return false;
     };
-    put(month, pad(parts.month || 1));
-    put(day, pad(parts.day || 1));
-    put(year, parts.year);
-    return Boolean(year ? year.value : month?.value);
+    const ok = [
+      await put(month, pad(parts.month || 1)),
+      await put(day, pad(parts.day || 1)),
+      await put(year, parts.year),
+    ];
+    return ok.every(Boolean);
   }
 
   function isFilled(entry) {
@@ -1482,29 +1514,66 @@
   // Nothing to fill until then, so the whole step used to be skipped.
   const LINK_KEYS = ["linkedin", "github", "portfolio", "other_link"];
   const ENTRY_SECTIONS = [
-    { test: /experience|employment|work.?history|where.*worked/i, count: (p) => (p.experience || []).length },
-    { test: /education|school/i, count: (p) => (p.education || []).length },
-    { test: /website/i, count: (p) => LINK_KEYS.filter((k) => String(p[k] || "").trim()).length },
+    { test: /experience|employment|work.?history|where.*worked/i, stems: ["workExperience"],
+      count: (p) => (p.experience || []).length },
+    { test: /education|school/i, stems: ["education"], count: (p) => (p.education || []).length },
+    { test: /website/i, stems: ["websitePanelSet", "webAddress"],
+      count: (p) => LINK_KEYS.filter((k) => String(p[k] || "").trim()).length },
   ];
+
+  /** Entries already on the page for a section: panels, marked boxes, or ids. */
+  function countEntries(kind, prefix) {
+    const numbers = new Set();
+    if (prefix) {
+      document.querySelectorAll(`[role="group"][aria-labelledby^="${CSS.escape(prefix)}"][aria-labelledby$="-panel"]`)
+        .forEach((g) => numbers.add(g.getAttribute("aria-labelledby")));
+    }
+    for (const stem of kind.stems) {
+      document.querySelectorAll(`[data-automation-id^="${stem}-"]`).forEach((el) => {
+        const m = el.getAttribute("data-automation-id").match(/-(\d+)$/);
+        if (m) numbers.add(`box${m[1]}`);
+      });
+      document.querySelectorAll(`[id^="${stem}-"]`).forEach((el) => {
+        const m = el.id.match(/^[a-zA-Z]+-(\d+)--/);
+        if (m) numbers.add(`box${m[1]}`);
+      });
+    }
+    return numbers.size;
+  }
+
+  const addButtonIn = (root) => [...root.querySelectorAll("button")].find((b) =>
+    b.getAttribute("data-automation-id") === "add-button" ||
+    /^add\b/i.test(b.getAttribute("aria-label") || b.textContent.trim()));
   const MAX_ENTRIES = 4;
 
   /** Sections with an Add button, and how many panels each should hold. */
   async function entryPlan() {
-    const sections = [...document.querySelectorAll('[role="group"][aria-labelledby$="-section"]')].filter(nodeVisible);
-    if (!sections.length) return [];
+    // A section is a labelled group ("Work-Experience-section") or, failing
+    // that, wherever a button says "Add Work Experience" / "Add Another …".
+    const found = [];
+    for (const group of document.querySelectorAll('[role="group"][aria-labelledby$="-section"]')) {
+      if (!nodeVisible(group)) continue;
+      const id = group.getAttribute("aria-labelledby");
+      found.push({ root: group, name: `${id} ${document.getElementById(id)?.textContent || ""}`, prefix: id.replace(/section$/, "") });
+    }
+    for (const button of document.querySelectorAll("button")) {
+      const name = button.getAttribute("aria-label") || button.textContent.trim();
+      if (!/^add\b/i.test(name) || !nodeVisible(button) || found.some((f) => f.root.contains(button))) continue;
+      if (/^add(?: another)?$/i.test(name.trim())) continue; // says nothing about which section
+      found.push({ root: button.parentElement, name, prefix: "", button });
+    }
+    if (!found.length) return [];
     let profile = {};
     try { ({ profile = {} } = await chrome.storage.local.get("profile")); } catch { return []; }
     const plan = [];
-    for (const section of sections) {
-      const id = section.getAttribute("aria-labelledby");
-      const kind = ENTRY_SECTIONS.find((k) => k.test.test(`${id} ${document.getElementById(id)?.textContent || ""}`));
-      if (!kind) continue;
-      // Panels are "Work-Experience-1-panel", "Work-Experience-2-panel"...
-      const prefix = id.replace(/section$/, "");
-      const panels = () => document.querySelectorAll(
-        `[role="group"][aria-labelledby^="${CSS.escape(prefix)}"][aria-labelledby$="-panel"]`).length;
+    const taken = new Set();
+    for (const { root, name, prefix, button } of found) {
+      const kind = ENTRY_SECTIONS.find((k) => k.test.test(name));
+      if (!kind || taken.has(kind)) continue;
+      taken.add(kind);
+      const panels = () => countEntries(kind, prefix);
       const want = Math.min(kind.count(profile), MAX_ENTRIES);
-      if (panels() < want) plan.push({ section, panels, want });
+      if (panels() < want) plan.push({ section: root, add: button, panels, want });
     }
     return plan;
   }
@@ -1517,11 +1586,10 @@
   /** Click Add until each section holds one panel per profile entry. */
   async function addEntries() {
     let added = 0;
-    for (const { section, panels, want } of await entryPlan()) {
+    for (const { section, add: first, panels, want } of await entryPlan()) {
       for (let guard = 0; panels() < want && guard < MAX_ENTRIES; guard++) {
-        const add = [...section.querySelectorAll("button")].find((b) =>
-          b.getAttribute("data-automation-id") === "add-button" ||
-          /^add\b/i.test(b.getAttribute("aria-label") || b.textContent.trim()));
+        // The button may be relabelled "Add Another" after the first click.
+        const add = (first && first.isConnected && first) || addButtonIn(section);
         if (!add) break;
         const before = panels();
         fire(add, "click");
