@@ -55,6 +55,22 @@ for (const row of rows) {
       const f = reply.fields;
       Object.assign(prediction.basics, {
         fname: f.first_name || "", lname: f.last_name || "", email: f.email || "", phone: f.phone || "",
+        city: f.city || "", state: f.state || "", country: f.country || "",
+      });
+      prediction.personalSummary = f.summary || "";
+      prediction.skills = reply.debug?.skillGroups || [];
+      const S = reply.sections;
+      prediction.projects = (S.projects || []).map((x, i) => ({
+        name: x.name || "", url: x.url || null,
+        startYear: date(x.start_date).year, endYear: date(x.end_date).year,
+        description: reply.debug?.projectBullets?.[i] || (x.description ? [x.description] : []),
+      }));
+      prediction.certifications = (S.certifications || []).map((c) => ({ name: c.name || "", issuer: c.issuer || "", date: c.date || "" }));
+      prediction.awards = (S.awards || []).map((a) => ({ title: a.title || "", awarder: a.awarder || "", date: a.date || "" }));
+      prediction.volunteering = (reply.debug?.volunteerOnly || []).map((v) => {
+        const start = date(v.start_date), end = date(v.end_date);
+        return { organization: v.organization || "", position: v.role || "", startYear: start.year,
+          endYear: end.year, currentlyVolunteerHere: end.current, description: v.description ? [v.description] : [] };
       });
       prediction.experience = reply.sections.experience.map((x, i) => {
         const start = date(x.start_date), end = date(x.end_date);

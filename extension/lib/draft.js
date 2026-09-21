@@ -19,11 +19,15 @@
 export const SECTION_KINDS = {
   education: "Education, academic background, qualifications, degrees",
   experience: "Work experience, employment, professional history, internships, jobs",
-  projects: "Projects, personal or academic projects",
-  skills: "Skills, technical skills, languages, tools",
-  summary: "Summary, profile, objective, about",
-  activities: "Leadership, activities, volunteering, affiliations, extracurriculars",
-  awards: "Awards, honors, certifications, publications",
+  projects: "Projects, personal or academic projects, open-source work, portfolio",
+  skills: "Skills, technical skills, tools, competencies",
+  summary: "Summary, profile, objective, about me",
+  certifications: "Certifications, licences, courses, training",
+  awards: "Awards, honours, recognition, achievements",
+  publications: "Publications, papers, talks, speaking",
+  volunteering: "Volunteering, community service, pro bono work",
+  activities: "Leadership, activities, memberships, affiliations, extracurriculars",
+  languages: "Spoken languages",
   other: "Some other section heading",
   __none__: "Not a section heading -- ordinary content",
 };
@@ -165,7 +169,14 @@ export function headingCandidates(lines) {
 const VOCABULARY = [
   [/\b(?:experience|employment|career|work history|professional history|positions|berufserfahrung|exp[eé]rience professionnelle|experiencia)\b/i, "experience"],
   [/\b(?:education|academic|credentials|qualifications|studies|ausbildung|formation|educaci[oó]n)\b/i, "education"],
-  [/\bprojects?\b/i, "projects"],
+  [/\b(?:projects?|open[- ]source|portfolio)\b/i, "projects"],
+  [/\b(?:certifications?|licen[cs]es|training|courses)\b/i, "certifications"],
+  [/\b(?:awards?|honou?rs|recognition|achievements)\b/i, "awards"],
+  [/\b(?:publications?|papers|speaking|talks)\b/i, "publications"],
+  [/\b(?:volunteer\w*|community service|pro bono)\b/i, "volunteering"],
+  [/\b(?:leadership|activities|affiliations|memberships|involvement|extracurricular)\b/i, "activities"],
+  [/\b(?:summary|profile|objective|about)\b/i, "summary"],
+  [/^languages?:?$/i, "languages"],
   [/\b(?:skills|competenc|technical|kenntnisse|comp[eé]tences|habilidades)/i, "skills"],
 ];
 
@@ -261,8 +272,9 @@ export function splitPieces(line) {
       pieces[pieces.length - 1] = `${prev}, ${piece}`;
       continue;
     }
-    // A lower-case start continues the previous clause.
-    if (prev && /^[a-z]/.test(piece)) {
+    // A lower-case start continues the previous clause -- but an email, handle
+    // or URL also starts in lower case and is its own field.
+    if (prev && /^[a-z]/.test(piece) && !/@|https?:|www\.|^[\w-]+(?:\.[\w-]+)+(?:\/|$)/.test(piece)) {
       pieces[pieces.length - 1] = `${prev}, ${piece}`;
       continue;
     }
@@ -344,4 +356,135 @@ export function splitDegreeField(text) {
 export function cleanGpa(text) {
   const m = text.match(/\d+(?:\.\d+)?\s*(?:\/\s*\d+(?:\.\d+)?)?/);
   return m ? m[0].replace(/\s+/g, "") : text;
+}
+
+
+// ------------------------------------------------------- the list sections
+//
+// Skills, certifications, awards and projects are regular enough that code
+// reads them directly: Jev has already said which section each line is in.
+
+const DATE_IN = new RegExp(DATE_RANGE.source, "i");
+const URL_IN = /(?:https?:\/\/|www\.)\S+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|io|dev|org|net|ai|app|co)(?:\/\S*)?/i;
+const strip = (line) => line.replace(BULLET, "").trim();
+
+const LIST_HEADER =
+  /^(?:name|title|certification|certificate|credential|award|honou?r|issuer|issued by|awarded by|organi[sz]ation|date|dates?|year|status|expiry|expires|status \/ expiry|id|credential id|venue|publisher)s?:?$/i;
+
+/** "Languages: Go, Python, Rust" -> { category: "Languages", skills: [...] } */
+export function readSkills(lines) {
+  const groups = [];
+  for (const raw of lines) {
+    const line = strip(raw);
+    if (!line) continue;
+    const labelled = line.match(/^([^:]{2,40}):\s*(.+)$/);
+    const category = labelled ? labelled[1].trim() : "";
+    const list = (labelled ? labelled[2] : line)
+      .replace(/\([^()]*\)/g, (m) => m.replace(/,/g, "\u0002"))
+      .split(/\s*(?:,|;|\||•|·)\s*/)
+      .map((x) => x.replace(/\u0002/g, ",").replace(/[.]$/, "").trim())
+      .filter((x) => x && x.split(/\s+/).length <= 5);
+    if (list.length) groups.push({ category, skills: list });
+  }
+  return groups;
+}
+
+/**
+ * One entry per line: a name, who gave it, and when.
+ * "AWS Certified Developer — Amazon Web Services, Issued: 06/2022"
+ */
+export function readListEntries(lines) {
+  const entries = [];
+  for (const raw of lines) {
+    const line = strip(raw);
+    if (!line || line.split(/\s+/).length > 30) continue;
+    let date = "";
+    const withoutDate = line
+      .replace(/\b(?:Issued|Awarded|Earned|Received|Completed|Date):?\s*/gi, "")
+      .replace(/\(([^()]*)\)/g, (m, inner) => {
+        if (!date && DATE_IN.test(inner)) { date = inner.trim(); return ""; }
+        return m;
+      });
+    // In a list entry "|" and a spaced dash always separate fields, so split on
+    // them first -- a line with a sentence after the "|" reads as prose otherwise.
+    const pieces = withoutDate.split(/\s+[|\u2013\u2014-]\s+/).flatMap((part) => splitPieces(part));
+    const rest = [];
+    for (const p of pieces) {
+      if (!date && DATE_IN.test(p) && p.replace(DATE_IN, "").trim().length <= 2) date = p;
+      // Trailing commentary is not an issuer: "| the only industry exam for Ruby".
+      else if (rest.length && p.split(/\s+/).length > 8) break;
+      else rest.push(p);
+    }
+    if (!rest.length) continue;
+    // A table's header row names its columns: "Certification | Issuer | Date".
+    if (rest.every((p) => LIST_HEADER.test(p))) continue;
+    let name = rest[0];
+    let issuer = rest.slice(1).join(", ");
+    // "Ruby Certified Developer (Ruby Association, Japan)": the bracket is who issued it.
+    const bracket = name.match(/^(.*\S)\s*\(([^()]+)\)$/);
+    if (bracket && !issuer) {
+      name = bracket[1];
+      issuer = bracket[2];
+    }
+    entries.push({ name, issuer, date });
+  }
+  return entries;
+}
+
+/**
+ * A project name looks like a title: short and mostly capitalised, or it
+ * carries a separator, a link or a date. A sentence under a project -- or its
+ * wrapped tail, "Ongoing since late 2022" -- is description, not the next one.
+ */
+function projectTitleLike(line) {
+  const words = strip(line).split(/\s+/);
+  if (/\||—|https?:|www\.|github\.com/.test(line)) return true;
+  if (words.length > 8) return false;
+  const capitalised = words.filter((w) => /^[A-Z0-9“"'(]/.test(w)).length;
+  return capitalised / words.length >= 0.6;
+}
+
+/** A project starts at a title-like line; the lines under it are its description. */
+export function readProjects(lines) {
+  const projects = [];
+  let current = null;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (isBullet(line) || (current && !projectTitleLike(line))) {
+      if (current) current.description.push(strip(line));
+      continue;
+    }
+    const url = (line.match(URL_IN) || [""])[0];
+    const dates = (line.match(DATE_IN) || [""])[0];
+    const name = strip(line)
+      .replace(URL_IN, "").replace(DATE_IN, "")
+      .split(/\s*(?:\||—|– |:|\(|,)\s*/)[0]
+      .replace(/[—–|·,:-]+\s*$/, "").trim();
+    if (!name) continue;
+    current = { name, url, dates, description: [] };
+    projects.push(current);
+  }
+  return projects;
+}
+
+const COUNTRIES =
+  /^(?:USA|US|U\.S\.A?\.|United States|UK|U\.K\.|United Kingdom|Canada|India|Germany|France|Spain|Italy|Ireland|Australia|Singapore|Japan|China|Netherlands|Switzerland|Sweden|Brazil|Mexico|México|Argentina|UAE)$/i;
+
+/** City, state and country from the header's "San Francisco, CA" piece. */
+export function readHomeLocation(headerLines) {
+  for (const line of headerLines) {
+    for (const piece of splitPieces(line)) {
+      if (/@|\d{3}|https?:|www\.|\.com/i.test(piece)) continue;
+      const parts = piece.split(/\s*,\s*/);
+      if (parts.length < 2 || parts.length > 3) continue;
+      if (!parts.every((p) => /^[A-ZÀ-Þ][\p{L}.' -]*$/u.test(p))) continue;
+      const [city, second, third] = parts;
+      const country = COUNTRIES.test(third || "") ? third : COUNTRIES.test(second) ? second : "";
+      const state = /^[A-Z]{2}$/.test(second) || (third && !COUNTRIES.test(second)) ? second : "";
+      if (!state && !country) continue;
+      return { city, state, country };
+    }
+  }
+  return null;
 }

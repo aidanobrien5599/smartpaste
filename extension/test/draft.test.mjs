@@ -174,3 +174,49 @@ test("assemble: a table's header row is not a job", () => {
   assert.equal(roles.length, 1);
   assert.equal(roles[0].company, "Zenith Corp");
 });
+
+test("readSkills: categories and lists", async () => {
+  const { readSkills } = await import("../lib/draft.js");
+  assert.deepEqual(readSkills(["Languages: Go, Python, Ruby", "• Frameworks: React, Rails (Ruby, API mode)"]), [
+    { category: "Languages", skills: ["Go", "Python", "Ruby"] },
+    { category: "Frameworks", skills: ["React", "Rails (Ruby, API mode)"] },
+  ]);
+});
+
+test("readListEntries: name, issuer, date", async () => {
+  const { readListEntries } = await import("../lib/draft.js");
+  assert.deepEqual(readListEntries(["AWS Certified Developer — Amazon Web Services, Issued: 06/2022"]),
+    [{ name: "AWS Certified Developer", issuer: "Amazon Web Services", date: "06/2022" }]);
+  assert.deepEqual(readListEntries(["• SAP Innovator of the Year, SAP CTO office (2022)"]),
+    [{ name: "SAP Innovator of the Year", issuer: "SAP CTO office", date: "2022" }]);
+});
+
+test("readProjects: a header line and its bullets", async () => {
+  const { readProjects } = await import("../lib/draft.js");
+  const p = readProjects(["BadgerBase | Next.js, Hono, Bun", "• Shipped an MCP server", "• Reached 2000+ users",
+    "Local LLM Inference Lab | llama.cpp", "• Built an inference lab"]);
+  assert.equal(p.length, 2);
+  assert.equal(p[0].name, "BadgerBase");
+  assert.equal(p[0].description.length, 2);
+});
+
+test("readHomeLocation: from the header", async () => {
+  const { readHomeLocation } = await import("../lib/draft.js");
+  assert.deepEqual(readHomeLocation(["Ruby Chen", "San Francisco, CA · ruby@email.com · (415) 555-0183"]),
+    { city: "San Francisco", state: "CA", country: "" });
+  assert.deepEqual(readHomeLocation(["Jane", "Berlin, Germany | jane@x.de"]), { city: "Berlin", state: "", country: "Germany" });
+});
+
+test("readListEntries: header rows skipped, bracket as issuer, trailing prose dropped", async () => {
+  const { readListEntries } = await import("../lib/draft.js");
+  assert.deepEqual(readListEntries(["Certification | Issuer | Status / Expiry"]), []);
+  assert.deepEqual(readListEntries(["Ruby Certified Developer (Ruby Association, Japan) | the only industry exam that tests Ruby internals in depth"]),
+    [{ name: "Ruby Certified Developer", issuer: "Ruby Association, Japan", date: "" }]);
+});
+
+test("readProjects: a sentence under a project is description", async () => {
+  const { readProjects } = await import("../lib/draft.js");
+  const p = readProjects(["OpenMetrics Collector | Go", "Open-source Prometheus-compatible metrics aggregation library for edge devices",
+    "Ongoing since late 2022", "DistSync | Rust"]);
+  assert.deepEqual(p.map((x) => x.name), ["OpenMetrics Collector", "DistSync"]);
+});

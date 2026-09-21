@@ -123,6 +123,18 @@ six of the nine sections are not extracted at all (each scores 0 everywhere).
 Where there is text and a section is extracted, the parse is strong --
 experience, the hardest section, is 0.94.
 
+**After adding the other sections** (summary, skills, projects, certifications,
+awards, volunteering, and home city/state):
+
+| | all 38 | the 10 with a text layer |
+|---|---|---|
+| Headline entity F1 | 0.084 -> **0.182** | 0.318 -> **0.691** |
+| personalSummary | | 0.973 |
+| experience / education | | 0.938 / 0.798 |
+| basics | | 0.672 -> 0.844 |
+| awards / skills / certifications / projects | | 0.672 / 0.504 / 0.388 / 0.377 |
+| volunteering | | 0 (one entry in the whole key) |
+
 Two caveats on any comparison. The drafter was tuned against these 38 resumes,
 so these numbers are optimistic. And the published leaderboard (top entries
 ~0.94 headline) is computed over a 155-resume set that includes medium-

@@ -86,6 +86,15 @@ export const GROUPS = [
     ],
   },
   {
+    title: "Summary & skills",
+    long: true,
+    fields: [
+      ["summary", "Professional summary", "Two or three sentences about who you are professionally."],
+      ["skills", "Skills", "Languages: Python, TypeScript, Go\nFrameworks: React, Next.js"],
+      ["languages", "Spoken languages", "English (native), Spanish (conversational)"],
+    ],
+  },
+  {
     title: "Written answers",
     long: true,
     fields: [
@@ -142,6 +151,43 @@ export const REPEATABLE = [
     ],
   },
 ];
+
+REPEATABLE.push(
+  {
+    key: "projects", title: "Projects", singular: "project", summary: "name",
+    fields: [
+      ["name", "Project name", "BadgerBase"],
+      ["url", "Link", "https://badgerbase.app"],
+      ["start_date", "Start date", "Jan 2025"],
+      ["end_date", "End date", "Present"],
+      ["description", "What it is", "Course-planning tool used by 2,000+ UW students", true],
+    ],
+  },
+  {
+    key: "certifications", title: "Certifications", singular: "certification", summary: "name",
+    fields: [["name", "Certification", "AWS Certified Developer"], ["issuer", "Issued by", "Amazon Web Services"],
+      ["date", "Date", "Jun 2025"]],
+  },
+  {
+    key: "awards", title: "Awards", singular: "award", summary: "title",
+    fields: [["title", "Award", "Dean's List"], ["awarder", "Awarded by", "UW-Madison"], ["date", "Date", "2025"]],
+  },
+  {
+    key: "publications", title: "Publications", singular: "publication", summary: "title",
+    fields: [["title", "Title", ""], ["venue", "Venue or publisher", ""], ["date", "Date", ""]],
+  },
+  {
+    key: "volunteering", title: "Volunteering & leadership", singular: "role", summary: "organization",
+    fields: [
+      ["organization", "Organization", "CoderDojo"],
+      ["role", "Role", "Volunteer mentor"],
+      ["location", "Location", "Madison, WI"],
+      ["start_date", "Start date", "Sep 2024"],
+      ["end_date", "End date", "Present"],
+      ["description", "What you did", "", true],
+    ],
+  },
+);
 
 export const ORDINALS = [
   "most recent",

@@ -9,7 +9,8 @@
 import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.js";
 import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.js";
 import {
-  assemble, cleanGpa, DEGREES, sectionByVocabulary, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
+  assemble, cleanGpa, DEGREES, sectionByVocabulary, readSkills, readListEntries, readProjects,
+  readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
 import { resolve } from "./lib/resolve.js";
@@ -38,16 +39,41 @@ async function loadOptions() {
   return { apiKey, options: buildOptions(profile, extraText) };
 }
 
+// A normal answer takes well under a second, but the API occasionally leaves a
+// request hanging with no response at all -- once for five minutes, which
+// froze a whole draft. Give up on a request after REQUEST_TIMEOUT and retry.
+const REQUEST_TIMEOUT = 20000;
+const ATTEMPTS = 3;
+const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
+
 async function callJev(apiKey, state, questions) {
-  const response = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ state, model: MODEL, questions }),
-  });
-  if (!response.ok) {
-    throw new Error(`TypeSafe API ${response.status}: ${(await response.text()).slice(0, 200)}`);
+  let lastError;
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+    try {
+      const response = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ state, model: MODEL, questions }),
+        signal: controller.signal,
+      });
+      if (response.ok) return (await response.json()).answers;
+      const detail = (await response.text()).slice(0, 200);
+      lastError = new Error(`TypeSafe API ${response.status}: ${detail}`);
+      // A request that is simply too big will not succeed on retry.
+      if (!RETRYABLE.has(response.status)) throw lastError;
+    } catch (error) {
+      if (error === lastError) throw error;
+      lastError = error.name === "AbortError"
+        ? new Error(`TypeSafe API did not answer within ${REQUEST_TIMEOUT / 1000}s`)
+        : error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  return (await response.json()).answers;
+  throw lastError;
 }
 
 /**
@@ -429,7 +455,7 @@ async function profileBySegments(text) {
   const fieldsPromise = contactFields(apiKey, contactLines);
 
   // 3. Cut education and experience lines into single-field pieces; ask what each is.
-  const pieces = { education: [], experience: [] };
+  const pieces = { education: [], experience: [], volunteering: [], activities: [] };
   for (const row of rows) {
     if (row.heading || !(row.section in pieces)) continue;
     if (isBullet(row.text)) {
@@ -460,7 +486,7 @@ async function profileBySegments(text) {
   }
   const pieceQuestions = {};
   for (const [section, list] of Object.entries(pieces)) {
-    const kinds = section === "education" ? EDUCATION_KINDS : EXPERIENCE_KINDS;
+    const kinds = section === "education" ? EDUCATION_KINDS : EXPERIENCE_KINDS; // volunteering reads like a job
     list.forEach((p, i) => {
       if (p.bullet || p.fixed) return;
       pieceQuestions[`${section}_${i}`] = choice(
@@ -496,6 +522,36 @@ async function profileBySegments(text) {
       start_date: start, end_date: end, location: e.location });
   });
 
+  // 4b. The list-like sections are regular enough for code to read.
+  const bodyOf = (kind) => rows.filter((r) => r.section === kind && !r.heading).map((r) => r.text);
+  // An entry with neither an organisation nor a role is noise, and a
+  // spurious entry costs as much as a missing one.
+  const asRoles = (list) => assemble(list, "experience").map((e) => {
+    const { start, end } = e.dates ? parseDates(e.dates) : { start: "", end: "" };
+    return prune({ organization: e.company, role: e.title, location: e.location,
+      start_date: start, end_date: end, description: e.description.join(" ") });
+  }).filter((v) => v.organization || v.role);
+  const volunteering = asRoles(pieces.volunteering);
+  const activities = asRoles(pieces.activities);
+  const skills = readSkills(bodyOf("skills"));
+  const projects = readProjects(bodyOf("projects")).map((p) => {
+    const { start, end } = p.dates ? parseDates(p.dates) : { start: "", end: "" };
+    return prune({ name: p.name, url: p.url, start_date: start, end_date: end,
+      description: p.description.join(" ") });
+  });
+  const certifications = readListEntries(bodyOf("certifications")).map((c) =>
+    prune({ name: c.name, issuer: c.issuer, date: c.date ? parseDates(c.date).end : "" }));
+  const awards = readListEntries(bodyOf("awards")).map((a) =>
+    prune({ title: a.name, awarder: a.issuer, date: a.date ? parseDates(a.date).end : "" }));
+  const publications = readListEntries(bodyOf("publications")).map((p) =>
+    prune({ title: p.name, venue: p.issuer, date: p.date ? parseDates(p.date).end : "" }));
+  const extras = prune({
+    summary: bodyOf("summary").join(" "),
+    skills: skills.map((g) => (g.category ? `${g.category}: ` : "") + g.skills.join(", ")).join("\n"),
+    languages: bodyOf("languages").join(", "),
+    ...(readHomeLocation(rows.filter((r) => r.section === "header").map((r) => r.text)) || {}),
+  });
+
   // 5. Degree names from a fixed list: "B.S." -> "Bachelor of Science".
   const degreeQuestions = {};
   education.forEach((e, i) => {
@@ -513,13 +569,19 @@ async function profileBySegments(text) {
   });
 
   return {
-    fields: await fieldsPromise,
-    sections: { education, experience },
+    fields: { ...extras, ...(await fieldsPromise) },
+    // The profile keeps one "Volunteering & leadership" list; the benchmark
+    // counts only volunteer work, so the split is kept in debug.
+    sections: { education, experience, projects, certifications, awards, publications,
+      volunteering: [...volunteering, ...activities] },
     lines: lines.length,
     // What Jev decided, line by line -- for the corpus scorer, not the UI.
     debug: {
       // Each role's bullets as a list, for scorers that compare them one by one.
       experienceBullets: assembledExperience.map((e) => e.description),
+      skillGroups: skills,
+      volunteerOnly: volunteering,
+      projectBullets: readProjects(bodyOf("projects")).map((p) => p.description),
       headings: [...headings].map(([i, kind]) => `${kind}: ${lines[i]}`),
       pieces: Object.fromEntries(Object.entries(pieces).map(([k, list]) =>
         [k, list.map((p) => `${p.bullet ? "bullet" : p.label}: ${p.text.slice(0, 50)}`)])),
