@@ -13,6 +13,7 @@
  */
 
 (() => {
+  const FILE_SELECTOR = 'input[type="file"]';
   const FIELD_SELECTOR =
     'input:not([type]), input[type="text"], input[type="email"], ' +
     'input[type="tel"], input[type="url"], input[type="search"], textarea, select';
@@ -158,8 +159,63 @@
     return true;
   }
 
+  /* ----------------------------------------------------------- attachments */
+
+  const DOC_KEYWORDS = [
+    ["resume", ["resume", "cv", "curriculum"]],
+    ["transcript", ["transcript", "academic record"]],
+    ["cover_letter", ["cover letter", "coverletter"]],
+  ];
+
+  function documentFor(label) {
+    const low = (label || "").toLowerCase();
+    for (const [key, words] of DOC_KEYWORDS) {
+      if (words.some((word) => low.includes(word))) return key;
+    }
+    return null;
+  }
+
+  function decode(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  /**
+   * A file input's `files` is read-only, but it accepts a FileList taken from
+   * a DataTransfer -- which is how a drag-and-drop would have delivered it.
+   */
+  async function attachDocuments() {
+    const inputs = [...document.querySelectorAll(FILE_SELECTOR)].filter(
+      (el) => !el.disabled && !el.files.length
+    );
+    if (!inputs.length) return 0;
+    const { documents = {} } = await chrome.storage.local.get("documents");
+    let attached = 0;
+    for (const input of inputs) {
+      const key = documentFor(labelFor(input) + " " + (input.name || ""));
+      const stored = key && documents[key];
+      if (!stored) continue;
+      try {
+        const file = new File([decode(stored.data)], stored.name, {
+          type: stored.type || "application/pdf",
+        });
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        attached++;
+      } catch (error) {
+        // Some hosts wrap uploads in a custom widget that rejects this.
+      }
+    }
+    return attached;
+  }
+
   /** Fill everything the model was confident about, leaving the rest alone. */
-  function fillPage() {
+  async function fillPage() {
     let filled = 0;
     let skipped = 0;
     for (const { element, result } of known) {
@@ -167,11 +223,11 @@
       if (element.value && element.value.trim()) { skipped++; continue; }
       if (setValue(element, result.value)) filled++;
     }
-    note(
-      skipped
-        ? `filled ${filled}, left ${skipped} for you`
-        : `filled ${filled}`
-    );
+    const attached = await attachDocuments();
+    const parts = [`filled ${filled}`];
+    if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
+    if (skipped) parts.push(`left ${skipped} for you`);
+    note(parts.join(", "));
   }
 
   function onKeyDown(event) {
@@ -237,12 +293,27 @@
 
   /* ---------------------------------------------------------------- button */
 
-  function showButton(count) {
+  async function countAttachable() {
+    const inputs = [...document.querySelectorAll(FILE_SELECTOR)].filter(
+      (el) => !el.disabled && !el.files.length
+    );
+    if (!inputs.length) return 0;
+    const { documents = {} } = await chrome.storage.local.get("documents");
+    return inputs.filter((el) => {
+      const key = documentFor(labelFor(el) + " " + (el.name || ""));
+      return key && documents[key];
+    }).length;
+  }
+
+  async function showButton(count) {
     document.querySelector(".smartpaste-button")?.remove();
-    if (!count) return;
+    const files = await countAttachable();
+    if (!count && !files) return;
     const button = document.createElement("button");
     button.className = "smartpaste-button";
-    button.textContent = `Autofill ${count} field${count === 1 ? "" : "s"}`;
+    button.textContent =
+      `Autofill ${count} field${count === 1 ? "" : "s"}` +
+      (files ? ` + ${files} file${files === 1 ? "" : "s"}` : "");
     button.addEventListener("click", (event) => {
       event.preventDefault();
       fillPage();

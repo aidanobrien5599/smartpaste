@@ -24,6 +24,25 @@ parsed resume 13–16 of 19 fields with several at 0.75–0.89; structured profi
 The resume box is still there as *Extra lines*, for essay answers that want a
 real bullet quoted back. It is optional.
 
+## Repeated sections
+
+Education and Experience take as many entries as you like, newest first. Each
+entry's options are labelled with an ordinal — *"Job title of the 2nd most
+recent role (Intelligible AI)"* — so a Workday form asking for `Employer 2` and
+`Job Title 2` gets the right one. Measured against a numbered Workday-shaped
+form with three roles, two of which share the same job title: **16 of 16
+correct in 0.66s**.
+
+## Documents
+
+Store your resume, transcript and cover letter once. Autofill attaches them to
+the form's upload fields, matching on the field's label, and leaves any other
+file input — a headshot, a work sample — alone.
+
+Nothing is uploaded anywhere. The file is held in this browser and handed
+straight to the page through a `DataTransfer`, exactly as a drag-and-drop
+would deliver it.
+
 ## Dropdowns
 
 A `<select>` gets a different question: not "which profile entry answers this"

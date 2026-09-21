@@ -7,7 +7,7 @@
  * the regex layer to extract a substring. Structured wins wherever it exists.
  */
 
-import { LABELS } from "./schema.js";
+import { LABELS, ORDINALS, REPEATABLE } from "./schema.js";
 
 export const NONE = "__none__";
 export const MAX_OPTIONS = 254;
@@ -31,13 +31,37 @@ export function extraSnippets(text, startIndex = 0) {
   return out;
 }
 
+/** Repeated entries, each option labelled with its ordinal and its subject. */
+function repeatedOptions(profile) {
+  const options = {};
+  for (const section of REPEATABLE) {
+    const entries = Array.isArray(profile[section.key]) ? profile[section.key] : [];
+    entries.forEach((entry, index) => {
+      const ordinal = ORDINALS[index] || `${index + 1}th most recent`;
+      const subject = (entry[section.summary] || "").trim();
+      for (const [key, label] of section.fields) {
+        const value = (entry[key] || "").toString().trim();
+        if (!value) continue;
+        options[`${section.key}${index + 1}_${key}`] = {
+          field: `${label} of the ${ordinal} ${section.singular}` +
+            (subject && key !== section.summary ? ` (${subject})` : ""),
+          value,
+        };
+      }
+    });
+  }
+  return options;
+}
+
 /** The full option set: labelled profile fields first, then free-form lines. */
 export function buildOptions(profile = {}, extraText = "") {
   const options = {};
   for (const [key, value] of Object.entries(profile)) {
-    if (!value || !String(value).trim()) continue;
+    if (Array.isArray(value) || value === null || typeof value === "object") continue;
+    if (!String(value).trim()) continue;
     options[key] = { field: LABELS[key] || key, value: String(value).trim() };
   }
+  Object.assign(options, repeatedOptions(profile));
   Object.assign(options, extraSnippets(extraText));
   return Object.fromEntries(Object.entries(options).slice(0, MAX_OPTIONS));
 }

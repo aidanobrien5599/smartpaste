@@ -51,6 +51,24 @@
          display: flex; align-items: center; gap: 14px; }
   .bar button { margin: 0; }
   textarea.short { min-height: 78px; }
+  .entry { border: 1px solid var(--line); border-radius: 8px; padding: 14px;
+           margin-bottom: 12px; position: relative; }
+  .entry h3 { font-size: 13px; margin: 0 0 4px; font-weight: 600; }
+  .entry .remove { position: absolute; top: 10px; right: 10px; background: none;
+                   border: 0; color: var(--dim); cursor: pointer; font-size: 18px;
+                   margin: 0; padding: 0 4px; line-height: 1; }
+  .entry .remove:hover { color: #c0392b; }
+  .add { background: transparent; color: var(--accent); border: 1px dashed var(--line);
+         width: 100%; margin-top: 0; }
+  .doc { display: flex; align-items: center; gap: 12px; padding: 9px 0;
+         border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .doc:last-child { border-bottom: 0; }
+  .doc .name { flex: 1; color: var(--dim); font: 12px ui-monospace, Menlo, monospace; }
+  .doc .name.set { color: var(--ok); }
+  .doc label.pick { color: var(--accent); cursor: pointer; font-size: 12.5px; }
+  .doc input[type=file] { display: none; }
+  .doc button { margin: 0; padding: 3px 8px; font-size: 12px; background: transparent;
+                color: var(--dim); border: 1px solid var(--line); }
   code { font: 12px ui-monospace, Menlo, monospace; background: var(--bg);
          padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
 </style>
@@ -75,6 +93,15 @@
   </section>
 
   <div id="groups"></div>
+  <div id="repeatables"></div>
+
+  <h2>Documents</h2>
+  <section>
+    <p class="hint">Stored in this browser and attached to a form's upload
+    fields when you hit Autofill. Nothing is uploaded to any server — the
+    file is handed straight to the page, the way a drag-and-drop would.</p>
+    <div id="documents"></div>
+  </section>
 
   <h2>Extra lines (optional)</h2>
   <section>

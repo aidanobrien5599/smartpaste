@@ -43,19 +43,6 @@ export const GROUPS = [
     ],
   },
   {
-    title: "Education",
-    fields: [
-      ["school", "School", "University of Wisconsin - Madison"],
-      ["degree", "Degree", "Bachelor of Science"],
-      ["major", "Major / discipline", "Computer Science"],
-      ["minor", "Minor", ""],
-      ["gpa", "GPA", "3.9/4.00"],
-      ["grad_date", "Expected graduation date", "May 2027"],
-      ["education_start", "Education start date", "September 2023"],
-      ["coursework", "Relevant coursework", "Algorithms, Operating Systems, …"],
-    ],
-  },
-  {
     title: "Work authorization",
     fields: [
       ["work_auth", "Authorized to work in the US", "Yes"],
@@ -93,6 +80,66 @@ export const GROUPS = [
       ["additional", "Anything else", ""],
     ],
   },
+];
+
+/**
+ * Sections you can have more than one of.
+ *
+ * Each entry's options are labelled with an ordinal -- "most recent", "2nd
+ * most recent" -- because a form that asks for "Employer 2" needs Jev to know
+ * which employer is which, and because two entries with identical field names
+ * are otherwise indistinguishable options.
+ */
+export const REPEATABLE = [
+  {
+    key: "education",
+    title: "Education",
+    singular: "school",
+    summary: "school",
+    fields: [
+      ["school", "School", "University of Wisconsin - Madison"],
+      ["degree", "Degree", "Bachelor of Science"],
+      ["major", "Major / discipline", "Computer Science"],
+      ["minor", "Minor", ""],
+      ["gpa", "GPA", "3.9/4.00"],
+      ["start_date", "Start date", "September 2023"],
+      ["end_date", "Graduation date", "May 2027"],
+      ["location", "Location", "Madison, WI"],
+      ["coursework", "Relevant coursework", "Algorithms, Operating Systems, …"],
+    ],
+  },
+  {
+    key: "experience",
+    title: "Experience",
+    singular: "role",
+    summary: "company",
+    fields: [
+      ["company", "Company", "Netflix"],
+      ["title", "Job title", "Software Engineer Intern"],
+      ["location", "Location", "Los Gatos, CA"],
+      ["start_date", "Start date", "May 2026"],
+      ["end_date", "End date", "August 2026"],
+      ["manager", "Manager / reference", ""],
+      ["salary", "Compensation", ""],
+      ["reason_for_leaving", "Reason for leaving", "End of internship"],
+      ["description", "What you did", "Drove $15M+ in projected savings by …", true],
+    ],
+  },
+];
+
+export const ORDINALS = [
+  "most recent",
+  "2nd most recent",
+  "3rd most recent",
+  "4th most recent",
+  "5th most recent",
+];
+
+/** Files the extension keeps and attaches to a form's upload fields. */
+export const DOCUMENTS = [
+  ["resume", "Resume / CV", ["resume", "cv", "curriculum"]],
+  ["transcript", "Transcript", ["transcript", "academic record"]],
+  ["cover_letter", "Cover letter", ["cover letter", "coverletter"]],
 ];
 
 export const FIELDS = GROUPS.flatMap((g) =>

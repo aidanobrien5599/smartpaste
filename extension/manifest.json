@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "smartpaste",
   "version": "0.1.0",
-  "description": "\u2318V pastes the answer the field is asking for, chosen from your own resume by Jev.",
+  "description": "Autofill job applications from a profile you control. Jev picks the answer; \u2318V pastes it.",
   "permissions": [
     "storage",
     "activeTab",
