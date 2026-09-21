@@ -108,6 +108,19 @@ nudging the prompt:
 - Link fields got the whole contact line, which says the word "LinkedIn" but
   carries no URL. Link questions now see only link-shaped options, so they get
   the real URLs recovered from the PDF's annotations.
+- Bullets arrived as half sentences, because a bullet that runs past the page
+  width continues on the next line. They are rejoined before splitting — only
+  bullets, and only up to a full stop, since joining every unterminated line
+  would weld "University of Wisconsin" onto the date beneath it.
+- `Company` came back as `Netflix Los Gatos, CA` and `Job title` as `Software
+  Engineer Intern May 2026 - August 2026`. A resume packs the employer, the
+  place and the dates onto one line, so each field now takes its own reading of
+  it: a Company wants the name with the place stripped, a Location wants the
+  place, and only knowing that Netflix is a company tells you where the
+  boundary falls — so a Company insists on a name being left over, while a
+  Location takes the longest place it can find.
+- Every role showed the same location, picked off a neighbouring role's line. A
+  company or location repeated across entries is now dropped as an echo.
 
 ### The flexibility catch-all
 

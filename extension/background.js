@@ -6,7 +6,7 @@
  * hand that page's context your API key. The key never leaves here.
  */
 
-import { asCriteria, buildOptions, extraSnippets, NONE } from "./lib/profile.js";
+import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.js";
 import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.js";
 import { resolve } from "./lib/resolve.js";
 
@@ -205,7 +205,7 @@ function resumeQuestions(criteria) {
 async function profileFromResume(text) {
   const { apiKey } = await loadOptions();
   if (!apiKey) throw new Error("No API key — open smartpaste settings.");
-  const snippets = extraSnippets(text, 0, 3);
+  const snippets = extraSnippets(unwrap(text), 0, 3);
   if (Object.keys(snippets).length < 4) {
     throw new Error("Could not read enough text out of that PDF.");
   }
@@ -236,8 +236,20 @@ async function profileFromResume(text) {
       fields[item.target.key] = resolved.value;
     }
   }
+  // A duplicated company or location across entries means one of them was
+  // picked off the wrong role's line. Keep the first, drop the echo.
   for (const key of Object.keys(sections)) {
-    sections[key] = sections[key].filter((e) => e && Object.keys(e).length >= 2);
+    const seen = { company: new Set(), location: new Set(), school: new Set() };
+    sections[key] = sections[key]
+      .filter((e) => e && Object.keys(e).length >= 2)
+      .map((entry) => {
+        for (const field of Object.keys(seen)) {
+          if (!entry[field]) continue;
+          if (seen[field].has(entry[field])) delete entry[field];
+          else seen[field].add(entry[field]);
+        }
+        return entry;
+      });
   }
   return { fields, sections, lines: Object.keys(snippets).length };
 }

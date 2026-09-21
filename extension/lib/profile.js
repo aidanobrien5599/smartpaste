@@ -13,6 +13,41 @@ export const NONE = "__none__";
 export const MAX_OPTIONS = 254;
 
 const BULLET_PREFIX = /^\s*(?:[-*•·▪●‣]|\d+[.)])\s+/;
+const BULLET_START = /^\s*[-*•·▪●‣]/;
+const ENDS_SENTENCE = /[.!?]$/;
+const HEADING = /^[A-Z][A-Z\s&]{3,}$/;
+
+/**
+ * Rejoin bullets the PDF wrapped across lines.
+ *
+ * A resume bullet runs past the page width and continues on the next line, so
+ * splitting on newlines yields two half-sentences and a description that stops
+ * mid-clause. Only bullets are joined, and only until the text reaches a full
+ * stop -- joining every unterminated line would weld "University of Wisconsin"
+ * onto the date sitting beneath it.
+ */
+export function unwrap(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    let block = lines[i];
+    if (BULLET_START.test(block)) {
+      let joined = 0;
+      while (
+        joined < 3 &&
+        i + 1 < lines.length &&
+        !ENDS_SENTENCE.test(block) &&
+        !BULLET_START.test(lines[i + 1]) &&
+        !HEADING.test(lines[i + 1])
+      ) {
+        block += " " + lines[++i];
+        joined++;
+      }
+    }
+    out.push(block);
+  }
+  return out.join("\n");
+}
 
 /** Free-form lines (resume bullets, extra notes) as unlabeled options. */
 export function extraSnippets(text, startIndex = 0, minLength = 8) {

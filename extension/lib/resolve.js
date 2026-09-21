@@ -30,6 +30,27 @@ const DATE = new RegExp(
 const GPA = /\d\.\d+\s*(?:\/\s*\d(?:\.\d+)?)?/g;
 const DEGREE_TAIL =
   /\s*[,;(]?\s*\b(?:expected|expecting|anticipated|graduating|grad(?:uation)?|class of|in progress|gpa)\b.*$/i;
+// "Netflix Los Gatos, CA", "Intelligible AI Remote" -- a resume puts the
+// employer and the place on one line, and a Company field wants only the name.
+// "Los Gatos, CA", "Remote". One line often holds both an employer and a
+// place -- "Netflix Los Gatos, CA" -- and only knowing that Netflix is a
+// company tells you where the boundary falls. So the two fields disagree on
+// purpose: a Location field prefers the longest place, a Company field
+// prefers the longest one that still leaves a name in front of it.
+const PLACE = /^(?:[A-Z][A-Za-z.'-]*(?:\s+[A-Z][A-Za-z.'-]*)*,\s*[A-Z]{2}|Remote|Hybrid|On-?site)$/;
+const MAX_PLACE_WORDS = 4;
+
+/** Every way the line could end in a place, longest first. */
+function placeSplits(text) {
+  const tokens = text.trim().split(/\s+/);
+  const splits = [];
+  for (let i = Math.max(0, tokens.length - MAX_PLACE_WORDS); i < tokens.length; i++) {
+    const place = tokens.slice(i).join(" ");
+    if (PLACE.test(place)) splits.push({ place, rest: tokens.slice(0, i).join(" ") });
+  }
+  return splits;
+}
+
 const TRAILING_RANGE = new RegExp(
   `\\s*(?:${MONTHS})\\.?\\s*\\d{4}\\s*(?:[-\\u2012-\\u2015]\\s*(?:(?:${MONTHS})\\.?\\s*)?(?:\\d{4}|present|current)\\s*)?$`,
   "i"
@@ -95,6 +116,28 @@ const EXTRACTORS = [
   [["graduation", "grad date", "start date", "available", "date"], matcher(DATE)],
   [["degree", "major", "discipline", "field of study"],
     (s) => s.replace(DEGREE_TAIL, "").trim().replace(/[,;-]+$/, "") || null],
+  [["job title", "title", "position", "role at"],
+    (s) => s.replace(TRAILING_RANGE, "").trim().replace(/[,;-]+$/, "") || null],
+  [["company", "employer", "organisation", "organization"],
+    (s) => {
+      const dated = s.replace(TRAILING_RANGE, "").trim();
+      const splits = placeSplits(dated);
+      // A company needs a name left over, so skip the reading that swallows
+      // the whole line. If every reading does, the line is only a place.
+      const named = splits.find((split) => split.rest);
+      const name = named ? named.rest : splits.length ? "" : dated;
+      return name.trim().replace(/[,;-]+$/, "") || null;
+    }],
+  // A blank location beats a wrong one: if the line names no place, say so
+  // rather than handing back the school or employer sitting in front of it.
+  [["location", "city and state", "office location"],
+    (s) => {
+      const splits = placeSplits(s);
+      if (!splits.length) return null; // blank beats wrong
+      // A line that is nothing but a place is the whole answer. Otherwise
+      // take the longest trailing place, which leaves a name in front.
+      return splits[0].rest === "" ? splits[0].place : splits[0].place;
+    }],
   [["school", "university", "college", "institution"],
     (s) => s.replace(TRAILING_RANGE, "").trim().replace(/[,;-]+$/, "") || null],
   [["website", "url", "link", "portfolio", "github", "linkedin", "twitter"],

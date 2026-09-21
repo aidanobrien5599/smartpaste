@@ -449,3 +449,23 @@ class TestGlyphStripping(unittest.TestCase):
     def test_normalizes_ligatures_so_keywords_are_searchable(self):
         self.assertEqual(self._strip("identiﬁes and reﬂects"),
                          "identifies and reflects")
+
+
+class TestResumeDraftExtraction(unittest.TestCase):
+    """The JS port of refine() drifted from this one; keep the cases together."""
+
+    def test_graduation_takes_the_end_of_a_range(self):
+        self.assertEqual(
+            answer.refine("Expected graduation date", "Sep 2023 - May 2027"), "May 2027"
+        )
+
+    def test_start_date_takes_the_beginning_of_a_range(self):
+        self.assertEqual(
+            answer.refine("Start date", "Sep 2023 - May 2027"), "Sep 2023"
+        )
+
+    def test_end_date_takes_the_end_of_a_range(self):
+        self.assertEqual(
+            answer.refine("End date of the most recent role", "May 2026 - August 2026"),
+            "August 2026",
+        )
