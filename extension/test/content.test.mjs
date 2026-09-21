@@ -132,7 +132,14 @@ test("labels: Lever question text, heavy asterisk stripped, radios grouped", { s
     assert.ok(labels.includes("LinkedIn URL"), labels);
     const radio = await page.eval(
       "window.__messages[0].fields.find(f => /authorized/.test(f.label))");
-    assert.deepEqual(radio, { label: "Are you authorized to work in the US?", options: ["Yes", "No"] });
+    assert.deepEqual(radio, { label: "Are you authorized to work in the US?", options: ["Yes", "No"], multi: false });
+    const langs = await page.eval("window.__messages[0].fields.find(f => /Language/.test(f.label))");
+    assert.equal(langs.label, "Language Skill(s) (Check all that apply)");
+    assert.equal(langs.multi, true);
+    assert.equal(langs.options.length, 6);
+    // The "Other" write-in inside the office question is not that question:
+    // it used to take its label and get the ranked list of places typed in.
+    assert.equal(labels.filter((l) => /office location/.test(l)).length, 1, labels.join(" | "));
   }));
 
 /* --------------------------------------------------------------- filling */
@@ -235,9 +242,13 @@ test("fill: Ashby toggle buttons", { skip }, () =>
     assert.equal(await page.eval(value("#_systemfield_name")), "Aidan O'Brien");
   }));
 
-test("fill: Lever radios", { skip }, () =>
+test("fill: Lever radios and check-all-that-apply boxes", { skip }, () =>
   withPage("lever.html", async (page) => {
     await autofill(page);
+    const ticked = (id) => page.eval(`[...document.querySelectorAll("#${id} input:checked")].map(b => b.value)`);
+    assert.deepEqual(await ticked("langs"), ["English (ENG)"]);
+    assert.deepEqual(await ticked("offices"), ["New York, NY", "Washington, DC", "Seattle, WA"]);
+    assert.equal(await page.eval(value("input[name='cards[o1][field1]']")), "");
     assert.equal(await page.eval("document.querySelector('#auth input:checked')?.value"), "Yes");
     assert.equal(await page.eval(value("input[name=email]")), "aidanobrien5599@gmail.com");
   }));

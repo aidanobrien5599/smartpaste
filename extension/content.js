@@ -258,9 +258,50 @@
     return fields;
   }
 
+  /**
+   * "Check all that apply": native checkboxes sharing a name, under one
+   * question (Lever's language and office questions). Several may be right,
+   * so the answer is a list of options, not one.
+   */
+  function collectCheckboxGroups() {
+    const groups = new Map();
+    for (const box of document.querySelectorAll('input[type="checkbox"]')) {
+      if (!box.name || box.disabled) continue;
+      if (!groups.has(box.name)) groups.set(box.name, []);
+      groups.get(box.name).push(box);
+    }
+    const fields = [];
+    for (const boxes of groups.values()) {
+      if (boxes.length < 2 || boxes.length > 60) continue;
+      const first = boxes[0];
+      const label = clean(
+        questionText(first)?.textContent ||
+          first.closest("fieldset")?.querySelector("legend")?.textContent || ""
+      );
+      const options = boxes.map((b) =>
+        clean(
+          b.closest("label")?.textContent ||
+            (b.id && document.querySelector(`label[for="${CSS.escape(b.id)}"]`)?.textContent) ||
+            b.value || ""
+        )
+      );
+      if (label.length < 2 || options.some((o) => !o)) continue;
+      const element = first.closest(QUESTION_BOX) || first.parentElement;
+      if (!nodeVisible(element)) continue;
+      fields.push({ element, label, options, buttons: boxes, combobox: false, multi: true });
+    }
+    return fields;
+  }
+
+  /** A write-in ("Other: ___") inside a choice question is not that question. */
+  function insideChoiceQuestion(element) {
+    const box = element.closest(QUESTION_BOX);
+    return Boolean(box) && box.querySelectorAll('input[type="checkbox"], input[type="radio"]').length >= 2;
+  }
+
   function collectFields() {
     return [...document.querySelectorAll(FIELD_SELECTOR)]
-      .filter((element) => visible(element) && !element.matches(DATE_PART))
+      .filter((element) => visible(element) && !element.matches(DATE_PART) && !insideChoiceQuestion(element))
       .map((element) => ({
         element,
         label: labelFor(element),
@@ -272,6 +313,7 @@
       .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label))
       .concat(collectToggleGroups())
       .concat(collectRadioGroups())
+      .concat(collectCheckboxGroups())
       .map((f) => ({ ...f, label: sectionPrefix(f.element) + f.label }));
   }
 
@@ -376,7 +418,7 @@
   async function answer(fields) {
     const reply = await chrome.runtime.sendMessage({
       type: "answer-fields",
-      fields: fields.map((f) => ({ label: f.label, options: f.options })),
+      fields: fields.map((f) => ({ label: f.label, options: f.options, multi: Boolean(f.multi) })),
       // Which employer "have you worked for us?" means.
       page: { url: location.href, title: document.title },
     });
@@ -410,6 +452,20 @@
     entry.buttons[index].click();
     await sleep(150);
     return toggleAnswered(entry);
+  }
+
+  /** Tick every box in `wants` that is not ticked already. */
+  async function setChecks(entry, wants) {
+    let ticked = 0;
+    for (const want of wants) {
+      const i = entry.options.findIndex((o) => normalize(o) === normalize(want));
+      const box = entry.buttons[i];
+      if (!box) continue;
+      if (!box.checked) box.click();
+      if (box.checked) ticked++;
+    }
+    await sleep(50);
+    return ticked > 0;
   }
 
   /**
@@ -1369,6 +1425,10 @@
     //    clicked now, the rest go to Jev together in the background.
     const pending = [];
     for (const entry of todo) {
+      if (entry.multi) {
+        await timed(entry, "checkboxes", () => setChecks(entry, entry.result.value));
+        continue;
+      }
       const texts = entry.buttons ? entry.options
         : entry.element.tagName === "SELECT" ? selectChoices(entry.element).map((o) => o.textContent.trim())
         : null;

@@ -7,4 +7,20 @@
 <div class="application-question" id="auth"><div class="application-label">Are you authorized to work in the US? ✱</div>
   <ul><li><label><input type="radio" name="cards[auth]" value="Yes"> Yes</label></li>
       <li><label><input type="radio" name="cards[auth]" value="No"> No</label></li></ul></div>
+<!-- Check-all-that-apply, as Lever builds it (Palantir's live form): one
+     name per group, the option in a span inside a wrapping label. -->
+<ul id="checks"></ul><script>document.getElementById("checks").innerHTML = `<li class="application-question custom-question" id="langs"><div class="application-label full-width multiple-select">
+  <div class="text">Language Skill(s) (Check all that apply)<span class="required">✱</span></div></div>
+  <div class="application-field full-width"><ul data-qa="checkboxes">
+  ${["English (ENG)", "Spanish (SPA)", "French (FRA)", "Mandarin (MAN)", "Choose not to disclose", "Other"].map((l) =>
+    `<li><label><input type="checkbox" name="cards[l1][field0]" value="${l}"><span class="application-answer-alternative">${l}</span></label></li>`).join("")}
+  </ul></div></li>
+<li class="application-question custom-question" id="offices"><div class="application-label full-width multiple-select">
+  <div class="text">What are your preferred office location(s) to work from in addition to the location you are applying to? Select 1-3 from below.<span class="required">✱</span></div></div>
+  <div class="application-field full-width"><ul data-qa="checkboxes">
+  ${["New York, NY", "Washington, DC", "Palo Alto, CA", "Seattle, WA", "Denver, CO", "Other"].map((l) =>
+    `<li><label><input type="checkbox" name="cards[o1][field0]" value="${l}"><span class="application-answer-alternative">${l}</span></label></li>`).join("")}
+  </ul>
+  <!-- a write-in for "Other": not the question itself -->
+  <input type="text" name="cards[o1][field1]" placeholder="Other location"></div></li>`;</script>
 </body>

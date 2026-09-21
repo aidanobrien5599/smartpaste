@@ -3,7 +3,7 @@
 // once already (it lost "end" from its end-of-range words); these pin it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { refine, resolve } from "../lib/resolve.js";
+import { maxTicks, refine, resolve } from "../lib/resolve.js";
 import { buildOptions, unwrap, extraSnippets, NONE } from "../lib/profile.js";
 
 test("refine: names from an all-caps header", () => {
@@ -136,4 +136,12 @@ test("buildOptions: a phone number implies a mobile device type unless one is gi
   assert.equal(buildOptions({ phone: "908-216-0389", phone_type: "Home" }).phone_type.value, "Home");
   assert.equal(buildOptions({ email: "a@b.co" }).phone_type, undefined);
   assert.equal(buildOptions({ phone: "1" }).phone_type.field, "Phone device type");
+});
+
+test("maxTicks: how many boxes a question allows", () => {
+  assert.equal(maxTicks("Select 1-3 from below."), 3);
+  assert.equal(maxTicks("Choose up to 2 locations"), 2);
+  assert.equal(maxTicks("Pick 3"), 3);
+  assert.equal(maxTicks("Language Skill(s) (Check all that apply)"), Infinity);
+  assert.equal(maxTicks("Which offices? (select all)"), Infinity);
 });

@@ -218,3 +218,10 @@ export function resolve(label, answer, options) {
     alternatives: ranked.slice(0, 4),
   };
 }
+
+/** "Select 1-3", "choose up to 3", "pick 2": the most boxes to tick. */
+export function maxTicks(label) {
+  const m = String(label).match(/\b(?:select|choose|pick|check|tick)\s+(?:up to\s+|at most\s+|\d+\s*(?:-|–|to)\s*)?(\d+)\b/i) ||
+    String(label).match(/\bup to (\d+)\b/i);
+  return m ? Number(m[1]) : Infinity;
+}

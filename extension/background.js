@@ -13,7 +13,7 @@ import {
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
-import { AUTO, resolve } from "./lib/resolve.js";
+import { AUTO, MENU, maxTicks, resolve } from "./lib/resolve.js";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -107,14 +107,32 @@ async function askChunk(apiKey, state, chunk) {
 
 async function askBatched(apiKey, state, questions) {
   const ids = Object.keys(questions);
-  const answers = {};
+  const chunks = [];
   for (let i = 0; i < ids.length; i += BATCH) {
     const chunk = {};
     for (const id of ids.slice(i, i + BATCH)) chunk[id] = questions[id];
-    Object.assign(answers, await askChunk(apiKey, state, chunk));
+    chunks.push(chunk);
   }
-  return answers;
+  // In parallel: a page with a 33-box "check all that apply" is several
+  // batches, and one after another they added a round trip each.
+  const replies = await Promise.all(chunks.map((chunk) => askChunk(apiKey, state, chunk)));
+  return Object.assign({}, ...replies);
 }
+
+/**
+ * "Check all that apply": each box is its own yes/no question. One pick-one
+ * question over all of them would split its probability across every right
+ * answer (English and Spanish both), so none would clear the bar.
+ */
+const ASK_MULTI =
+  "This application question lets the applicant tick several options. Going " +
+  "only by the applicant's profile, should this one option be ticked? Tick " +
+  "it only if the profile supports it: a language they speak, a place on " +
+  "their list of places they would work, and so on. Do not tick 'prefer not " +
+  "to say' or 'other' when a real answer is available.";
+const TICK = { yes: "Yes, tick it", no: "No, leave it unticked" };
+
+
 
 /**
  * Answer every field on the page in one round trip.
@@ -125,6 +143,30 @@ async function askBatched(apiKey, state, questions) {
  * and only the select knows which words it accepts.
  */
 const YES_NO = { yes: "Yes", no: "No" };
+
+/** The boxes to tick, most certain first, capped by what the question allows. */
+function ticked(field, i, answers) {
+  const yes = field.options
+    .map((text, j) => {
+      const a = answers[`f${i}_m${j}`];
+      const p = a && a.choice === "yes"
+        ? Math.min(Number(a.probabilities?.yes ?? 0), Number(a.confidence ?? 0)) : 0;
+      return { value: text, p };
+    })
+    .filter((o) => o.p >= MENU)
+    .sort((a, b) => b.p - a.p)
+    .slice(0, maxTicks(field.label));
+  if (!yes.length) return { label: field.label, status: "none", value: null, confidence: 0, alternatives: [] };
+  const confidence = Math.min(...yes.map((o) => o.p));
+  return {
+    label: field.label,
+    status: yes.some((o) => o.p >= AUTO) ? "auto" : "pick",
+    value: yes.filter((o) => o.p >= AUTO).map((o) => o.value),
+    confidence,
+    multi: true,
+    alternatives: yes,
+  };
+}
 
 async function answerFields(fields, page = {}) {
   const { apiKey, profile, options } = await loadOptions();
@@ -137,6 +179,16 @@ async function answerFields(fields, page = {}) {
   const criteria = asCriteria(options);
   const questions = {};
   fields.forEach((field, i) => {
+    if (field.multi) {
+      field.options.forEach((text, j) => {
+        questions[`f${i}_m${j}`] = {
+          type: "choice",
+          instructions: { field: field.label, option: text, all_options: field.options, ask: ASK_MULTI },
+          criteria: { ...TICK, [NONE]: "The profile does not say" },
+        };
+      });
+      return;
+    }
     // "Have you worked for us before?" is a judgement over the whole work
     // history, which no single profile entry holds.
     if (isPriorEmploymentQuestion(field.label)) {
@@ -177,6 +229,7 @@ async function answerFields(fields, page = {}) {
   const answers = await askBatched(apiKey, { applicant_profile: options }, questions);
 
   return fields.map((field, i) => {
+    if (field.multi) return ticked(field, i, answers);
     const answer = answers[`f${i}`];
     if (!answer) {
       return { label: field.label, status: "none", value: null, confidence: 0, alternatives: [] };
