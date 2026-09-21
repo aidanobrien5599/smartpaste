@@ -150,3 +150,27 @@ test("splitPieces: a bracket is one unit", () => {
     ["[Stealth Startup — NDA in effect]", "Jun 2019 – Feb 2020"]);
   assert.deepEqual(splitPieces("TechVenture, Remote"), ["TechVenture", "Remote"]);
 });
+
+test("assemble: an unfinished entry takes a second title instead of splitting", () => {
+  const roles = assemble([
+    { text: "Sony Interactive Entertainment", label: "company", index: 1 },
+    { text: "EMEA Liaison", label: "title", index: 1 },
+    { text: "Tokyo / London", label: "location", index: 2 },
+    { text: "Business Development Manager, Platform Partnerships", label: "title", index: 3 },
+    { text: "Jun 2017 – Feb 2019", label: "dates", index: 4 },
+    { text: "TechBerlin GmbH", label: "company", index: 6 },
+  ], "experience");
+  assert.equal(roles.length, 2);
+  assert.equal(roles[0].title, "Business Development Manager, Platform Partnerships");
+});
+
+test("assemble: a table's header row is not a job", () => {
+  const roles = assemble([
+    { text: "Employer", label: "company", index: 1 }, { text: "Title", label: "title", index: 1 },
+    { text: "Dates", label: "dates", index: 1 },
+    { text: "Zenith Corp", label: "company", index: 2 }, { text: "Senior PM", label: "title", index: 2 },
+    { text: "2021 – Present", label: "dates", index: 2 },
+  ], "experience");
+  assert.equal(roles.length, 1);
+  assert.equal(roles[0].company, "Zenith Corp");
+});

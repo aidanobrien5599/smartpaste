@@ -125,6 +125,10 @@ export function joinContinuations(segments) {
     // lower case and is never the rest of a sentence.
     const midSentence = /^[a-z(,;]/.test(text) && /\s/.test(text) && !/@|https?:|www\./.test(text) &&
       prev && seg.x0 >= prev.x0 - 2;
+    // A line that stops on "to", "of", "and"... runs on to the next one, even
+    // when that starts with a capital: "…seconded to" / "Tokyo HQ (…)".
+    const dangling = prev && /\b(?:to|of|and|the|for|with|in|at|by|from|a|an|or|as|via|including)$/i.test(prev.text.trim()) &&
+      /^[A-Z(]/.test(text) && seg.x0 >= prev.x0 - 2;
     // A word hyphenated across the line break: "Busi-" + "ness".
     const hyphenated = /[a-z]-\s*$/.test(prev?.text || "") && /^[a-z]/.test(text);
     if (adjacent && hyphenated) {
@@ -133,7 +137,7 @@ export function joinContinuations(segments) {
       prev.x1 = Math.max(prev.x1, seg.x1);
       continue;
     }
-    if (adjacent && !BULLET_MARK.test(decodeCork(seg.text)) && (underBullet || midSentence)) {
+    if (adjacent && !BULLET_MARK.test(decodeCork(seg.text)) && (underBullet || midSentence || dangling)) {
       prev.text = `${prev.text.trimEnd()} ${text}`;
       prev.y = seg.y;
       prev.x1 = Math.max(prev.x1, seg.x1);

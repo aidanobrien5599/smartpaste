@@ -79,6 +79,10 @@ const DATE_RANGE = new RegExp(
   "gi"
 );
 const DATE_SPLIT = new RegExp(`\\s*(?:[-\\u2012-\\u2015]|\\bto\\b|\\buntil\\b)\\s*(?=${RANGE_END})`, "i");
+// A table's header row names its columns: "Employer | Title | Dates" was read
+// as a job at a company called "Employer".
+const COLUMN_HEADER =
+  /^(?:employer|company|organi[sz]ation|title|job title|position|role|dates?|period|duration|location|city|institution|school|university|degree|qualification|field|major|gpa|grade)s?:?$/i;
 const HAS_DATE = /\d|present|current|now|today/i;
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -303,6 +307,7 @@ export function assemble(pieces, kind) {
     const field = FIELD[label];
     if (!field) continue;
     if (field === "dates" && !HAS_DATE.test(text)) continue; // a "Dates" column header
+    if (COLUMN_HEADER.test(text)) continue; // "Employer | Title | Dates"
     // Two neighbouring pieces of one line with the same label are one field
     // that held a comma: "Senior Director" + "International Business
     // Development". Without this the second opened a phantom entry.
@@ -311,9 +316,14 @@ export function assemble(pieces, kind) {
       continue;
     }
     last = { field, line: index };
-    const collides = entry && (entry[field] !== undefined ||
-      (HEAD.has(label) && entry.description.length > 0));
-    if (!entry || collides) open();
+    const repeated = entry && entry[field] !== undefined;
+    const afterWork = entry && HEAD.has(label) && entry.description.length > 0;
+    // An entry with no dates and no description yet is not finished, so a
+    // repeated title there replaces the first rather than opening a phantom
+    // entry: "Sony Interactive Entertainment — EMEA Liaison" (split into a
+    // company and a title) followed by the real title two lines later.
+    const unfinished = entry && !entry.dates && entry.description.length === 0;
+    if (!entry || afterWork || (repeated && !(unfinished && HEAD.has(label)))) open();
     entry[field] = text;
   }
   return entries.filter((e) => Object.keys(e).length > 1 || e.description.length);

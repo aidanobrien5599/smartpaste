@@ -128,3 +128,9 @@ test("page furniture: footers everywhere, running headers after page 1", async (
   assert.equal(inBody(at(760), 792, 2), false);  // page 2 running header
   assert.equal(inBody(at(400), 792, 2), true);
 });
+
+test("a line ending on a dangling word runs on, even into a capital", () => {
+  const lines = linesFromItems([item("Note: Employed by Sony LLC; seconded to", 50, 500, 200),
+    item("Tokyo HQ for the liaison role.", 50, 488, 150)]);
+  assert.equal(lines.length, 1);
+});
