@@ -69,12 +69,15 @@ const YEAR = "(?:19|20)(?:\\d{2}|xx)";
 // Word boundaries matter: without them "Now" matches inside "Snowflake" and
 // the company is cut in two around a date that is not there.
 const ONE_DATE =
-  `(?<![A-Za-z])(?:(?:${MONTH}|${SEASON})\\s+${YEAR}|\\d{1,2}\\s*/\\s*${YEAR}|${YEAR}|Present|Current|Now|Today)(?![A-Za-z])`;
+  `(?<![A-Za-z])(?:(?:${MONTH}|${SEASON})\\s+${YEAR}|\\d{1,2}\\s*/\\s*${YEAR}|${YEAR})(?![A-Za-z])`;
+// "Present" and "Now" are dates only at the end of a range. On their own they
+// are words: "Momentum Solutions (now Apex Systems)" was being cut at "now".
+const RANGE_END = `(?:${ONE_DATE}|(?<![A-Za-z])(?:Present|Current|Now|Today)(?![A-Za-z]))`;
 const DATE_RANGE = new RegExp(
-  `(?:Expected\\s+|Graduat(?:ed|ing|ion):?\\s+)?${ONE_DATE}(?:\\s*(?:[-\\u2012-\\u2015]|to|until)\\s*${ONE_DATE})?`,
+  `(?:Expected\\s+|Graduat(?:ed|ing|ion):?\\s+)?${ONE_DATE}(?:\\s*(?:[-\\u2012-\\u2015]|to|until)\\s*${RANGE_END})?`,
   "gi"
 );
-const DATE_SPLIT = new RegExp(`\\s*(?:[-\\u2012-\\u2015]|\\bto\\b|\\buntil\\b)\\s*(?=${ONE_DATE})`, "i");
+const DATE_SPLIT = new RegExp(`\\s*(?:[-\\u2012-\\u2015]|\\bto\\b|\\buntil\\b)\\s*(?=${RANGE_END})`, "i");
 
 /** "May 2026 – August 2026" -> { start, end }. A lone date is an end date. */
 export function parseDates(text) {

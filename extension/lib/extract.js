@@ -125,6 +125,14 @@ export function joinContinuations(segments) {
     // lower case and is never the rest of a sentence.
     const midSentence = /^[a-z(,;]/.test(text) && /\s/.test(text) && !/@|https?:|www\./.test(text) &&
       prev && seg.x0 >= prev.x0 - 2;
+    // A word hyphenated across the line break: "Busi-" + "ness".
+    const hyphenated = /[a-z]-\s*$/.test(prev?.text || "") && /^[a-z]/.test(text);
+    if (adjacent && hyphenated) {
+      prev.text = prev.text.trimEnd().replace(/-$/, "") + text;
+      prev.y = seg.y;
+      prev.x1 = Math.max(prev.x1, seg.x1);
+      continue;
+    }
     if (adjacent && !BULLET_MARK.test(decodeCork(seg.text)) && (underBullet || midSentence)) {
       prev.text = `${prev.text.trimEnd()} ${text}`;
       prev.y = seg.y;

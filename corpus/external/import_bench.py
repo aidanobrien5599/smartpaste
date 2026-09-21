@@ -23,6 +23,11 @@ DEGREES = {
     "m.a.": "Master of Arts", "ma": "Master of Arts", "mba": "Master of Business Administration",
     "ph.d.": "Doctor of Philosophy", "phd": "Doctor of Philosophy", "m.d.": "Doctor of Medicine",
     "md": "Doctor of Medicine", "j.d.": "Juris Doctor", "jd": "Juris Doctor",
+    "m.b.a.": "Master of Business Administration", "b.b.a.": "Bachelor of Business Administration",
+    "bba": "Bachelor of Business Administration", "m.eng.": "Master of Engineering",
+    "meng": "Master of Engineering", "b.eng.": "Bachelor of Engineering", "beng": "Bachelor of Engineering",
+    "m.p.h.": "Master of Public Health", "mph": "Master of Public Health", "m.f.a.": "Master of Fine Arts",
+    "b.f.a.": "Bachelor of Fine Arts", "dphil": "Doctor of Philosophy", "d.phil.": "Doctor of Philosophy",
 }
 
 
@@ -35,10 +40,20 @@ def date(month, year, current=False):
 
 
 def degree(study):
+    """The degree as written, its expansion, and the text before any bracket:
+    "Master of Business Administration (MBA)" is also "Master of Business
+    Administration"."""
     if not study:
         return []
-    full = DEGREES.get(study.strip().lower())
-    return [study] + ([full] if full else [])
+    out = [study]
+    bare = study.split("(")[0].strip().rstrip(",")
+    if bare and bare != study:
+        out.append(bare)
+    for form in (study, bare):
+        full = DEGREES.get(form.strip().lower())
+        if full and full not in out:
+            out.append(full)
+    return out
 
 
 def main():

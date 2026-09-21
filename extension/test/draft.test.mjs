@@ -91,3 +91,9 @@ test("splitPieces: never inside brackets, and prose stays whole", () => {
   assert.equal(splitPieces(prose).length, 1);
   assert.equal(splitPieces("Bachelor of Science, Computer Information Systems (CIS), Towson University, Towson, MD").length, 4);
 });
+
+test("Present and Now are dates only at the end of a range", () => {
+  assert.deepEqual(splitPieces("Momentum Solutions (now Apex Systems)"), ["Momentum Solutions (now Apex Systems)"]);
+  assert.deepEqual(parseDates("Aug 2024 – Present"), { start: "Aug 2024", end: "Present" });
+  assert.deepEqual(splitPieces("Mar 2022 – Now, Remote"), ["Mar 2022 – Now", "Remote"]);
+});

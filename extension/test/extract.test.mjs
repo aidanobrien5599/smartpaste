@@ -114,3 +114,8 @@ test("page numbers are dropped, years are not", () => {
     item("Page 2 of 2", 280, 30, 50), item("2014", 50, 600, 25)]);
   assert.deepEqual(lines, ["SAP SE", "2014"]);
 });
+
+test("a word hyphenated across the line break is rejoined", () => {
+  const lines = linesFromItems([item("Stanford Graduate School of Busi-", 50, 500, 180), item("ness", 50, 488, 20)]);
+  assert.deepEqual(lines, ["Stanford Graduate School of Business"]);
+});
