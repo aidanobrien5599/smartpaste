@@ -65,6 +65,12 @@ window.chrome = {
           let best = 0;
           m.options.forEach((o, i) => { const s = words(o).filter((w) => want.has(w)).length; if (s > best) { best = s; index = i; } });
         }
+        // Like Jev: an answer listed twice splits its probability between
+        // the copies, and neither clears background.js's 0.5 bar. Live,
+        // "Madison, Wisconsin, United States" twice came back at 0.36.
+        if (index >= 0 && m.options.filter((o) => o === m.options[index]).length > 1) {
+          return { ok: true, index: -1, confidence: 0.36 };
+        }
         return { ok: true, index };
       }
       return { ok: false };

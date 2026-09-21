@@ -8,6 +8,7 @@
  */
 
 import { LABELS, ORDINALS, REPEATABLE } from "./schema.js";
+import { placesOptions } from "./places.js";
 
 export const NONE = "__none__";
 export const MAX_OPTIONS = 254;
@@ -149,6 +150,7 @@ export function buildOptions(profile = {}, extraText = "") {
     options[key] = { field: LABELS[key] || key, value: String(value).trim() };
   }
   Object.assign(options, repeatedOptions(profile));
+  Object.assign(options, placesOptions(profile.work_locations));
   Object.assign(options, extraSnippets(extraText));
   return Object.fromEntries(Object.entries(options).slice(0, MAX_OPTIONS));
 }

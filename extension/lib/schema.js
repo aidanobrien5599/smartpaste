@@ -26,14 +26,16 @@ export const GROUPS = [
     title: "Location",
     fields: [
       ["address", "Street address", "123 Example St"],
-      // "(mailing address)" and "(city you live in now)" keep these apart:
-      // with bare "City" next to "Current location", Jev could not tell
-      // which a "Location (City)" field meant (0.63) and it went unfilled.
-      ["city", "City (mailing address)", "Madison"],
-      ["state", "State (mailing address)", "Wisconsin"],
+      ["city", "City", "Madison"],
+      ["state", "State", "Wisconsin"],
       ["zip", "Postal code", "53703"],
       ["country", "Country", "United States"],
-      ["location", "Current location (city you live in now)", "Madison, WI"],
+      // Worded as the form field it answers. "City" (the address) and
+      // "Location (City)" (where you live) are different questions, and with
+      // place preferences also in the profile, "Current location (city you
+      // live in now)" fell to 0.56 on Figma's "Location (City)"; this is 0.96
+      // while a plain "City" field stays on the address at 0.98.
+      ["location", "Location (City) — where I live now", "Madison, WI"],
       ["hometown", "Hometown", "Little Silver, New Jersey"],
     ],
   },

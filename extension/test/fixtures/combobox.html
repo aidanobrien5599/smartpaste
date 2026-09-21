@@ -41,7 +41,10 @@ function combo(id, all, needsTyping) {
   input.addEventListener("input", () => render(input.value));
 }
 combo("grad", ["Fall 2026", "Spring 2027", "Fall 2027", "Spring 2028"], false);
-const locations = ["Madison, Wisconsin, United States", "Town of Madison, Wisconsin, United States", "Madison, Alabama, United States"];
+// The live geocoder lists "Madison, Wisconsin, United States" twice (two
+// places share the name), so the same wording appears as two options.
+const locations = ["Madison, Wisconsin, United States", "Town of Madison, Wisconsin, United States",
+  "Madison, Wisconsin, United States", "Madison, Alabama, United States"];
 (() => {
   const input = document.getElementById("loc"), shell = input.closest(".select-shell");
   let timer, results = null;

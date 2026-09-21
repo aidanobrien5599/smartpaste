@@ -122,9 +122,10 @@
   /** A dropdown carries its own answer set, so send it along with the label. */
   function selectOptions(element) {
     if (element.tagName !== "SELECT") return null;
-    return [...element.options]
+    // Each wording once, for the same reason as askChoice().
+    return [...new Set([...element.options]
       .map((o) => o.textContent.trim())
-      .filter((t) => t && !/^(?:select|choose|please select|--)/i.test(t))
+      .filter((t) => t && !/^(?:select|choose|please select|--)/i.test(t)))]
       .slice(0, 60);
   }
 
@@ -717,15 +718,7 @@
 
     let index = exact();
     if (index < 0 && texts.length === 1) index = 0;
-    if (index < 0) {
-      const reply = await chrome.runtime.sendMessage({
-        type: "choose-option",
-        label: labelFor(field),
-        want,
-        options: texts.slice(0, MAX_MENU),
-      });
-      if (reply && reply.ok && reply.index >= 0) index = reply.index;
-    }
+    if (index < 0) index = await askChoice(labelFor(field), want, texts.slice(0, MAX_MENU));
     if (index < 0 || !nodes[index]) {
       field.blur();
       return false;
@@ -890,10 +883,24 @@
       const shared = pool.filter((i) => words.some((w) => texts[i].toLowerCase().includes(w)));
       pool = (shared.length ? shared : pool).slice(0, MAX_MENU);
     }
-    const reply = await chrome.runtime.sendMessage({
-      type: "choose-option", label, want, options: pool.map((i) => texts[i]),
-    });
-    return reply && reply.ok && reply.index >= 0 ? pool[reply.index] : -1;
+    const picked = await askChoice(label, want, pool.map((i) => texts[i]));
+    return picked >= 0 ? pool[picked] : -1;
+  }
+
+  /**
+   * Ask Jev which of `texts` expresses `want`, giving each wording once.
+   *
+   * Menus repeat themselves: Greenhouse's location search lists "Madison,
+   * Wisconsin, United States" twice (two places share the name). Asked about
+   * both copies, Jev splits its probability between them (0.36 live), neither
+   * clears the bar, and the field is left empty. Either copy is the answer,
+   * so ask about the wording and click its first occurrence.
+   */
+  async function askChoice(label, want, texts) {
+    const unique = [...new Set(texts)];
+    const reply = await chrome.runtime.sendMessage({ type: "choose-option", label, want, options: unique });
+    if (!reply || !reply.ok || reply.index < 0) return -1;
+    return texts.indexOf(unique[reply.index]);
   }
 
   /** A whole click, pointer events included: Workday's pickers act on pointerdown. */

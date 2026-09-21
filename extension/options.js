@@ -1,5 +1,6 @@
 import { DOCUMENTS, GROUPS, ORDINALS, REPEATABLE } from "./lib/schema.js";
 import { humanSize, MAX_BYTES, toBase64 } from "./lib/documents.js";
+import { normalizePlaces } from "./lib/places.js";
 import { textFromStoredPdf } from "./lib/extract.js";
 
 let state = { profile: {}, documents: {} };
@@ -41,6 +42,80 @@ function renderGroups(profile) {
     section.appendChild(grid);
     host.append(heading, section);
   }
+}
+
+/* ------------------------------------------------------------------ places */
+
+/**
+ * Where you would work: "open to anywhere", plus places in order of
+ * preference. Kept in state.profile.work_locations as { ranked, anywhere }.
+ */
+function renderPlaces() {
+  const host = $("places");
+  host.innerHTML = "";
+  const prefs = state.profile.work_locations || (state.profile.work_locations = { ranked: [], anywhere: false });
+  if (!Array.isArray(prefs.ranked)) prefs.ranked = [];
+
+  const anywhere = document.createElement("label");
+  anywhere.className = "anywhere";
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  box.checked = Boolean(prefs.anywhere);
+  box.addEventListener("change", () => { prefs.anywhere = box.checked; });
+  anywhere.append(box, "Open to any location");
+  host.appendChild(anywhere);
+
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent =
+    "Most preferred first. A form asking which office or city you want gets " +
+    "your highest-ranked place it offers; \"open to relocating to X?\" is Yes " +
+    "for a place on your list, or anywhere if the box above is ticked.";
+  host.appendChild(hint);
+
+  const move = (from, to) => {
+    const [item] = prefs.ranked.splice(from, 1);
+    prefs.ranked.splice(to, 0, item);
+    renderPlaces();
+  };
+  prefs.ranked.forEach((place, i) => {
+    const row = document.createElement("div");
+    row.className = "place";
+    const rank = document.createElement("span");
+    rank.className = "rank";
+    rank.textContent = `${i + 1}.`;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = place;
+    input.placeholder = "not set · e.g. New York, NY";
+    input.addEventListener("input", () => { prefs.ranked[i] = input.value; });
+    const button = (text, title, disabled, onClick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = text;
+      b.title = title;
+      b.disabled = disabled;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+    row.append(
+      rank, input,
+      button("\u2191", "Prefer this more", i === 0, () => move(i, i - 1)),
+      button("\u2193", "Prefer this less", i === prefs.ranked.length - 1, () => move(i, i + 1)),
+      button("\u00d7", "Remove", false, () => { prefs.ranked.splice(i, 1); renderPlaces(); }),
+    );
+    host.appendChild(row);
+  });
+
+  const add = document.createElement("button");
+  add.className = "add";
+  add.textContent = "+ Add a place";
+  add.addEventListener("click", () => {
+    prefs.ranked.push("");
+    renderPlaces();
+    host.querySelectorAll(".place input")[prefs.ranked.length - 1]?.focus();
+  });
+  host.appendChild(add);
 }
 
 /* ------------------------------------------------------------- repeatables */
@@ -249,6 +324,7 @@ function collect() {
       Object.values(entry).some((v) => String(v || "").trim())
     );
   }
+  profile.work_locations = normalizePlaces(profile.work_locations);
   return profile;
 }
 
@@ -257,6 +333,7 @@ async function save() {
   const extraText = $("extra").value;
   await chrome.storage.local.set({ profile, extraText });
   state.profile = profile;
+  renderPlaces(); // show the list as saved: blanks and duplicates gone
   const { buildOptions } = await import("./lib/profile.js");
   const count = Object.keys(buildOptions(profile, extraText)).length;
   const docs = Object.keys(state.documents).length;
@@ -296,6 +373,7 @@ $("clear").addEventListener("click", async () => {
   $("extra").value = "";
   state.profile = {};
   renderRepeatables();
+  renderPlaces();
   await chrome.storage.local.set({ profile: {}, extraText: "" });
   say($("save-status"), "Cleared. Your API key and documents are untouched.");
 });
@@ -314,6 +392,7 @@ document.addEventListener("keydown", (event) => {
   state = { profile, documents };
   $("key").value = apiKey;
   renderGroups(profile);
+  renderPlaces();
   renderRepeatables();
   renderDocuments();
   $("extra").value = extraText;
