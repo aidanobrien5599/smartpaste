@@ -208,7 +208,7 @@ test("fill: a whole Workday page", { skip }, () =>
         dates: ["05", "2026", "2027"], radio: "pw-no",
       });
     // 18 filled; the "broken" prompt never takes a click and is left for you.
-    assert.match(summary, /^filled 18 in [0-9.]+s, attached 1 file, left 1 for you$/);
+    assert.match(summary, /^filled 18 in [0-9.]+s, attached 1 file, left 1 for you(?: · slowest: .*)?$/);
     assert.equal(await page.eval("document.querySelectorAll('.pop').length"), 0, "a menu was left open");
     // Only menus with no plain match go to Jev: "United States" is the one
     // country starting with it, "LinkedIn" the one source. Degree and gender

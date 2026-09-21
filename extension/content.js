@@ -1282,7 +1282,11 @@
     const parts = [`filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
     if (skipped) parts.push(`left ${skipped} for you`);
-    note(parts.join(", "));
+    // Name the slow fields right in the note, so a slow page can be
+    // diagnosed from a screenshot.
+    const slow = timeline.filter((t) => t.ms >= 700).sort((a, b) => b.ms - a.ms).slice(0, 3);
+    const why = slow.map((t) => `${t.field.slice(0, 28)} ${(t.ms / 1000).toFixed(1)}s${t.ok ? "" : " ✗"}`);
+    note(parts.join(", ") + (why.length ? ` · slowest: ${why.join(", ")}` : ""), false, why.length ? 12000 : 4000);
   }
 
   function onKeyDown(event) {
@@ -1350,14 +1354,14 @@
     setTimeout(() => badge.remove(), 1400);
   }
 
-  function note(text, isError = false) {
+  function note(text, isError = false, ms = 4000) {
     const existing = document.querySelector(".smartpaste-note");
     if (existing) existing.remove();
     const el = document.createElement("div");
     el.className = "smartpaste-note" + (isError ? " smartpaste-error" : "");
     el.textContent = text;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+    setTimeout(() => el.remove(), ms);
   }
 
   /* ----------------------------------------------------------------- start */
