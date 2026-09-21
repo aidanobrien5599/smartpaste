@@ -7,6 +7,23 @@ Jev never writes anything. It only chooses. If your profile does not answer a
 field, the field is left alone and ⌘V falls through to an ordinary paste — it
 never invents a value and never eats the keystroke.
 
+## What Jev actually decides
+
+One `Choice` per field on the page, in a single batched call. The options are
+every entry in your profile, each carrying its own label, plus an escape
+option. The question is literally *"which entry from the applicant's profile
+answers this field?"* — the meta-match, not a per-field rule anywhere in code.
+
+**Jev selects; it never composes.** Asked for `Name` with only a first and last
+name stored, it correctly returns nothing — handing back `Aidan` for a
+full-name box would be wrong, and the escape option exists so it declines
+rather than guesses. Joining them is code's job, so `lib/profile.js` derives
+the composed answers (`full_name` from first + last, first/last back out of a
+full name, `location` from city + state) and offers each as an option in its
+own right. Anything you typed explicitly always wins over a derived value.
+
+That split is the whole design: the model judges, code composes and extracts.
+
 ## Why a form and not a resume
 
 The first version parsed your resume PDF into snippets and let Jev pick among

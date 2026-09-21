@@ -29,6 +29,7 @@ export const GROUPS = [
       ["state", "State", "Wisconsin"],
       ["zip", "Postal code", "53703"],
       ["country", "Country", "United States"],
+      ["location", "Current location", "Madison, WI"],
       ["hometown", "Hometown", "Little Silver, New Jersey"],
       ["relocate", "Willing to relocate", "Yes, happy to relocate"],
       ["work_preference", "Remote / hybrid / onsite", "Onsite or hybrid"],
