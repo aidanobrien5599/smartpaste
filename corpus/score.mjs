@@ -62,7 +62,10 @@ const correct = (got, accept, field) =>
   accept.length
     ? accept.some((a) => {
         const want = norm(a, field), have = norm(got, field);
-        return want === have || (/location/.test(field) && have.startsWith(want + ","));
+        if (want === have || (/location/.test(field) && have.startsWith(want + ","))) return true;
+        // A key holding only a year is matched by a more specific date in
+        // that year: "Summer 2015" for "2015".
+        return /date/.test(field) && /^\d{4}$/.test(want) && new RegExp(`\\b${want}$`).test(have);
       })
     : null;
 

@@ -65,26 +65,60 @@ const MONTH =
   "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|" +
   "Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\.?";
 const SEASON = "(?:Spring|Summer|Fall|Autumn|Winter)";
-const YEAR = "(?:19|20)(?:\\d{2}|xx)";
+const YEAR = "(?:(?:19|20)(?:\\d{2}|xx)|['\u2019]\\d{2})";
 // Word boundaries matter: without them "Now" matches inside "Snowflake" and
 // the company is cut in two around a date that is not there.
 const ONE_DATE =
-  `(?<![A-Za-z])(?:(?:${MONTH}|${SEASON})\\s+${YEAR}|\\d{1,2}\\s*/\\s*${YEAR}|${YEAR})(?![A-Za-z])`;
+  `(?<![A-Za-z0-9])(?:(?:${MONTH}|${SEASON})\\s*${YEAR}|Q[1-4]\\s*${YEAR}|(?:19|20)\\d{2}\\s*[/.-]\\s*(?:0?[1-9]|1[0-2])(?![0-9])|\\d{1,2}\\s*[/.]\\s*${YEAR}|${YEAR})(?![A-Za-z0-9])`;
 // "Present" and "Now" are dates only at the end of a range. On their own they
 // are words: "Momentum Solutions (now Apex Systems)" was being cut at "now".
 const RANGE_END = `(?:${ONE_DATE}|(?<![A-Za-z])(?:Present|Current|Now|Today)(?![A-Za-z]))`;
+const BARE_MONTH = `(?<![A-Za-z])${MONTH}(?=\\s*(?:[-\\u2012-\\u2015]|to)\\s*${MONTH}\\s*${YEAR})`;
 const DATE_RANGE = new RegExp(
-  `(?:Expected\\s+|Class\\s+of\\s+|Graduat(?:ed|ing|ion):?\\s+)?${ONE_DATE}(?:\\s*(?:[-\\u2012-\\u2015]|to|until)\\s*${RANGE_END})?`,
+  `(?:Expected\\s+|Class\\s+of\\s+|Graduat(?:ed|ing|ion):?\\s+)?(?:${ONE_DATE}|${BARE_MONTH})(?:\\s*(?:[-\\u2012-\\u2015]|to|until)\\s*${RANGE_END})?`,
   "gi"
 );
 const DATE_SPLIT = new RegExp(`\\s*(?:[-\\u2012-\\u2015]|\\bto\\b|\\buntil\\b)\\s*(?=${RANGE_END})`, "i");
+const HAS_DATE = /\d|present|current|now|today/i;
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_INDEX = (word) => MONTH_NAMES.findIndex((m) => word.toLowerCase().startsWith(m.toLowerCase()));
+
+/**
+ * One date, in one form: "Feb 2019", "2019", "Summer 2015", "Present".
+ * Code, not the model -- "Feb ’19", "Dec. 2020", "2013/09" and "09.2013" are
+ * spellings of a date, and a form wants the date.
+ */
+export function normalizeDate(raw, borrowYear = "") {
+  const t = raw.trim().replace(/\s+/g, " ");
+  if (/^(?:present|current|now|today)$/i.test(t)) return "Present";
+  const fullYear = (y) => (y.length === 2 || /^['\u2019]/.test(y)
+    ? (Number(y.replace(/\D/g, "")) > 50 ? "19" : "20") + y.replace(/\D/g, "")
+    : y);
+  let m = t.match(/^((?:19|20)\d{2})\s*[/.-]\s*(\d{1,2})$/); // 2013/09
+  if (m) return `${MONTH_NAMES[Number(m[2]) - 1]} ${m[1]}`;
+  m = t.match(/^(\d{1,2})\s*[/.]\s*((?:19|20)\d{2})$/); // 09/2013, 09.2013
+  if (m && Number(m[1]) >= 1 && Number(m[1]) <= 12) return `${MONTH_NAMES[Number(m[1]) - 1]} ${m[2]}`;
+  m = t.match(/^([A-Za-z]+)\.?\s*((?:19|20)\d{2}|['\u2019]\d{2})?$/); // Feb ’19, Dec. 2020, March
+  if (m) {
+    const i = MONTH_INDEX(m[1]);
+    const year = m[2] ? fullYear(m[2]) : borrowYear;
+    if (i >= 0 && m[1].length >= 3) return year ? `${MONTH_NAMES[i]} ${year}` : MONTH_NAMES[i];
+    if (/^(?:spring|summer|fall|autumn|winter)$/i.test(m[1])) return year ? `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${year}` : t;
+  }
+  return t.replace(/['\u2019](\d{2})$/, (_, yy) => fullYear(yy));
+}
 
 /** "May 2026 – August 2026" -> { start, end }. A lone date is an end date. */
 export function parseDates(text) {
   const clean = text.replace(/^(?:Expected|Class\s+of|Graduat(?:ed|ing|ion):?)\s+/i, "").trim();
   const parts = clean.split(DATE_SPLIT).map((p) => p.trim()).filter(Boolean);
-  if (parts.length >= 2) return { start: parts[0], end: parts[parts.length - 1] };
-  return { start: "", end: parts[0] || "" };
+  if (parts.length >= 2) {
+    const end = normalizeDate(parts[parts.length - 1]);
+    const endYear = (end.match(/(?:19|20)\d{2}/) || [""])[0];
+    return { start: normalizeDate(parts[0], endYear), end };
+  }
+  return { start: "", end: parts[0] ? normalizeDate(parts[0]) : "" };
 }
 
 // ---------------------------------------------------------------- sections
@@ -261,6 +295,7 @@ export function assemble(pieces, kind) {
     }
     const field = FIELD[label];
     if (!field) continue;
+    if (field === "dates" && !HAS_DATE.test(text)) continue; // a "Dates" column header
     // Two neighbouring pieces of one line with the same label are one field
     // that held a comma: "Senior Director" + "International Business
     // Development". Without this the second opened a phantom entry.

@@ -25,8 +25,8 @@ test("splitPieces: what must stay whole", () => {
 });
 
 test("parseDates", () => {
-  assert.deepEqual(parseDates("May 2026 – August 2026"), { start: "May 2026", end: "August 2026" });
-  assert.deepEqual(parseDates("05/2025 - 08/2025"), { start: "05/2025", end: "08/2025" });
+  assert.deepEqual(parseDates("May 2026 – August 2026"), { start: "May 2026", end: "Aug 2026" });
+  assert.deepEqual(parseDates("05/2025 - 08/2025"), { start: "May 2025", end: "Aug 2025" });
   assert.deepEqual(parseDates("Aug 2024 – Present"), { start: "Aug 2024", end: "Present" });
   assert.deepEqual(parseDates("Expected May 2026"), { start: "", end: "May 2026" });
 });
@@ -126,4 +126,19 @@ test("headingCandidates: a heading starts with a capital", () => {
 test("headingCandidates: look past a leading icon", () => {
   const got = headingCandidates(["[BRIEFCASE] Work History", "\u{1F4BC} Experience", "[GRADUATION] Education"]).map((c) => c.text);
   assert.equal(got.length, 3);
+});
+
+test("parseDates normalises the many spellings of a date", async () => {
+  assert.deepEqual(parseDates("Feb \u201919 \u2013 Dec. 2020"), { start: "Feb 2019", end: "Dec 2020" });
+  assert.deepEqual(parseDates("March \u2013 June 2019"), { start: "Mar 2019", end: "Jun 2019" });
+  assert.deepEqual(parseDates("2013/09 \u2013 2015/08"), { start: "Sep 2013", end: "Aug 2015" });
+  assert.deepEqual(parseDates("09.2013 - 08.2015"), { start: "Sep 2013", end: "Aug 2015" });
+  assert.deepEqual(parseDates("2019 \u2013 present"), { start: "2019", end: "Present" });
+  assert.deepEqual(parseDates("May 2026 \u2013 August 2026"), { start: "May 2026", end: "Aug 2026" });
+});
+
+test("splitPieces keeps the new date spellings whole", () => {
+  assert.deepEqual(splitPieces("Acme, Feb \u201919 \u2013 Dec. 2020"), ["Acme", "Feb \u201919 \u2013 Dec. 2020"]);
+  assert.deepEqual(splitPieces("Acme, March \u2013 June 2019"), ["Acme", "March \u2013 June 2019"]);
+  assert.deepEqual(splitPieces("Acme, 2013/09 \u2013 2015/08"), ["Acme", "2013/09 \u2013 2015/08"]);
 });
