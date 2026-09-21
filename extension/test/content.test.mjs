@@ -353,7 +353,7 @@ test("fill: a picker whose clicks never take is given up on, not retried for age
     let took = await page.eval(`(async () => {
       const t = performance.now();
       const ok = await window.__smartpasteTest.setPrompt(document.getElementById("referral--referral"), "Career Site");
-      return { ms: performance.now() - t, ok, open: document.querySelectorAll(".pop").length };
+      return { ms: performance.now() - t, ok, open: document.querySelectorAll(".pop:not([data-closing])").length };
     })()`);
     assert.deepEqual({ ok: took.ok, open: took.open }, { ok: false, open: 0 });
     took = took.ms;

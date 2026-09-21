@@ -825,17 +825,35 @@
    * the visible options nearest the thing that opened it.
    */
   function optionsNear(anchor) {
+    // Workday marks the open popup data-automation-activepopup="true" and
+    // its field aria-expanded="true". Read only that popup: a menu that just
+    // closed stays on screen for a moment as it animates out, and reading
+    // by position picked up its options -- State's list when opening Phone
+    // Device Type, so "Mobile" was never there to be chosen.
+    if (anchor.hasAttribute("aria-expanded")) {
+      const popups = [...document.querySelectorAll('[data-automation-activepopup="true"]')].filter(nodeVisible);
+      if (popups.length) {
+        if (anchor.getAttribute("aria-expanded") !== "true") return [];
+        return leafOptions(popups[popups.length - 1]);
+      }
+    }
     const box = anchor.getBoundingClientRect();
-    return [...document.querySelectorAll(OPTION)].filter((node) => {
+    return leafOptions(document).filter((node) => {
+      const rect = node.getBoundingClientRect();
+      return rect.bottom > box.top - 500 && rect.top < box.bottom + 700;
+    });
+  }
+
+  /** Visible options under `root`, innermost only (see optionsNear). */
+  function leafOptions(root) {
+    return [...root.querySelectorAll(OPTION)].filter((node) => {
       // Options nest on Workday (li[role=option] > div[promptOption]). Keep
       // the innermost, which carries the label; optionTarget() climbs back
       // to the row for the click. Dropping both levels -- as this once did --
       // found no options at all, and every Workday menu timed out.
       if (node.querySelector(OPTION)) return false;
-      const rect = node.getBoundingClientRect();
-      if (!rect.height) return false;
-      return rect.bottom > box.top - 500 && rect.top < box.bottom + 700 &&
-        !NOT_A_SUGGESTION.test(optionText(node));
+      if (!node.getBoundingClientRect().height) return false;
+      return !NOT_A_SUGGESTION.test(optionText(node));
     });
   }
 
@@ -1022,7 +1040,16 @@
    * first and asks Jev about all of them at once, instead of holding each
    * menu open through its own round trip.
    */
+  /** Close whatever popup is open and let it go before opening another. */
+  async function settlePopups(field) {
+    const open = () => [...document.querySelectorAll('[data-automation-activepopup="true"]')].some(nodeVisible);
+    if (!open()) return;
+    closeMenu(field);
+    for (let i = 0; i < 20 && open(); i++) await sleep(25);
+  }
+
   async function surveyListbox(button, want) {
+    await settlePopups(button);
     button.focus();
     click(button);
     const opened = (await waitForOptions(button)).length > 0;
@@ -1044,6 +1071,7 @@
 
   async function applyListbox(button, texts, index) {
     if (index < 0) return false;
+    await settlePopups(button);
     button.focus();
     click(button);
     if (!(await waitForOptions(button)).length) { closeMenu(button); return false; }

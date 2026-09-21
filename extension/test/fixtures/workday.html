@@ -28,7 +28,13 @@ const PROMPTS = {
   "Referral": ["Employee Referral"],
 };
 const SCHOOLS = ["University of Wisconsin - Madison","University of Wisconsin - Milwaukee","Wisconsin Lutheran College"];
-function closePops(){document.querySelectorAll(".pop").forEach(p=>p.remove())}
+// Like Workday: the open popup is marked data-automation-activepopup="true"
+// and its button aria-expanded="true". A closing popup stays on screen for
+// a moment as it animates out, still showing its options.
+function closePops(){
+  document.querySelectorAll("[aria-expanded=true]").forEach(b=>b.setAttribute("aria-expanded","false"));
+  document.querySelectorAll(".pop").forEach(p=>{ if(p.dataset.closing) return; p.dataset.closing="1"; p.dataset.automationActivepopup="false"; setTimeout(()=>p.remove(),250); });
+}
 function place(pop, el){const r=el.getBoundingClientRect();pop.style.left=(scrollX+r.left)+"px";pop.style.top=(scrollY+r.bottom+2)+"px";document.body.appendChild(pop)}
 // Listbox button, virtualized: only ~12 items rendered around scrollTop.
 // Options nest: li[role=option] > div[promptOption], as on Workday.
@@ -37,6 +43,7 @@ function listbox(btn, key){
     closePops();
     const items = LISTS[key];
     const pop=document.createElement("div");pop.className="pop";pop.dataset.automationId="activeListContainer";
+    pop.dataset.automationActivepopup="true";btn.setAttribute("aria-expanded","true");
     const ul=document.createElement("ul");ul.setAttribute("role","listbox");pop.appendChild(ul);
     const spacer=document.createElement("div");spacer.style.height=(items.length*20)+"px";ul.appendChild(spacer);
     const render=()=>{
