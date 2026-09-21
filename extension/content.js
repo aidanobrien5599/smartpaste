@@ -546,9 +546,24 @@
       const list = id && document.getElementById(id);
       const nodes = list ? [...list.querySelectorAll('[role="option"]')] : [];
       if (nodes.length) return nodes;
-      await sleep(120);
+      // An open menu saying "No options" is an answer, not a slow load.
+      if (menuNotice(field)) return [];
+      await sleep(25);
     }
     return [];
+  }
+
+  function menuNotice(field) {
+    const shell = field.closest(SELECT_SHELL)?.parentElement;
+    const notice = shell && shell.querySelector('[class*="menu-notice"]');
+    return notice && nodeVisible(notice) ? notice.textContent.trim() : "";
+  }
+
+  /** "Start typing..." -- a menu with nothing in it until you type. */
+  const TYPE_FIRST = /start typing|type to search|begin typing|search for/i;
+  function needsTyping(field) {
+    const shown = field.closest(SELECT_SHELL)?.querySelector('[class*="placeholder"]')?.textContent || "";
+    return TYPE_FIRST.test(`${field.placeholder || ""} ${shown}`);
   }
 
   function isReactSelect(field) {
@@ -598,7 +613,8 @@
     fire(field, "mouseup");
     fire(field, "click");
 
-    let nodes = await menuOptions(field, 1500);
+    // A type-first menu is empty when opened: waiting on it only costs time.
+    let nodes = needsTyping(field) ? [] : await menuOptions(field, 1500);
     let texts = nodes.map((n) => n.textContent.trim());
     const exact = () => texts.findIndex((t) => normalize(t) === normalize(want));
 
@@ -659,7 +675,7 @@
     fire(nodes[index], "mousedown");
     fire(nodes[index], "mouseup");
     fire(nodes[index], "click");
-    await sleep(200);
+    for (let i = 0; i < 16 && !currentValue(field); i++) await sleep(25);
     return Boolean(currentValue(field));
   }
 
@@ -1285,6 +1301,7 @@
     // Where the time went, for when a page feels slow.
     console.info(`smartpaste: filled in ${Math.round(performance.now() - started)}ms`);
     console.table(timeline);
+    if (window.__smartpasteTest) window.__smartpasteTest.timeline = timeline;
 
     const parts = [`filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);

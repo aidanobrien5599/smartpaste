@@ -167,6 +167,10 @@ test("fill: Greenhouse comboboxes pick by meaning, scoped to their own menu", { 
     assert.equal(choice.options.length, 4);
     // "Start typing..." has no options until typed into.
     assert.equal(await page.eval(text("#loc-value")), "Madison, Wisconsin, United States");
+    // Each is a quick open-read-click: no fixed sleeps, no waiting for a
+    // type-first menu to open by itself (that was 1.5s of Figma's 2.4s).
+    const slow = (await page.eval("window.__smartpasteTest.timeline")).filter((t) => t.ms > 250);
+    assert.deepEqual(slow, []);
   }));
 
 test("fill: Ashby toggle buttons", { skip }, () =>
