@@ -46,13 +46,41 @@ async function callJev(apiKey, state, questions) {
   return (await response.json()).answers;
 }
 
+/**
+ * Send one chunk; if the API says it is too large, halve it and try again.
+ *
+ * A request's size is questions x options, and a long resume offered as the
+ * options of every question blows past the limit ("max_tokens_exceeded") at
+ * a batch size that is fine for a one-page resume. Splitting on demand keeps
+ * short documents at one round trip and lets long ones through at all. A
+ * single question that is still too large is skipped rather than failing the
+ * whole draft.
+ */
+async function askChunk(apiKey, state, chunk) {
+  try {
+    return await callJev(apiKey, state, chunk);
+  } catch (error) {
+    const ids = Object.keys(chunk);
+    if (!/max_tokens_exceeded/.test(error.message)) throw error;
+    if (ids.length === 1) return {};
+    const half = Math.ceil(ids.length / 2);
+    const [left, right] = [ids.slice(0, half), ids.slice(half)].map((part) =>
+      Object.fromEntries(part.map((id) => [id, chunk[id]]))
+    );
+    return {
+      ...(await askChunk(apiKey, state, left)),
+      ...(await askChunk(apiKey, state, right)),
+    };
+  }
+}
+
 async function askBatched(apiKey, state, questions) {
   const ids = Object.keys(questions);
   const answers = {};
   for (let i = 0; i < ids.length; i += BATCH) {
     const chunk = {};
     for (const id of ids.slice(i, i + BATCH)) chunk[id] = questions[id];
-    Object.assign(answers, await callJev(apiKey, state, chunk));
+    Object.assign(answers, await askChunk(apiKey, state, chunk));
   }
   return answers;
 }
@@ -210,7 +238,11 @@ async function profileFromResume(text) {
     throw new Error("Could not read enough text out of that PDF.");
   }
   const { questions, plan } = resumeQuestions(asCriteria(snippets));
-  const answers = await askBatched(apiKey, { resume_lines: snippets }, questions);
+  const answers = await askBatched(
+    apiKey,
+    "The options of each question are the lines of one resume, in order.",
+    questions
+  );
 
   const fields = {};
   const sections = {};

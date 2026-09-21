@@ -10,3 +10,5 @@ corpus/results/
 # the one real resume in the corpus, and its answer key
 corpus/pdf/aidan-obrien-real.pdf
 corpus/truth/aidan-obrien-real.json
+# third-party corpora are downloaded locally, not redistributed
+corpus/external/*/

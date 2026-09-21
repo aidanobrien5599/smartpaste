@@ -13,6 +13,15 @@ import path from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname;
 const CORPUS = path.join(ROOT, "corpus");
 const label = process.argv[2] || "run";
+// Which answer keys to score: "synthetic" (corpus/truth), "bench"
+// (ResumeExtractBench, downloaded locally), or "all".
+const SET = process.env.SET || "all";
+const TRUTH_DIRS = {
+  synthetic: [path.join(CORPUS, "truth")],
+  bench: [path.join(CORPUS, "external/resumeextractbench/truth")],
+  career: [path.join(CORPUS, "external/career-centers/truth")],
+};
+TRUTH_DIRS.all = [...TRUTH_DIRS.synthetic, ...TRUTH_DIRS.career, ...TRUTH_DIRS.bench];
 
 const key = fs.readFileSync(process.env.HOME + "/.config/smartpaste/env", "utf8").split("=")[1].trim();
 const listeners = [];
@@ -45,8 +54,14 @@ function norm(value, field = "") {
   }
   return s.replace(/[.,;:]+$/, "").trim();
 }
+// A location answer of "San Francisco" is right for "San Francisco, CA".
 const correct = (got, accept, field) =>
-  accept.length ? accept.some((a) => norm(a, field) === norm(got, field)) : null;
+  accept.length
+    ? accept.some((a) => {
+        const want = norm(a, field), have = norm(got, field);
+        return want === have || (/location/.test(field) && have.startsWith(want + ","));
+      })
+    : null;
 
 function bulletRecall(description, bullets) {
   const d = norm(description);
@@ -64,9 +79,12 @@ const add = (k, ok) => { if (ok === null) return; (tally[k] ||= [0, 0]); tally[k
 const misses = [];
 const perResume = [];
 
-for (const file of fs.readdirSync(path.join(CORPUS, "truth")).sort()) {
-  const truth = JSON.parse(fs.readFileSync(path.join(CORPUS, "truth", file), "utf8"));
-  const bytes = new Uint8Array(fs.readFileSync(path.join(CORPUS, "pdf", truth.file)));
+const truthFiles = TRUTH_DIRS[SET].filter((d) => fs.existsSync(d))
+  .flatMap((d) => fs.readdirSync(d).filter((f) => f.endsWith(".json")).sort().map((f) => path.join(d, f)));
+for (const file of truthFiles) {
+  const truth = JSON.parse(fs.readFileSync(file, "utf8"));
+  const pdfPath = truth.file.includes("/") ? path.join(CORPUS, truth.file) : path.join(CORPUS, "pdf", truth.file);
+  const bytes = new Uint8Array(fs.readFileSync(pdfPath));
   const t0 = Date.now();
   let text = "", reply;
   try {
@@ -102,15 +120,20 @@ for (const file of fs.readdirSync(path.join(CORPUS, "truth")).sort()) {
   const p = perResume.at(-1);
   console.log(`${(100 * right / Math.max(total, 1)).toFixed(0).padStart(3)}%  ${String(right).padStart(2)}/${String(total).padEnd(2)}` +
     `  bullets ${p.recall === null ? "  - " : (100 * p.recall).toFixed(0).padStart(3) + "%"}  ${p.lines.toString().padStart(3)} lines` +
-    `  ${truth.file}${p.error ? "   !! " + p.error : ""}`);
+    `  ${path.basename(truth.file).slice(0, 58)}${p.error ? "   !! " + p.error.slice(0, 40) : ""}`);
 }
 
+const withText = perResume.filter((p) => p.lines >= 4);
+const imageOnly = perResume.filter((p) => p.lines < 4);
+const sum = (rows) => rows.reduce((acc, p) => [acc[0] + p.right, acc[1] + p.total], [0, 0]);
 const pct = ([a, b]) => `${(100 * a / b).toFixed(0).padStart(3)}%  (${a}/${b})`;
 console.log("\nBY FIELD");
 for (const [k, v] of Object.entries(tally).sort()) console.log(`  ${k.padEnd(26)} ${pct(v)}`);
 const all = Object.entries(tally).filter(([k]) => k !== "experience.description")
   .reduce((acc, [, [a, b]]) => [acc[0] + a, acc[1] + b], [0, 0]);
 const recalls = perResume.filter((p) => p.recall !== null);
+console.log(`\nTEXT LAYER   ${withText.length} resumes  fields ${pct(sum(withText))}`);
+console.log(`IMAGE ONLY   ${imageOnly.length} resumes  fields ${pct(sum(imageOnly))}  (nothing to read without OCR)`);
 console.log(`\nOVERALL fields ${pct(all)}   mean bullet recall ${(100 * recalls.reduce((s, p) => s + p.recall, 0) / recalls.length).toFixed(0)}%`);
 
 fs.mkdirSync(path.join(CORPUS, "results"), { recursive: true });

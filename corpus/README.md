@@ -58,3 +58,38 @@ The misses sort into three kinds, all structural:
    picking one line returns one bullet.
 
 My own resume scores 11 points above the rest: the regexes were fitted to it.
+
+## Beyond my own test set
+
+Synthetic resumes I wrote myself are still resumes I wrote myself. Two
+independent sources, downloaded locally by `SET=... node corpus/score.mjs`
+and kept out of git:
+
+- **[ResumeExtractBench](https://huggingface.co/datasets/Careerflow/ResumeExtractBench)**
+  (Careerflow, CC-BY-4.0) — 38 resumes of fictional people with human-verified
+  answer keys: 28 handwritten scans and 10 LaTeX documents built to break
+  parsers (chaotic dates, a German-format CV, trilingual, prose instead of
+  bullets, hidden prompt-injection text, one company held four times).
+  `python3 corpus/external/import_bench.py` converts its keys.
+- **University career-centre samples** — real Word exports in the most common
+  student format. Answer keys written by hand; template placeholders such as
+  `5/20xx` are not graded.
+
+| Set | Resumes | Fields right | Bullets recovered |
+|---|---|---|---|
+| my synthetic set (text) | 11 | 81% | 39% |
+| career-centre Word sample | 1 | 27% | 0% |
+| ResumeExtractBench, text layer | 10 | 32% | ~3% |
+| ResumeExtractBench, image only | 28 | 0% | 0% |
+
+The career-centre result is the one to notice. That format puts degree, major,
+school and city on one comma-separated line — `Master of Science, Computer
+Science, Towson University, Towson, MD` — and it is the standard student
+layout, not an edge case. Picking one line cannot split it.
+
+The benchmark also broke the drafter outright before it could be measured:
+every question carried the whole resume as its options, 24 questions to a
+request, so anything over ~120 lines hit `max_tokens_exceeded`. Requests now
+split in half and retry when they are too large. It is also a point in favour
+of classifying lines instead: that asks many small questions over one copy of
+the document, rather than one large question per field.
