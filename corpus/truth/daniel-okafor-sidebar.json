@@ -1,0 +1,95 @@
+{
+ "file": "daniel-okafor-sidebar.pdf",
+ "layout": "sidebar",
+ "fields": {
+  "full_name": [
+   "Daniel Okafor"
+  ],
+  "first_name": [
+   "Daniel"
+  ],
+  "last_name": [
+   "Okafor"
+  ],
+  "email": [
+   "d.okafor@example.com"
+  ],
+  "phone": [
+   "+1 416 555 0199"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/daniel-okafor-example"
+  ],
+  "github": [
+   "https://github.com/dokafor-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "University of Toronto"
+   ],
+   "degree": [
+    "Bachelor of Applied Science",
+    "BASc"
+   ],
+   "major": [
+    "Engineering Science"
+   ],
+   "gpa": [
+    "3.74/4.00"
+   ],
+   "start_date": [
+    "Sep 2021"
+   ],
+   "end_date": [
+    "Apr 2026"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Wealthsimple"
+   ],
+   "title": [
+    "Backend Developer Intern"
+   ],
+   "location": [
+    "Toronto, ON"
+   ],
+   "start_date": [
+    "Jan 2025"
+   ],
+   "end_date": [
+    "Apr 2025"
+   ],
+   "bullets": [
+    "Rewrote the tax-slip generation job in Rust, cutting the year-end batch from 9 hours to 50 minutes",
+    "Added idempotency keys to the transfers API after tracing a double-deposit incident"
+   ]
+  },
+  {
+   "company": [
+    "Shopify"
+   ],
+   "title": [
+    "Software Developer Intern"
+   ],
+   "location": [
+    "Ottawa, ON"
+   ],
+   "start_date": [
+    "May 2024"
+   ],
+   "end_date": [
+    "Dec 2024"
+   ],
+   "bullets": [
+    "Shipped bulk editing for product variants to 1.2M merchants behind a staged rollout",
+    "Profiled and fixed an N+1 query in the admin GraphQL layer that dominated p99 latency",
+    "Mentored two first-term interns through their first production deploys"
+   ]
+  }
+ ]
+}

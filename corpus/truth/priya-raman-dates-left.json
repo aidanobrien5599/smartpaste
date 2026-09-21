@@ -1,0 +1,117 @@
+{
+ "file": "priya-raman-dates-left.pdf",
+ "layout": "dates-left",
+ "fields": {
+  "full_name": [
+   "Priya Raman"
+  ],
+  "first_name": [
+   "Priya"
+  ],
+  "last_name": [
+   "Raman"
+  ],
+  "email": [
+   "priya.raman@example.com"
+  ],
+  "phone": [
+   "+1 412 555 0134"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/priya-raman-example"
+  ],
+  "github": [
+   "https://github.com/praman-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "Carnegie Mellon University"
+   ],
+   "degree": [
+    "Master of Science",
+    "M.S.",
+    "MS"
+   ],
+   "major": [
+    "Computer Science"
+   ],
+   "gpa": [
+    "3.93/4.00"
+   ],
+   "start_date": [
+    "08/2024"
+   ],
+   "end_date": [
+    "12/2025"
+   ]
+  },
+  {
+   "school": [
+    "Indian Institute of Technology Madras"
+   ],
+   "degree": [
+    "Bachelor of Technology",
+    "B.Tech"
+   ],
+   "major": [
+    "Computer Science and Engineering"
+   ],
+   "gpa": [
+    "9.1/10"
+   ],
+   "start_date": [
+    "07/2019"
+   ],
+   "end_date": [
+    "05/2023"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Amazon"
+   ],
+   "title": [
+    "Software Development Engineer Intern"
+   ],
+   "location": [
+    "Seattle, WA"
+   ],
+   "start_date": [
+    "05/2025"
+   ],
+   "end_date": [
+    "08/2025"
+   ],
+   "bullets": [
+    "Designed a sharded cache in front of the seller-inventory service, absorbing 60% of read traffic",
+    "Load-tested the design to 40k requests per second and wrote the launch readiness review"
+   ]
+  },
+  {
+   "company": [
+    "Flipkart"
+   ],
+   "title": [
+    "Software Engineer"
+   ],
+   "location": [
+    "Bengaluru, India"
+   ],
+   "start_date": [
+    "07/2023"
+   ],
+   "end_date": [
+    "07/2024"
+   ],
+   "bullets": [
+    "Owned the order-promise estimator used on every product page during Big Billion Days",
+    "Cut estimator cold-start time from 14s to 2s by precomputing warehouse lead-time tables",
+    "Led the migration of three services from a monorepo build to Bazel"
+   ]
+  }
+ ]
+}

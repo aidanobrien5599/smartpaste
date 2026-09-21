@@ -1,0 +1,95 @@
+{
+ "file": "lucas-moreau-table.pdf",
+ "layout": "table",
+ "fields": {
+  "full_name": [
+   "Lucas Moreau"
+  ],
+  "first_name": [
+   "Lucas"
+  ],
+  "last_name": [
+   "Moreau"
+  ],
+  "email": [
+   "lucas.moreau@example.com"
+  ],
+  "phone": [
+   "(510) 555-0147"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/lucas-moreau-example"
+  ],
+  "github": [
+   "https://github.com/lmoreau-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "University of California, Berkeley"
+   ],
+   "degree": [
+    "Bachelor of Arts",
+    "B.A.",
+    "BA"
+   ],
+   "major": [
+    "Computer Science and Economics"
+   ],
+   "gpa": [
+    "3.61"
+   ],
+   "start_date": [
+    "Aug 2022"
+   ],
+   "end_date": [
+    "May 2026"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "UC Berkeley EECS"
+   ],
+   "title": [
+    "Undergraduate Student Instructor"
+   ],
+   "location": [
+    "Berkeley, CA"
+   ],
+   "start_date": [
+    "Aug 2024"
+   ],
+   "end_date": [
+    "Present"
+   ],
+   "bullets": [
+    "Teach two weekly discussion sections of 35 students for CS 61B Data Structures",
+    "Wrote autograder tests for four projects used by 1,400 students"
+   ]
+  },
+  {
+   "company": [
+    "Robinhood"
+   ],
+   "title": [
+    "Software Engineering Intern"
+   ],
+   "location": [
+    "Menlo Park, CA"
+   ],
+   "start_date": [
+    "Summer 2025"
+   ],
+   "end_date": [
+    "Summer 2025"
+   ],
+   "bullets": [
+    "Built a reconciliation service comparing ledger balances against clearing-firm statements nightly",
+    "Surfaced 14 historical breaks that finance had been correcting by hand"
+   ]
+  }
+ ]
+}

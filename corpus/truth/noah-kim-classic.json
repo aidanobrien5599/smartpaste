@@ -1,0 +1,116 @@
+{
+ "file": "noah-kim-classic.pdf",
+ "layout": "classic",
+ "fields": {
+  "full_name": [
+   "Noah Kim"
+  ],
+  "first_name": [
+   "Noah"
+  ],
+  "last_name": [
+   "Kim"
+  ],
+  "email": [
+   "noah.kim@example.com"
+  ],
+  "phone": [
+   "(310) 555-0172"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/noah-kim-example"
+  ],
+  "github": [
+   "https://github.com/nkim-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "University of California, Los Angeles"
+   ],
+   "degree": [
+    "Bachelor of Science",
+    "B.S.",
+    "BS"
+   ],
+   "major": [
+    "Computer Science"
+   ],
+   "gpa": [
+    "3.68/4.00"
+   ],
+   "start_date": [
+    "Sep 2024"
+   ],
+   "end_date": [
+    "Jun 2026"
+   ]
+  },
+  {
+   "school": [
+    "Santa Monica College"
+   ],
+   "degree": [
+    "Associate of Science",
+    "A.S.",
+    "AS"
+   ],
+   "major": [
+    "Mathematics"
+   ],
+   "gpa": [
+    "3.95/4.00"
+   ],
+   "start_date": [
+    "Aug 2022"
+   ],
+   "end_date": [
+    "May 2024"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Snap Inc."
+   ],
+   "title": [
+    "Software Engineer Intern"
+   ],
+   "location": [
+    "Los Angeles, CA"
+   ],
+   "start_date": [
+    "Jun 2025"
+   ],
+   "end_date": [
+    "Sep 2025"
+   ],
+   "bullets": [
+    "Built the server side of a Lens usage dashboard for creator analytics",
+    "Cut dashboard query cost by 70% by moving aggregation into a nightly rollup table"
+   ]
+  },
+  {
+   "company": [
+    "Santa Monica College Math Lab"
+   ],
+   "title": [
+    "Math Tutor"
+   ],
+   "location": [
+    "Santa Monica, CA"
+   ],
+   "start_date": [
+    "Sep 2022"
+   ],
+   "end_date": [
+    "May 2024"
+   ],
+   "bullets": [
+    "Tutored 20 students a week in calculus and linear algebra"
+   ]
+  }
+ ]
+}

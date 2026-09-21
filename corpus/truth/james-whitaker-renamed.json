@@ -1,0 +1,92 @@
+{
+ "file": "james-whitaker-renamed.pdf",
+ "layout": "renamed",
+ "fields": {
+  "full_name": [
+   "James Whitaker"
+  ],
+  "first_name": [
+   "James"
+  ],
+  "last_name": [
+   "Whitaker"
+  ],
+  "email": [
+   "j.whitaker@example.co.uk"
+  ],
+  "phone": [
+   "+44 7700 900123"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/james-whitaker-example"
+  ],
+  "github": [
+   "https://github.com/jwhitaker-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "Imperial College London"
+   ],
+   "degree": [
+    "Master of Engineering",
+    "MEng"
+   ],
+   "major": [
+    "Computing"
+   ],
+   "gpa": [],
+   "start_date": [
+    "Oct 2021"
+   ],
+   "end_date": [
+    "Jun 2025"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Bloomberg"
+   ],
+   "title": [
+    "Software Engineer Intern"
+   ],
+   "location": [
+    "London, UK"
+   ],
+   "start_date": [
+    "Jul 2024"
+   ],
+   "end_date": [
+    "Sep 2024"
+   ],
+   "bullets": [
+    "Added streaming backfill to the market-data normaliser so late ticks no longer dropped silently",
+    "Reduced memory use of the tick buffer by 40% by switching to an arena allocator"
+   ]
+  },
+  {
+   "company": [
+    "Monzo"
+   ],
+   "title": [
+    "Backend Engineering Intern"
+   ],
+   "location": [
+    "London, UK"
+   ],
+   "start_date": [
+    "Jun 2023"
+   ],
+   "end_date": [
+    "Sep 2023"
+   ],
+   "bullets": [
+    "Built a Go service that flags duplicate card authorisations before they reach settlement",
+    "Wrote the chaos test that caught a race in the ledger's idempotency check"
+   ]
+  }
+ ]
+}

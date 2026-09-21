@@ -1,0 +1,130 @@
+{
+ "file": "elena-petrova-stacked.pdf",
+ "layout": "stacked",
+ "fields": {
+  "full_name": [
+   "Elena Petrova"
+  ],
+  "first_name": [
+   "Elena"
+  ],
+  "last_name": [
+   "Petrova"
+  ],
+  "email": [
+   "elena.petrova@example.com"
+  ],
+  "phone": [
+   "+1 519 555 0158"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/elena-petrova-example"
+  ],
+  "github": [
+   "https://github.com/epetrova-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "University of Waterloo"
+   ],
+   "degree": [
+    "Bachelor of Mathematics",
+    "BMath"
+   ],
+   "major": [
+    "Computer Science"
+   ],
+   "gpa": [],
+   "start_date": [
+    "Sep 2021"
+   ],
+   "end_date": [
+    "Apr 2026"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Databricks"
+   ],
+   "title": [
+    "Software Engineer Intern"
+   ],
+   "location": [
+    "San Francisco, CA"
+   ],
+   "start_date": [
+    "Jan 2025"
+   ],
+   "end_date": [
+    "Apr 2025"
+   ],
+   "bullets": [
+    "Implemented predicate pushdown for nested struct columns in the Photon scan operator"
+   ]
+  },
+  {
+   "company": [
+    "Snowflake"
+   ],
+   "title": [
+    "Software Engineer Intern"
+   ],
+   "location": [
+    "San Mateo, CA"
+   ],
+   "start_date": [
+    "May 2024"
+   ],
+   "end_date": [
+    "Aug 2024"
+   ],
+   "bullets": [
+    "Built a cost-based rule that rewrites correlated subqueries into semi-joins"
+   ]
+  },
+  {
+   "company": [
+    "Cohere"
+   ],
+   "title": [
+    "Machine Learning Engineer Intern"
+   ],
+   "location": [
+    "Toronto, ON"
+   ],
+   "start_date": [
+    "Sep 2023"
+   ],
+   "end_date": [
+    "Dec 2023"
+   ],
+   "bullets": [
+    "Wrote the evaluation harness for multilingual retrieval across 18 languages"
+   ]
+  },
+  {
+   "company": [
+    "Faire"
+   ],
+   "title": [
+    "Software Engineer Intern"
+   ],
+   "location": [
+    "Kitchener, ON"
+   ],
+   "start_date": [
+    "Jan 2023"
+   ],
+   "end_date": [
+    "Apr 2023"
+   ],
+   "bullets": [
+    "Shipped wholesale order splitting across multiple warehouses"
+   ]
+  }
+ ]
+}

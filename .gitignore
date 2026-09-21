@@ -5,3 +5,8 @@ build/
 dist/
 *.egg-info/
 .DS_Store
+corpus/build/
+corpus/results/
+# the one real resume in the corpus, and its answer key
+corpus/pdf/aidan-obrien-real.pdf
+corpus/truth/aidan-obrien-real.json

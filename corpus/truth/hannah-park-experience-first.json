@@ -1,0 +1,95 @@
+{
+ "file": "hannah-park-experience-first.pdf",
+ "layout": "experience-first",
+ "fields": {
+  "full_name": [
+   "Hannah Park"
+  ],
+  "first_name": [
+   "Hannah"
+  ],
+  "last_name": [
+   "Park"
+  ],
+  "email": [
+   "hannah.park@example.com"
+  ],
+  "phone": [
+   "617-555-0121"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/hannah-park-example"
+  ],
+  "github": [
+   "https://github.com/hpark-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "Northeastern University"
+   ],
+   "degree": [
+    "Bachelor of Science",
+    "BS",
+    "B.S."
+   ],
+   "major": [
+    "Data Science"
+   ],
+   "gpa": [
+    "3.70"
+   ],
+   "start_date": [
+    "Sep 2021"
+   ],
+   "end_date": [
+    "May 2026"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "HubSpot"
+   ],
+   "title": [
+    "Software Engineering Co-op"
+   ],
+   "location": [
+    "Cambridge, MA"
+   ],
+   "start_date": [
+    "Jul 2025"
+   ],
+   "end_date": [
+    "Dec 2025"
+   ],
+   "bullets": [
+    "Built the lead-scoring feature store backing the CRM's predictive contact score",
+    "Cut model retraining time from six hours to 40 minutes by caching feature joins"
+   ]
+  },
+  {
+   "company": [
+    "Wayfair"
+   ],
+   "title": [
+    "Data Science Co-op"
+   ],
+   "location": [
+    "Boston, MA"
+   ],
+   "start_date": [
+    "Jan 2024"
+   ],
+   "end_date": [
+    "Jun 2024"
+   ],
+   "bullets": [
+    "Ran a pricing experiment on 80k SKUs and wrote the analysis that shipped to all furniture categories",
+    "Replaced a hand-tuned demand forecast with a gradient-boosted model, lowering MAPE by 11 points"
+   ]
+  }
+ ]
+}

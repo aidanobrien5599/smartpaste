@@ -1,0 +1,96 @@
+{
+ "file": "maya-chen-classic.pdf",
+ "layout": "classic",
+ "fields": {
+  "full_name": [
+   "Maya Chen"
+  ],
+  "first_name": [
+   "Maya"
+  ],
+  "last_name": [
+   "Chen"
+  ],
+  "email": [
+   "maya.chen@example.com"
+  ],
+  "phone": [
+   "(404) 555-0182"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/maya-chen-example"
+  ],
+  "github": [
+   "https://github.com/mayachen-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "Georgia Institute of Technology"
+   ],
+   "degree": [
+    "Bachelor of Science",
+    "B.S.",
+    "BS"
+   ],
+   "major": [
+    "Computer Science"
+   ],
+   "gpa": [
+    "3.82/4.00"
+   ],
+   "start_date": [
+    "Aug 2022"
+   ],
+   "end_date": [
+    "May 2026"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Stripe"
+   ],
+   "title": [
+    "Software Engineering Intern"
+   ],
+   "location": [
+    "San Francisco, CA"
+   ],
+   "start_date": [
+    "Jun 2025"
+   ],
+   "end_date": [
+    "Aug 2025"
+   ],
+   "bullets": [
+    "Built a retry scheduler for failed webhook deliveries that cut merchant-visible failures by 31%",
+    "Migrated the dispute evidence uploader from a cron job to an event-driven Kafka consumer",
+    "Wrote the runbook and alerting for the new pipeline, adopted by two other teams"
+   ]
+  },
+  {
+   "company": [
+    "Georgia Tech Research Institute"
+   ],
+   "title": [
+    "Undergraduate Researcher"
+   ],
+   "location": [
+    "Atlanta, GA"
+   ],
+   "start_date": [
+    "Jan 2024"
+   ],
+   "end_date": [
+    "May 2025"
+   ],
+   "bullets": [
+    "Trained a YOLOv8 model on 40k labelled drone frames for runway debris detection",
+    "Reduced inference latency on a Jetson Orin from 90ms to 34ms with TensorRT quantization"
+   ]
+  }
+ ]
+}

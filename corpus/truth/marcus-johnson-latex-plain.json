@@ -1,0 +1,95 @@
+{
+ "file": "marcus-johnson-latex-plain.pdf",
+ "layout": "latex-plain",
+ "fields": {
+  "full_name": [
+   "Marcus Johnson"
+  ],
+  "first_name": [
+   "Marcus"
+  ],
+  "last_name": [
+   "Johnson"
+  ],
+  "email": [
+   "marcus.johnson@example.com"
+  ],
+  "phone": [
+   "(202) 555-0113"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/marcus-johnson-example"
+  ],
+  "github": [
+   "https://github.com/mjohnson-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "Howard University"
+   ],
+   "degree": [
+    "Bachelor of Science",
+    "B.S.",
+    "BS"
+   ],
+   "major": [
+    "Computer Science"
+   ],
+   "gpa": [
+    "3.52/4.00"
+   ],
+   "start_date": [
+    "Aug 2022"
+   ],
+   "end_date": [
+    "May 2026"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Microsoft"
+   ],
+   "title": [
+    "Software Engineer Intern"
+   ],
+   "location": [
+    "Redmond, WA"
+   ],
+   "start_date": [
+    "May 2025"
+   ],
+   "end_date": [
+    "Aug 2025"
+   ],
+   "bullets": [
+    "Built a flaky-test quarantine bot for the Azure Storage CI pipeline",
+    "Cut median pull-request queue time by 18 minutes across a 400-engineer org"
+   ]
+  },
+  {
+   "company": [
+    "Google"
+   ],
+   "title": [
+    "STEP Intern"
+   ],
+   "location": [
+    "Mountain View, CA"
+   ],
+   "start_date": [
+    "May 2024"
+   ],
+   "end_date": [
+    "Aug 2024"
+   ],
+   "bullets": [
+    "Added offline support to an internal Android field-inspection app",
+    "Wrote the sync-conflict resolution logic and its property-based tests"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,114 @@
+{
+ "file": "sofia-alvarez-latex-template.pdf",
+ "layout": "latex-template",
+ "fields": {
+  "full_name": [
+   "Sofia Alvarez"
+  ],
+  "first_name": [
+   "Sofia"
+  ],
+  "last_name": [
+   "Alvarez"
+  ],
+  "email": [
+   "sofia.alvarez@example.com"
+  ],
+  "phone": [
+   "734-555-0166"
+  ],
+  "linkedin": [
+   "https://www.linkedin.com/in/sofia-alvarez-example"
+  ],
+  "github": [
+   "https://github.com/salvarez-example"
+  ]
+ },
+ "education": [
+  {
+   "school": [
+    "University of Michigan"
+   ],
+   "degree": [
+    "Bachelor of Science in Engineering",
+    "BSE"
+   ],
+   "major": [
+    "Computer Engineering"
+   ],
+   "gpa": [
+    "3.91/4.00"
+   ],
+   "start_date": [
+    "Sep 2022"
+   ],
+   "end_date": [
+    "Apr 2026"
+   ]
+  }
+ ],
+ "experience": [
+  {
+   "company": [
+    "Michigan Hackers"
+   ],
+   "title": [
+    "President"
+   ],
+   "location": [
+    "Ann Arbor, MI"
+   ],
+   "start_date": [
+    "Sep 2024"
+   ],
+   "end_date": [
+    "Present"
+   ],
+   "bullets": [
+    "Run weekly workshops for a 300-member student club and organise the annual hackathon"
+   ]
+  },
+  {
+   "company": [
+    "Ford Motor Company"
+   ],
+   "title": [
+    "Software Engineering Intern"
+   ],
+   "location": [
+    "Dearborn, MI"
+   ],
+   "start_date": [
+    "May 2025"
+   ],
+   "end_date": [
+    "Aug 2025"
+   ],
+   "bullets": [
+    "Built a CAN-bus log replay tool that let firmware engineers reproduce field faults on a bench",
+    "Cut replay setup from a day of manual wiring to a ten-minute scripted run"
+   ]
+  },
+  {
+   "company": [
+    "Qualcomm"
+   ],
+   "title": [
+    "Embedded Software Intern"
+   ],
+   "location": [
+    "San Diego, CA"
+   ],
+   "start_date": [
+    "May 2024"
+   ],
+   "end_date": [
+    "Aug 2024"
+   ],
+   "bullets": [
+    "Ported a sensor-fusion driver to a new DSP and closed out 23 hardware bring-up bugs",
+    "Wrote a power-measurement harness that became the team's regression gate"
+   ]
+  }
+ ]
+}
