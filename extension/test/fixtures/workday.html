@@ -31,6 +31,7 @@ const SCHOOLS = ["University of Wisconsin - Madison","University of Wisconsin - 
 function closePops(){document.querySelectorAll(".pop").forEach(p=>p.remove())}
 function place(pop, el){const r=el.getBoundingClientRect();pop.style.left=(scrollX+r.left)+"px";pop.style.top=(scrollY+r.bottom+2)+"px";document.body.appendChild(pop)}
 // Listbox button, virtualized: only ~12 items rendered around scrollTop.
+// Options nest: li[role=option] > div[promptOption], as on Workday.
 function listbox(btn, key){
   btn.addEventListener("click",()=>{
     closePops();
@@ -44,7 +45,7 @@ function listbox(btn, key){
       items.slice(start,start+12).forEach((t,i)=>{
         const li=document.createElement("li");li.setAttribute("role","option");li.dataset.automationLabel=t;
         li.style.position="absolute";li.style.top=((start+i)*20)+"px";
-        li.innerHTML="<div>"+t+"</div>";
+        li.innerHTML='<div data-automation-id="promptOption" data-automation-label="'+t+'">'+t+'</div>';
         li.addEventListener("click",()=>{btn.textContent=t;btn.setAttribute("aria-label",btn.dataset.q+" "+t+" Required");window.__model[key]=t;closePops()});
         ul.appendChild(li);
       });
@@ -68,9 +69,9 @@ function prompt(input, key, source){
     for(const o of opts){
       // Real shape: a leaf row holding a radio circle and a label. Only the
       // row takes the click; the label swallows its own.
-      const leaf=document.createElement("div");leaf.dataset.automationId="promptLeafNode";
+      const leaf=document.createElement("div");leaf.dataset.automationId="promptLeafNode";leaf.setAttribute("role","option");
       leaf.innerHTML='<input type="radio" tabindex="-1">';
-      const d=document.createElement("div");d.dataset.automationId="promptOption";d.dataset.automationLabel=o;d.setAttribute("role","option");d.textContent=o;
+      const d=document.createElement("div");d.dataset.automationId="promptOption";d.dataset.automationLabel=o;d.textContent=o;
       d.addEventListener("click",e=>e.stopPropagation());
       leaf.appendChild(d);
       leaf.addEventListener("click",()=>{ if(broken) return; leaf.dataset.automationChecked="Checked"; onpick(o); });

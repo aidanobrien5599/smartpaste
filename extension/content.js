@@ -678,7 +678,11 @@
   function optionsNear(anchor) {
     const box = anchor.getBoundingClientRect();
     return [...document.querySelectorAll(OPTION)].filter((node) => {
-      if (node.parentElement?.closest(OPTION) || node.querySelector(OPTION)) return false;
+      // Options nest on Workday (li[role=option] > div[promptOption]). Keep
+      // the innermost, which carries the label; optionTarget() climbs back
+      // to the row for the click. Dropping both levels -- as this once did --
+      // found no options at all, and every Workday menu timed out.
+      if (node.querySelector(OPTION)) return false;
       const rect = node.getBoundingClientRect();
       if (!rect.height) return false;
       return rect.bottom > box.top - 500 && rect.top < box.bottom + 700 &&
@@ -691,7 +695,7 @@
     while (Date.now() < deadline) {
       const nodes = optionsNear(anchor);
       if (nodes.length) return nodes;
-      await sleep(120);
+      await sleep(40);
     }
     return [];
   }
@@ -764,9 +768,26 @@
    * the options sharing a word with the answer, since "United States" has to
    * find "United States of America" in 250 countries and a Choice takes 255.
    */
-  async function chooseAmong(label, want, texts) {
+  /**
+   * An option that is plainly the answer, with no model needed: the same
+   * text, or the only option that starts with the answer as whole words
+   * ("Other" -> "Other Source", but not "Job Board Other"; "Yes" -> "Yes,
+   * I am authorized"). Simplify's Workday rules use the same two tiers.
+   */
+  function localMatch(texts, want) {
     const exact = texts.findIndex((t) => normalize(t) === normalize(want));
     if (exact >= 0) return exact;
+    const head = want.trim().toLowerCase();
+    if (head.length < 2) return -1;
+    const starts = texts
+      .map((t, i) => [t.trim().toLowerCase(), i])
+      .filter(([t]) => t.startsWith(head) && /^[^a-z0-9]/.test(t.slice(head.length)));
+    return starts.length === 1 ? starts[0][1] : -1;
+  }
+
+  async function chooseAmong(label, want, texts) {
+    const local = localMatch(texts, want);
+    if (local >= 0) return local;
     let pool = texts.map((t, i) => i);
     if (pool.length > MAX_MENU) {
       const words = (want.toLowerCase().match(/[a-z0-9]{3,}/g) || []);
@@ -825,8 +846,10 @@
     const target = optionTarget(node);
     target.scrollIntoView({ block: "nearest" });
     click(target);
-    await sleep(200);
-    if (!target.isConnected || optionPicked(node)) return;
+    for (let i = 0; i < 6; i++) {
+      await sleep(40);
+      if (!target.isConnected || optionPicked(node)) return;
+    }
     const box = target.querySelector('input[type="radio"], input[type="checkbox"]');
     if (box && !box.checked) { click(box); await sleep(200); }
   }
@@ -841,8 +864,18 @@
     click(button);
     const opened = (await waitForOptions(button)).length > 0;
     const texts = opened ? await readMenu(button, want) : [];
+    // The answer is right there: click it now rather than close, decide and
+    // reopen. Only menus that need Jev pay for a second visit.
+    const exact = localMatch(texts, want);
+    if (exact >= 0) {
+      const node = await findOption(button, texts[exact], texts.at?.get(texts[exact]));
+      if (node) {
+        await pickOption(node);
+        if (!EMPTY_BUTTON.test(button.textContent.trim())) { texts.done = true; return texts; }
+      }
+    }
     closeMenu(button);
-    await sleep(80);
+    await sleep(40);
     return texts;
   }
 
@@ -863,9 +896,17 @@
     press(input, "Enter", 13);
     const found = (await waitForOptions(input, 2500)).length > 0;
     const texts = found ? await readMenu(input, want) : [];
+    const exact = localMatch(texts, want);
+    if (exact >= 0) {
+      const node = await findOption(input, texts[exact], texts.at?.get(texts[exact]));
+      if (node) {
+        await pickOption(node);
+        if (promptChosen(input) || optionPicked(node)) { closeMenu(input); texts.done = true; return texts; }
+      }
+    }
     closeMenu(input);
     nativeSet(input, "");
-    await sleep(80);
+    await sleep(40);
     return texts;
   }
 
@@ -1127,6 +1168,7 @@
   }
 
   async function fillFields() {
+    const started = performance.now();
     const quiet = [...document.querySelectorAll(FILE_SELECTOR)]
       .filter((el) => !el.files.length).every((el) => el.matches(QUIET_UPLOAD));
     const attached = await attachDocuments();
@@ -1166,6 +1208,7 @@
       if (entry.widget === "listbox" || entry.widget === "prompt") {
         const texts = entry.widget === "listbox"
           ? await surveyListbox(element, want) : await surveyPrompt(element, want);
+        if (texts.done) { filled++; continue; }
         menus.push({ entry, texts, decision: texts.length ? chooseAmong(entry.label, want, texts) : Promise.resolve(-1) });
         continue;
       }
@@ -1192,7 +1235,7 @@
         ? await applyListbox(entry.element, texts, index)
         : await applyPrompt(entry.element, entry.result.value, texts, index));
     }
-    const parts = [`filled ${filled}`];
+    const parts = [`filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
     if (skipped) parts.push(`left ${skipped} for you`);
     note(parts.join(", "));
@@ -1320,7 +1363,7 @@
   // Tests (extension/test/content.test.mjs) reach the pure helpers here.
   // The flag is only ever set by the test stub, never by a real page.
   if (window.__smartpasteTest) {
-    Object.assign(window.__smartpasteTest, { dateParts, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize, setPrompt });
+    Object.assign(window.__smartpasteTest, { dateParts, localMatch, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize, setPrompt });
   }
 
   // The manifest runs this at document_idle, but an injected or early copy can

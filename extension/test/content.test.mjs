@@ -54,6 +54,23 @@ test("dateParts reads the date shapes a profile holds", { skip }, () =>
     ]);
   }));
 
+test("localMatch: exact, or the one option that starts with the answer", { skip }, () =>
+  withPage("contact.html", async (page) => {
+    const picks = await page.eval(() => {
+      const { localMatch } = window.__smartpasteTest;
+      const source = ["Other Source", "Job Board Other", "Organizational Affiliation Other"];
+      return [
+        localMatch(source, "Other"),                                   // the screenshot case
+        localMatch(["Yes, I am authorized", "No"], "Yes"),
+        localMatch(["No", "No, not now", "Yes"], "No"),                // exact beats prefix
+        localMatch(["Yes, now", "Yes, later", "No"], "Yes"),           // two prefixes: ask Jev
+        localMatch(["Nothing", "Yes"], "No"),                          // "No" is not a word of "Nothing"
+        localMatch(["Bachelor of Science", "Master of Science"], "B.S."),
+      ];
+    });
+    assert.deepEqual(picks, [0, 0, 0, -1, -1, -1]);
+  }));
+
 /* ------------------------------------------------------ application gate */
 
 for (const fixture of ["form.html", "application-no-upload.html", "workday.html", "ashby.html", "lever.html"]) {
@@ -191,11 +208,13 @@ test("fill: a whole Workday page", { skip }, () =>
         dates: ["05", "2026", "2027"], radio: "pw-no",
       });
     // 18 filled; the "broken" prompt never takes a click and is left for you.
-    assert.match(summary, /filled 18, attached 1 file, left 1 for you/);
+    assert.match(summary, /^filled 18 in [0-9.]+s, attached 1 file, left 1 for you$/);
     assert.equal(await page.eval("document.querySelectorAll('.pop').length"), 0, "a menu was left open");
-    // The long list reached Jev shortlisted, not as 237 options.
-    const country = await page.eval("window.__messages.find(m => m.type === 'choose-option' && m.label === 'Country')");
-    assert.ok(country.options.length <= 5, country.options);
+    // Only menus with no plain match go to Jev: "United States" is the one
+    // country starting with it, "LinkedIn" the one source. Degree and gender
+    // need the model ("B.S.", "Prefer not to say").
+    const asked = await page.eval("window.__messages.filter(m => m.type === 'choose-option').map(m => m.label)");
+    assert.deepEqual(asked.sort(), ["Education 1: Degree", "Gender"]);
   }));
 
 test("fill: Workday menus are read first and decided together, not one round trip each", { skip }, () =>
@@ -205,8 +224,8 @@ test("fill: Workday menus are read first and decided together, not one round tri
     const started = Date.now();
     await autofill(page, 60000);
     const elapsed = Date.now() - started;
-    // Four dropdowns need Jev; asked one after another that alone is 3.6s.
-    assert.ok(await page.eval("window.__maxInFlight") >= 3, "choose-option calls ran one at a time");
+    // Two dropdowns need Jev; they must be in flight together.
+    assert.equal(await page.eval("window.__maxInFlight"), 2, "choose-option calls ran one at a time");
     assert.ok(elapsed < 8000, `a Workday page took ${elapsed}ms to fill`);
     assert.equal(await page.eval("window.__model.gender"), "I do not wish to answer");
   }));
