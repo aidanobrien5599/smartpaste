@@ -134,3 +134,8 @@ test("a line ending on a dangling word runs on, even into a capital", () => {
     item("Tokyo HQ for the liaison role.", 50, 488, 150)]);
   assert.equal(lines.length, 1);
 });
+
+test("a date range wrapped onto the next line is rejoined", () => {
+  const lines = linesFromItems([item("September 2016 – December", 50, 500, 150), item("2021", 50, 488, 25)]);
+  assert.deepEqual(lines, ["September 2016 – December 2021"]);
+});

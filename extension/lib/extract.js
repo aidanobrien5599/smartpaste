@@ -129,6 +129,9 @@ export function joinContinuations(segments) {
     // when that starts with a capital: "…seconded to" / "Tokyo HQ (…)".
     const dangling = prev && /\b(?:to|of|and|the|for|with|in|at|by|from|a|an|or|as|via|including)$/i.test(prev.text.trim()) &&
       /^[A-Z(]/.test(text) && seg.x0 >= prev.x0 - 2;
+    // A date range wrapped at its end: "September 2016 – December" / "2021".
+    const wrappedRange = prev && /(?:[-\u2012-\u2015]|\bto)\s*(?:[A-Z][a-z]{2,8}\.?)?\s*$/.test(prev.text.trim()) &&
+      /\d{4}/.test(prev.text) && /^(?:(?:19|20)\d{2}|[A-Z][a-z]{2,8}\.?\s+(?:19|20)\d{2}|Present)\b/.test(text);
     // A word hyphenated across the line break: "Busi-" + "ness".
     const hyphenated = /[a-z]-\s*$/.test(prev?.text || "") && /^[a-z]/.test(text);
     if (adjacent && hyphenated) {
@@ -137,7 +140,7 @@ export function joinContinuations(segments) {
       prev.x1 = Math.max(prev.x1, seg.x1);
       continue;
     }
-    if (adjacent && !BULLET_MARK.test(decodeCork(seg.text)) && (underBullet || midSentence || dangling)) {
+    if (adjacent && !BULLET_MARK.test(decodeCork(seg.text)) && (underBullet || midSentence || dangling || wrappedRange)) {
       prev.text = `${prev.text.trimEnd()} ${text}`;
       prev.y = seg.y;
       prev.x1 = Math.max(prev.x1, seg.x1);

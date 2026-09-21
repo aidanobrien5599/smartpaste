@@ -390,6 +390,9 @@ export function linksByDomain(lines) {
   return links;
 }
 
+const FIELD_LABEL =
+  /^(?:company|employer|organi[sz]ation|title|job title|position|role|location|dates?|period|school|university|institution|degree|major|field of study|gpa|cgpa|cumulative gpa|grade)$/i;
+
 const LABELS_BY_KEY = Object.fromEntries(FIELDS.map((f) => [f.key, f.label]));
 const context = (lines, i) => ({ previous_line: lines[i - 1] || "", next_line: lines[i + 1] || "" });
 
@@ -437,6 +440,18 @@ async function profileBySegments(text) {
         continue;
       }
       pieces[row.section].push({ text, bullet: true });
+      continue;
+    }
+    // "Joint appointment: Stanford AI Lab …", "Reports to: …" describe the entry;
+    // one labelled a company opened a phantom entry. A line that carries its
+    // own label is detail -- unless the label is a field name.
+    const labelled = row.text.match(/^([A-Z][\w ()&\/.-]{2,32}):\s+\S/);
+    // Note labels are short ("Reports to", "Research Group"); a longer one, or
+    // one ending in a field word, is the field itself: "BSE Computer
+    // Engineering GPA: 3.91/4.00".
+    if (labelled && labelled[1].split(/\s+/).length <= 3 && !FIELD_LABEL.test(labelled[1]) &&
+        !/\b(?:c?gpa|grade|dates?|location)$/i.test(labelled[1])) {
+      pieces[row.section].push({ text: row.text, bullet: true });
       continue;
     }
     for (const piece of splitPieces(row.text)) {
