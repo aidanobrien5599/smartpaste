@@ -108,3 +108,9 @@ test("an email under a phone number is its own line", () => {
   const lines = linesFromItems([item("+1 416 555 0199", 40, 710, 80), item("d.okafor@example.com", 40, 697, 110)]);
   assert.deepEqual(lines, ["+1 416 555 0199", "d.okafor@example.com"]);
 });
+
+test("page numbers are dropped, years are not", () => {
+  const lines = linesFromItems([item("SAP SE", 50, 700, 40), item("1", 300, 40, 5),
+    item("Page 2 of 2", 280, 30, 50), item("2014", 50, 600, 25)]);
+  assert.deepEqual(lines, ["SAP SE", "2014"]);
+});

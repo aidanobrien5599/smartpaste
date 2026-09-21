@@ -9,7 +9,7 @@
 import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.js";
 import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.js";
 import {
-  assemble, cleanGpa, DEGREES, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
+  assemble, cleanGpa, DEGREES, sectionByVocabulary, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
 import { resolve } from "./lib/resolve.js";
@@ -403,15 +403,19 @@ async function profileBySegments(text) {
   const candidates = headingCandidates(lines);
   const headingQuestions = Object.fromEntries(candidates.map(({ text, index }) => [
     `h${index}`,
-    choice({ line: text, ...context(lines, index),
-      ask: "Is this line a section heading of a resume? If so, which section does it open?" },
+    choice({ line: text, previous_line: lines[index - 1] || "",
+      following_lines: lines.slice(index + 1, index + 4),
+      ask: "Is this line a section heading of a resume? Headings can be creative " +
+        "('Career Journey', 'Academic Credentials'); judge by what follows it. " +
+        "If it is a heading, which section does it open?" },
     SECTION_KINDS),
   ]));
   const headingAnswers = await askBatched(apiKey, "Lines of one resume, in order.", headingQuestions);
   const headings = new Map();
-  for (const { index } of candidates) {
+  for (const { index, text } of candidates) {
     const kind = label(headingAnswers[`h${index}`], 0.5);
     if (kind && kind !== NONE) headings.set(index, kind);
+    else if (sectionByVocabulary(text)) headings.set(index, sectionByVocabulary(text));
   }
   const rows = sectionise(lines, headings);
 

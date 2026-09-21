@@ -77,3 +77,17 @@ test("headingCandidates: a company or a job title is not a heading", () => {
     "Academic Background", "Professional Experience", "Honors:", "Qualcomm"]).map((c) => c.text);
   assert.deepEqual(got, ["EDUCATION", "Academic Background", "Professional Experience", "Honors:"]);
 });
+
+test("creative headings still map by their section word", async () => {
+  const { sectionByVocabulary } = await import("../lib/draft.js");
+  assert.equal(sectionByVocabulary("Career Journey"), "experience");
+  assert.equal(sectionByVocabulary("Academic Credentials"), "education");
+  assert.equal(sectionByVocabulary("Michigan Hackers"), null);
+});
+
+test("splitPieces: never inside brackets, and prose stays whole", () => {
+  assert.ok(splitPieces("Compilers, Operating Systems (C, Rust)").includes("Operating Systems (C, Rust)"));
+  const prose = "In this role I taught Ruby to first-year undergraduates, which was confusing for everyone involved";
+  assert.equal(splitPieces(prose).length, 1);
+  assert.equal(splitPieces("Bachelor of Science, Computer Information Systems (CIS), Towson University, Towson, MD").length, 4);
+});

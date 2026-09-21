@@ -101,6 +101,8 @@ export function readingOrder(segments) {
   return [...left, ...right];
 }
 
+const PAGE_NUMBER = /^(?:(?:page|seite|p\.?)\s*)?\d{1,3}(?:\s*(?:of|\/|von|de)\s*\d{1,3})?$|^-\s*\d{1,3}\s*-$/i;
+
 const BULLET_MARK = /^\s*[\u2022\u00b7\u25aa\u25cf\u2023\u25e6\u2043*-]\s*/;
 
 /**
@@ -196,7 +198,9 @@ export function linesFromItems(items, isIcon = () => false) {
     close();
   }
   const lines = joinContinuations(readingOrder(segments)).map((seg) => seg.text);
-  return lines.map(repair).filter(Boolean);
+  // Page numbers and "Page 1 of 2" footers are not content. On a two-page CV
+  // a lone "1" was labelled a company and split an entry in two.
+  return lines.map(repair).filter((line) => line && !PAGE_NUMBER.test(line));
 }
 
 let pdfjs = null;

@@ -115,6 +115,20 @@ export function headingCandidates(lines) {
     });
 }
 
+// A strong section word decides the section when Jev declines a creative
+// heading: "Career Journey" is experience whatever else it is.
+const VOCABULARY = [
+  [/\b(?:experience|employment|career|work history|professional history|positions|berufserfahrung|exp[eé]rience professionnelle|experiencia)\b/i, "experience"],
+  [/\b(?:education|academic|credentials|qualifications|studies|ausbildung|formation|educaci[oó]n)\b/i, "education"],
+  [/\bprojects?\b/i, "projects"],
+  [/\b(?:skills|competenc|technical|kenntnisse|comp[eé]tences|habilidades)/i, "skills"],
+];
+
+export function sectionByVocabulary(text) {
+  const hit = VOCABULARY.find(([re]) => re.test(text));
+  return hit ? hit[1] : null;
+}
+
 /**
  * Assign every line a section, from the headings Jev confirmed.
  * Lines before the first heading are the header: name and contact details.
@@ -144,9 +158,17 @@ const PLACE_CODE =
  * back on its city: "Towson" + "MD" -> "Towson, MD".
  */
 export function splitPieces(line) {
+  // Prose is one piece. Length cannot tell it from an entry line -- "Bachelor
+  // of Science, Computer Information Systems (CIS), Towson University,
+  // Towson, MD" is eleven words and must be split -- but its words can: prose
+  // is mostly lower case, an entry line mostly capitalised names.
+  const words = line.trim().split(/\s+/);
+  const lower = words.filter((w) => /^[a-z]/.test(w) && !/^(?:of|and|the|in|at|for|to|&)$/.test(w)).length;
+  if (words.length > 8 && lower / words.length >= 0.4) return [line.replace(BULLET, "").trim()];
   if (isBullet(line)) return [line.replace(BULLET, "").trim()];
   const dates = [];
-  const guarded = line.replace(DATE_RANGE, (m) => {
+  const bracketed = line.replace(/\([^()]*\)/g, (m) => m.replace(/,/g, "\u0002"));
+  const guarded = bracketed.replace(DATE_RANGE, (m) => {
     dates.push(m.trim());
     return `\u0001${dates.length - 1}\u0001`;
   });
@@ -163,6 +185,7 @@ export function splitPieces(line) {
       pieces.push(dates[Number(piece)]);
       continue;
     }
+    piece = piece.replace(/\u0002/g, ",");
     // A separator stranded next to a date range: "· Toronto".
     piece = piece.replace(/^[\s|\u2022\u00b7\u2014\u2013;,]+|[\s|\u2022\u00b7\u2014\u2013;,]+$/g, "");
     if (!piece) continue;
