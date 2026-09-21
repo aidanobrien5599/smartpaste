@@ -24,6 +24,25 @@ own right. Anything you typed explicitly always wins over a derived value.
 
 That split is the whole design: the model judges, code composes and extracts.
 
+## The flexibility catch-all
+
+Applications ask the same logistics question in endlessly different words —
+*"willing and able to relocate to New York City"*, *"in the office 3 days a
+week"*, *"can you work Pacific hours"*. The **Flexibility** group holds explicit
+stances for the common ones plus a deliberately scoped catch-all:
+
+> **Default answer on any other question about location, office attendance,
+> travel or schedule** — *"Yes, I am flexible and open to whatever the role
+> requires."*
+
+Scoping is the whole point. A blanket "say yes to anything unanswered" would
+also say yes to *"are you willing to work unpaid during a trial period?"* and
+*"do you agree to a background check?"*. Because the catch-all names its own
+domain, the escape option still wins outside it. Measured across ten
+questions: five logistics answered, and unpaid work, background checks,
+graduation date, sponsorship and salary all left alone or answered from their
+own fields.
+
 ## Why a form and not a resume
 
 The first version parsed your resume PDF into snippets and let Jev pick among

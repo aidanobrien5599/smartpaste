@@ -31,8 +31,6 @@ export const GROUPS = [
       ["country", "Country", "United States"],
       ["location", "Current location", "Madison, WI"],
       ["hometown", "Hometown", "Little Silver, New Jersey"],
-      ["relocate", "Willing to relocate", "Yes, happy to relocate"],
-      ["work_preference", "Remote / hybrid / onsite", "Onsite or hybrid"],
     ],
   },
   {
@@ -51,6 +49,22 @@ export const GROUPS = [
       ["sponsorship", "Requires visa sponsorship", "No"],
       ["visa_status", "Visa status", "US citizen"],
       ["clearance", "Security clearance", "None"],
+    ],
+  },
+  {
+    title: "Flexibility",
+    fields: [
+      ["relocate", "Willing to relocate",
+        "Yes, I am willing and able to relocate anywhere in the US"],
+      ["work_preference", "Remote / hybrid / onsite",
+        "Happy to work onsite, hybrid or remote"],
+      ["office_days", "Days per week in the office",
+        "Able to be in the office five days a week"],
+      ["travel", "Willing to travel", "Comfortable with occasional travel"],
+      ["schedule", "Schedule and hours", "Full-time, standard hours, flexible"],
+      ["flexibility_default", "Default answer on any other question about " +
+        "location, office attendance, travel or schedule",
+        "Yes — I am flexible and open to whatever the role requires"],
     ],
   },
   {
