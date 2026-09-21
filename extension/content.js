@@ -1796,12 +1796,17 @@
           ? applyListbox(entry.element, texts, index)
           : applyPrompt(entry.element, entry.result.value, texts, index);
       });
-      if (timeline[before]) timeline[before].read = read;
+      if (timeline[before]) {
+        timeline[before].read = read;
+        timeline[before].wanted = String(entry.result.value).slice(0, 40);
+        if (!timeline[before].ok) menus.find((m) => m.entry === entry).failed = true;
+      }
     }
     // Where the time went, for when a page feels slow.
     if (timeline.length) {
       console.info(`smartpaste: filled in ${Math.round(performance.now() - started)}ms`);
       console.table(timeline);
+      reportGaps(menus);
     }
     if (window.__smartpasteTest) window.__smartpasteTest.timeline = timeline;
 
@@ -1816,6 +1821,30 @@
     // A follow-up round adds to the fill's summary rather than replacing it.
     lastSummary = only && lastSummary ? `${lastSummary} · ${summary}` : summary;
     note(lastSummary, false, why.length || only ? 12000 : 4000);
+  }
+
+  /**
+   * For diagnosing a page from one console paste: questions on it that
+   * smartpaste found no field in, with a trimmed copy of their markup, and
+   * for each dropdown that failed, what it wanted and every option offered.
+   */
+  function reportGaps(menus = []) {
+    const handled = [...known.map((k) => k.element), ...collectFields().map((f) => f.element)];
+    const gaps = [];
+    for (const box of document.querySelectorAll('[data-automation-id^="formField"], .application-question, fieldset')) {
+      if (!nodeVisible(box) || box.querySelector('[data-automation-id^="formField"]')) continue;
+      if (handled.some((el) => box.contains(el) || el.contains(box))) continue;
+      const label = clean(box.querySelector("label, legend")?.textContent || "");
+      if (!label) continue;
+      const html = box.outerHTML.replace(/\s(?:class|style)="[^"]*"/g, "").replace(/\s+/g, " ").slice(0, 700);
+      gaps.push({ question: label, markup: html });
+    }
+    const failed = menus.filter((m) => m.failed).map((m) => ({ field: m.entry.label, wanted: m.entry.result.value, options: m.texts.join(" | ").slice(0, 1500) }));
+    if (!gaps.length && !failed.length) return;
+    console.groupCollapsed(`smartpaste: ${gaps.length} question(s) not recognised, ${failed.length} dropdown(s) not matched -- paste this when reporting a problem`);
+    if (gaps.length) console.table(gaps);
+    if (failed.length) console.table(failed);
+    console.groupEnd();
   }
 
   function onKeyDown(event) {
