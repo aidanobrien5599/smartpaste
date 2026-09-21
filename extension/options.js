@@ -33,7 +33,7 @@ function renderGroups(profile) {
       else input.type = "text";
       input.id = `f-${key}`;
       input.dataset.key = key;
-      input.placeholder = placeholder ? `e.g. ${placeholder}` : "";
+      input.placeholder = placeholder ? `not set · e.g. ${placeholder}` : "not set";
       input.value = profile[key] || "";
       wrap.append(tag, input);
       grid.appendChild(wrap);
@@ -73,7 +73,7 @@ function entryNode(section, entry, index) {
     const input = long ? document.createElement("textarea") : document.createElement("input");
     if (long) input.className = "short";
     else input.type = "text";
-    input.placeholder = placeholder ? `e.g. ${placeholder}` : "";
+    input.placeholder = placeholder ? `not set · e.g. ${placeholder}` : "not set";
     input.value = entry[key] || "";
     input.addEventListener("input", () => {
       state.profile[section.key][index][key] = input.value;

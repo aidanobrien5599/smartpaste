@@ -13,7 +13,7 @@ import {
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
-import { resolve } from "./lib/resolve.js";
+import { AUTO, resolve } from "./lib/resolve.js";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -190,7 +190,7 @@ async function answerFields(fields, page = {}) {
       if (!value || confidence < 0.4) {
         return { label: field.label, status: "none", value: null, confidence, alternatives: [] };
       }
-      return { label: field.label, status: confidence >= 0.85 ? "auto" : "pick", value, confidence, alternatives: [] };
+      return { label: field.label, status: confidence >= AUTO ? "auto" : "pick", value, confidence, alternatives: [] };
     }
     if (field.options && field.options.length) {
       const index = Number(String(answer.choice).replace("o", ""));
@@ -204,7 +204,7 @@ async function answerFields(fields, page = {}) {
       }
       return {
         label: field.label,
-        status: confidence >= 0.85 ? "auto" : "pick",
+        status: confidence >= AUTO ? "auto" : "pick",
         value: picked,
         confidence,
         isSelect: true,

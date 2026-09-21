@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Apply - Lever</title>
+<body style="font:14px system-ui;max-width:600px;margin:30px auto">
+<!-- Lever-style: attaching a resume makes the site parse it and rebuild the
+     form 800ms later, wiping whatever was typed. -->
+<div class="application-question"><label><div class="application-label">Resume/CV ✱</div><input type="file" id="resume" name="resume"></label></div>
+<div id="form"></div>
+<script>
+const build = () => { document.getElementById("form").innerHTML = `
+  <div class="application-question"><label><div class="application-label">Full name ✱</div><input name="name" type="text"></label></div>
+  <div class="application-question"><label><div class="application-label">Email ✱</div><input name="email" type="email"></label></div>
+  <div class="application-question"><div class="application-label">LinkedIn URL</div><input name="urls[LinkedIn]" type="text"></div>`; };
+build();
+window.__rebuilt = 0;
+document.getElementById("resume").addEventListener("change", () => setTimeout(() => { build(); window.__rebuilt++; }, 800));
+</script></body>

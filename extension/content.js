@@ -547,7 +547,13 @@
   function menuFor(field) {
     const id = field.getAttribute("aria-controls");
     return (id && document.getElementById(id)) ||
-      field.closest(SELECT_SHELL)?.parentElement?.querySelector('[class*="select__menu"]') || null;
+      selectRoot(field)?.querySelector('[class*="select__menu"]') || null;
+  }
+
+  /** The whole React Select: control, menu and notices all live under it. */
+  function selectRoot(field) {
+    return field.closest('[class*="select-shell"], [class*="select__container"]') ||
+      field.closest(SELECT_SHELL)?.parentElement || null;
   }
 
   // Opening a menu shows it at once, even if its options are still loading
@@ -564,15 +570,19 @@
       // An open menu saying "No options" is an answer, not a slow load.
       const notice = menuNotice(field);
       if (notice && !/loading|searching/i.test(notice)) return [];
-      if (opening && !menu && Date.now() - started > OPENS_WITHIN) return [];
+      // Opened and still empty with no "Loading" notice: it lists nothing
+      // until typed into (Greenhouse's location box shows a bare empty list).
+      if (opening && Date.now() - started > OPENS_WITHIN) return [];
       await sleep(25);
     }
     return [];
   }
 
   function menuNotice(field) {
-    const shell = field.closest(SELECT_SHELL)?.parentElement;
-    const notice = shell && shell.querySelector('[class*="menu-notice"]');
+    // Under the whole select: on Greenhouse the menu is not a sibling of the
+    // control, so looking beside it missed "No options" and sat out 1.5s.
+    const root = selectRoot(field);
+    const notice = root && root.querySelector('[class*="menu-notice"]');
     return notice && nodeVisible(notice) ? notice.textContent.trim() : "";
   }
 
@@ -1201,33 +1211,49 @@
    * already typed and replaces the elements we were holding. So attach, give
    * the parser a moment, then re-find the fields by label and fill those.
    */
-  // Uploads known not to re-render the form around them: Workday's in-form
-  // resume box just stores the file, so waiting on it is dead time.
-  const QUIET_UPLOAD = '[data-automation-id="file-upload-input-ref"]';
 
   async function fillPage() {
     if (filling) return;
     filling = true;
     try {
-      await fillFields();
+      const started = performance.now();
+      const attached = await attachDocuments();
+      await fillFields(started, attached);
+      if (attached) await refillIfReparsed(started);
     } finally {
       filling = false;
       setTimeout(scan, 300);
     }
   }
 
-  async function fillFields() {
-    const started = performance.now();
-    const quiet = [...document.querySelectorAll(FILE_SELECTOR)]
-      .filter((el) => !el.files.length).every((el) => el.matches(QUIET_UPLOAD));
-    const attached = await attachDocuments();
-    if (attached && !quiet) {
-      await sleep(2500);
+  // How long a site may take to parse an attached resume and rebuild the form.
+  const REPARSE_WINDOW = 3000;
+
+  /**
+   * Some sites (Lever) parse an attached resume and re-render the form,
+   * wiping what was filled. This used to be a flat 2.5s wait before filling
+   * on every page with an upload -- most of a 3s Ashby fill, where nothing
+   * re-renders. Now: fill at once, then watch; refill only if it happened.
+   */
+  async function refillIfReparsed(started) {
+    const filledNow = known.filter((k) => k.result.status === "auto" && isFilled(k));
+    if (!filledNow.length) return;
+    const deadline = Date.now() + REPARSE_WINDOW;
+    while (Date.now() < deadline) {
+      await sleep(150);
+      const wiped = filledNow.some((k) => !k.element.isConnected || !isFilled(k));
+      if (!wiped) continue;
+      await sleep(500); // let the re-render finish
       const byLabel = new Map(known.map((k) => [k.label, k.result]));
       known = collectFields()
         .filter((f) => byLabel.has(f.label))
         .map((f) => ({ ...f, result: byLabel.get(f.label) }));
+      await fillFields(started, 0, "refilled after the site re-read your resume: ");
+      return;
     }
+  }
+
+  async function fillFields(started, attached, prefix = "") {
     let filled = 0;
     let skipped = 0;
     const count = (ok) => (ok ? filled++ : skipped++);
@@ -1320,7 +1346,7 @@
     console.table(timeline);
     if (window.__smartpasteTest) window.__smartpasteTest.timeline = timeline;
 
-    const parts = [`filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
+    const parts = [`${prefix}filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
     if (skipped) parts.push(`left ${skipped} for you`);
     // Name the slow fields right in the note, so a slow page can be

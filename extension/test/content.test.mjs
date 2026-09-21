@@ -173,6 +173,27 @@ test("fill: Greenhouse comboboxes pick by meaning, scoped to their own menu", { 
     const times = Object.fromEntries((await page.eval("window.__smartpasteTest.timeline")).map((t) => [t.field, t.ms]));
     assert.ok(times["When do you expect to graduate?"] < 250, JSON.stringify(times));
     assert.ok(times["Location (City)"] < 900, JSON.stringify(times));
+    assert.equal(await page.eval(text("#loc-value")), "Madison, Wisconsin, United States");
+  }));
+
+test("fill: attaching a resume does not hold up the fill", { skip }, () =>
+  withPage("form.html", async (page) => {
+    // This page does not re-render on upload; waiting 2.5s "in case" it did
+    // was most of a 3s Ashby fill.
+    const summary = await autofill(page);
+    const seconds = Number(summary.match(/in ([0-9.]+)s/)[1]);
+    assert.match(summary, /attached 2 files/);
+    assert.ok(seconds < 1, summary);
+  }));
+
+test("fill: a site that rebuilds the form after reading the resume is refilled", { skip }, () =>
+  withPage("lever-reparse.html", async (page) => {
+    await autofill(page);
+    await page.waitFor("window.__rebuilt === 1");
+    await page.waitFor("document.querySelector('input[name=email]').value", 5000);
+    assert.equal(await page.eval(value("input[name=email]")), "aidanobrien5599@gmail.com");
+    assert.equal(await page.eval(value("input[name=name]")), "Aidan O'Brien");
+    assert.equal(await page.eval(value("input[name^=urls]")), "https://www.linkedin.com/in/aidanobrien5599");
   }));
 
 test("fill: Ashby toggle buttons", { skip }, () =>

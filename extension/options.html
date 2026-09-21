@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <title>smartpaste</title>
 <style>
+  /* An empty field must not look answered: "e.g. No" was read as a value. */
+  input::placeholder, textarea::placeholder { color: #aaa; font-style: italic; }
   :root {
     --bg: #fbfaf8; --fg: #1a1a18; --dim: #6b6b64; --line: #e3e0d8;
     --card: #fff; --ok: #1f7a3d; --warn: #c98a00; --accent: #2a5db0;

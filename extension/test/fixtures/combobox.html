@@ -8,11 +8,13 @@
   <input id="grad" class="select__input" role="combobox" aria-controls="grad-menu" aria-labelledby="grad-label" type="text">
   <div class="select__single-value" id="grad-value"></div></div>
 <div id="grad-menu"></div>
-<!-- Figma's Location (City): no aria-controls, no "Start typing" hint, and
-     its menu is a sibling that appears only once a (400ms) search returns. -->
+<!-- Figma's Location (City), as the live page builds it: select-shell >
+     div > control, the menu a child of the shell (not beside the control).
+     Opened empty it says "No options"; typing shows "Loading..." until a
+     400ms search returns. aria-controls only appears once it is open. -->
 <div class="select__container"><label for="loc" id="loc-label">Location (City)</label>
-  <div class="select__control"><input id="loc" class="select__input" role="combobox" type="text">
-  <div class="select__single-value" id="loc-value"></div></div></div>
+  <div class="select-shell"><div><div class="select__control"><input id="loc" class="select__input" role="combobox" type="text">
+  <div class="select__single-value" id="loc-value"></div></div></div></div></div>
 <div id="decoy" role="listbox"></div>
 <script>
 const decoy = document.getElementById("decoy");
@@ -34,23 +36,34 @@ function combo(id, all, needsTyping) {
 combo("grad", ["Fall 2026", "Spring 2027", "Fall 2027", "Spring 2028"], false);
 const locations = ["Madison, Wisconsin, United States", "Town of Madison, Wisconsin, United States", "Madison, Alabama, United States"];
 (() => {
-  const input = document.getElementById("loc"), container = input.closest(".select__container");
-  let timer;
-  input.addEventListener("input", () => {
-    container.querySelector(".select__menu")?.remove();
-    clearTimeout(timer);
-    const q = input.value.split(",")[0].trim().toLowerCase();
-    if (!q) return;
-    timer = setTimeout(() => {
-      const menu = document.createElement("div"); menu.className = "select__menu";
-      const list = document.createElement("div"); list.className = "select__menu-list"; menu.appendChild(list);
-      for (const o of locations.filter((l) => l.toLowerCase().includes(q))) {
+  const input = document.getElementById("loc"), shell = input.closest(".select-shell");
+  let timer, results = null;
+  const render = (notice) => {
+    shell.querySelector(".select__menu")?.remove();
+    input.setAttribute("aria-controls", "react-select-loc-listbox");
+    const menu = document.createElement("div"); menu.className = "select__menu";
+    // Like the live page: the listbox aria-controls names exists even when
+    // all it holds is a notice.
+    if (notice) menu.innerHTML = `<div id="react-select-loc-listbox" role="listbox"><div class="select__menu-notice">${notice}</div></div>`;
+    else {
+      const list = document.createElement("div"); list.id = "react-select-loc-listbox"; list.setAttribute("role", "listbox");
+      for (const o of results) {
         const d = document.createElement("div"); d.setAttribute("role", "option"); d.textContent = o;
         d.addEventListener("click", () => { document.getElementById("loc-value").textContent = o; input.value = ""; menu.remove(); });
         list.appendChild(d);
       }
-      container.appendChild(menu);
-    }, 400);
+      menu.appendChild(list);
+    }
+    shell.appendChild(menu);
+  };
+  // Opened empty, the live box shows a bare empty list: no options, no notice.
+  input.addEventListener("click", () => { results = []; render(null); });
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = input.value.split(",")[0].trim().toLowerCase();
+    if (!q) return render("No options");
+    render("Loading...");
+    timer = setTimeout(() => { results = locations.filter((l) => l.toLowerCase().includes(q)); render(results.length ? null : "No options"); }, 400);
   });
 })();
 </script></body>

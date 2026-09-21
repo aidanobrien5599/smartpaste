@@ -26,11 +26,14 @@ export const GROUPS = [
     title: "Location",
     fields: [
       ["address", "Street address", "123 Example St"],
-      ["city", "City", "Madison"],
-      ["state", "State", "Wisconsin"],
+      // "(mailing address)" and "(city you live in now)" keep these apart:
+      // with bare "City" next to "Current location", Jev could not tell
+      // which a "Location (City)" field meant (0.63) and it went unfilled.
+      ["city", "City (mailing address)", "Madison"],
+      ["state", "State (mailing address)", "Wisconsin"],
       ["zip", "Postal code", "53703"],
       ["country", "Country", "United States"],
-      ["location", "Current location", "Madison, WI"],
+      ["location", "Current location (city you live in now)", "Madison, WI"],
       ["hometown", "Hometown", "Little Silver, New Jersey"],
     ],
   },

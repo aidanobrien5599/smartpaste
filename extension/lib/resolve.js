@@ -11,7 +11,7 @@ import { NONE, isStructured, valueOf } from "./profile.js";
 
 // Above AUTO, Cmd-V pastes silently. Below MENU we offer nothing at all and
 // let the keystroke fall through to an ordinary paste.
-export const AUTO = 0.85;
+export const AUTO = 0.65;
 export const MENU = 0.4;
 
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
