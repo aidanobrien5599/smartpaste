@@ -15,6 +15,7 @@ import {
 } from "./lib/draft.js";
 import { AUTO, MENU, maxTicks, resolve } from "./lib/resolve.js";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
+import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.js";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const MODEL = "jev-latest";
@@ -236,9 +237,31 @@ async function answerFields(fields, page = {}) {
     }
   });
 
-  const answers = await askBatched(apiKey, { applicant_profile: options }, questions);
+  // Your own answers may say {company} or {role}. Code cuts candidate names
+  // out of the page's title, heading and URL; Jev says which is which, in
+  // the same batch as everything else.
+  const candidates = Object.values(options).some((o) => hasPlaceholders(o.value))
+    ? pageCandidates(page) : [];
+  if (candidates.length) {
+    const criteria = { [NONE]: "None of these", ...Object.fromEntries(candidates.map((c, j) => [`c${j}`, c])) };
+    const where = { url: page.url || "", title: page.title || "", heading: page.heading || "" };
+    questions.page_company = { type: "choice", criteria,
+      instructions: { page: where, ask: "Which of these is the name of the company this job application is for?" } };
+    questions.page_role = { type: "choice", criteria,
+      instructions: { page: where, ask: "Which of these is the job title of the role being applied for?" } };
+  }
 
-  return fields.map((field, i) => {
+  const answers = await askBatched(apiKey, { applicant_profile: options }, questions);
+  const named = (id) => {
+    const a = answers[id];
+    const p = a ? Math.min(Number(a.probabilities?.[a.choice] ?? 0), Number(a.confidence ?? 0)) : 0;
+    return a && a.choice !== NONE && p >= 0.6 ? candidates[Number(String(a.choice).slice(1))] : null;
+  };
+  const known = candidates.length ? { company: named("page_company"), role: named("page_role") } : {};
+
+  return fields.map((field, i) => withPlaceholders(answerFor(field, i), known));
+
+  function answerFor(field, i) {
     if (field.multi) return ticked(field, i, answers);
     const answer = answers[`f${i}`];
     if (!answer) {
@@ -280,7 +303,21 @@ async function answerFields(fields, page = {}) {
       };
     }
     return resolve(field.label, answer, options);
-  });
+  }
+}
+
+/**
+ * Fill {company} / {role} in an answer. One that cannot be filled is not
+ * typed in unasked: it drops to "pick", so Cmd-V shows it for you to finish.
+ */
+function withPlaceholders(result, known) {
+  if (!result || typeof result.value !== "string" || !hasPlaceholders(result.value)) return result;
+  const filled = fillPlaceholders(result.value, known);
+  const alternatives = (result.alternatives || []).map((a) =>
+    typeof a.value === "string" ? { ...a, value: fillPlaceholders(a.value, known) ?? a.value } : a);
+  return filled
+    ? { ...result, value: filled, alternatives }
+    : { ...result, status: result.status === "auto" ? "pick" : result.status, alternatives };
 }
 
 // A resume states who you are and what you have done. It does not state your
@@ -316,6 +353,7 @@ function resumeQuestions(criteria) {
     plan.push({ id: `p_${field.key}`, target: { key: field.key }, label: field.label });
   }
   for (const section of REPEATABLE) {
+    if (section.named) continue; // test scores are rarely on a resume
     const count = section.key === "education" ? 2 : 3;
     for (let i = 0; i < count; i++) {
       for (const [key, label] of section.fields) {

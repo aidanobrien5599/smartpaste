@@ -421,7 +421,9 @@
       type: "answer-fields",
       fields: fields.map((f) => ({ label: f.label, options: f.options, multi: Boolean(f.multi) })),
       // Which employer "have you worked for us?" means.
-      page: { url: location.href, title: document.title },
+      // ...and which company and role {company} / {role} mean.
+      page: { url: location.href, title: document.title,
+        heading: document.querySelector("h1, h2")?.textContent.replace(/\s+/g, " ").trim().slice(0, 120) || "" },
     });
     if (!reply || !reply.ok) {
       if (reply && reply.error) note(reply.error, true);

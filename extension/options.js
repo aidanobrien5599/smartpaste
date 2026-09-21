@@ -1,6 +1,7 @@
 import { DOCUMENTS, GROUPS, ORDINALS, REPEATABLE } from "./lib/schema.js";
 import { humanSize, MAX_BYTES, toBase64 } from "./lib/documents.js";
 import { normalizePlaces } from "./lib/places.js";
+import { normalizeAnswers } from "./lib/answers.js";
 import { textFromStoredPdf } from "./lib/extract.js";
 
 let state = { profile: {}, documents: {} };
@@ -118,6 +119,73 @@ function renderPlaces() {
   host.appendChild(add);
 }
 
+/* ----------------------------------------------------------------- answers */
+
+/**
+ * Your own answers to open-ended questions: the question as forms tend to
+ * word it, and what you would say. Matched to a form's field by meaning,
+ * with {company} and {role} filled in from the page.
+ */
+function renderAnswers() {
+  const host = $("answers");
+  host.innerHTML = "";
+  if (!Array.isArray(state.profile.custom_answers)) state.profile.custom_answers = [];
+  const list = state.profile.custom_answers;
+
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent =
+    "Write the question the way forms ask it, and your answer. It is used " +
+    "wherever a form asks the same thing in other words. {company} and {role} " +
+    "become the company and job on the page; if they can't be worked out, the " +
+    "answer waits for you (\u2318V) instead of being typed in.";
+  host.appendChild(hint);
+
+  list.forEach((entry, i) => {
+    const node = document.createElement("div");
+    node.className = "entry";
+    const remove = document.createElement("button");
+    remove.className = "remove";
+    remove.textContent = "\u00d7";
+    remove.title = "Remove this answer";
+    remove.addEventListener("click", () => { list.splice(i, 1); renderAnswers(); });
+
+    const field = (labelText, tag, key, placeholder) => {
+      const wrap = document.createElement("div");
+      const label = document.createElement("label");
+      label.className = "field";
+      label.textContent = labelText;
+      const input = document.createElement(tag);
+      if (tag === "input") input.type = "text";
+      else input.className = "short";
+      input.placeholder = placeholder;
+      input.value = entry[key] || "";
+      input.addEventListener("input", () => { entry[key] = input.value; });
+      wrap.append(label, input);
+      return wrap;
+    };
+    const grid = document.createElement("div");
+    grid.className = "grid one";
+    grid.append(
+      field("Question", "input", "question", "not set · e.g. Why do you want to work at {company}?"),
+      field("Your answer", "textarea", "answer",
+        "not set · e.g. I want to work on {role} problems at {company} because…"),
+    );
+    node.append(remove, grid);
+    host.appendChild(node);
+  });
+
+  const add = document.createElement("button");
+  add.className = "add";
+  add.textContent = "+ Add a question";
+  add.addEventListener("click", () => {
+    list.push({ question: "", answer: "" });
+    renderAnswers();
+    host.querySelectorAll(".entry input")[list.length - 1]?.focus();
+  });
+  host.appendChild(add);
+}
+
 /* ------------------------------------------------------------- repeatables */
 
 function entryNode(section, entry, index) {
@@ -126,8 +194,9 @@ function entryNode(section, entry, index) {
   node.dataset.section = section.key;
 
   const heading = document.createElement("h3");
-  heading.textContent =
-    `${ORDINALS[index] || `${index + 1}th most recent`} ${section.singular}`;
+  heading.textContent = section.named
+    ? `${entry[section.summary] || `${section.singular[0].toUpperCase()}${section.singular.slice(1)} ${index + 1}`}`
+    : `${ORDINALS[index] || `${index + 1}th most recent`} ${section.singular}`;
   const remove = document.createElement("button");
   remove.className = "remove";
   remove.textContent = "\u00d7";
@@ -172,9 +241,11 @@ function renderRepeatables() {
     const box = document.createElement("section");
     const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent =
-      `Newest first. Each entry is labelled by position, so a form asking for ` +
-      `"${section.summary} 2" gets the right one.`;
+    hint.textContent = section.named
+      ? `One entry per ${section.singular}. A form asking for your "SAT score" ` +
+        `gets the score from the entry whose ${section.summary} is SAT.`
+      : `Newest first. Each entry is labelled by position, so a form asking for ` +
+        `"${section.summary} 2" gets the right one.`;
     box.appendChild(hint);
     entries.forEach((entry, i) => box.appendChild(entryNode(section, entry, i)));
 
@@ -325,6 +396,7 @@ function collect() {
     );
   }
   profile.work_locations = normalizePlaces(profile.work_locations);
+  profile.custom_answers = normalizeAnswers(profile.custom_answers);
   return profile;
 }
 
@@ -333,7 +405,8 @@ async function save() {
   const extraText = $("extra").value;
   await chrome.storage.local.set({ profile, extraText });
   state.profile = profile;
-  renderPlaces(); // show the list as saved: blanks and duplicates gone
+  renderPlaces(); // show the lists as saved: blanks and duplicates gone
+  renderAnswers();
   const { buildOptions } = await import("./lib/profile.js");
   const count = Object.keys(buildOptions(profile, extraText)).length;
   const docs = Object.keys(state.documents).length;
@@ -374,6 +447,7 @@ $("clear").addEventListener("click", async () => {
   state.profile = {};
   renderRepeatables();
   renderPlaces();
+  renderAnswers();
   await chrome.storage.local.set({ profile: {}, extraText: "" });
   say($("save-status"), "Cleared. Your API key and documents are untouched.");
 });
@@ -393,6 +467,7 @@ document.addEventListener("keydown", (event) => {
   $("key").value = apiKey;
   renderGroups(profile);
   renderPlaces();
+  renderAnswers();
   renderRepeatables();
   renderDocuments();
   $("extra").value = extraText;

@@ -9,6 +9,7 @@
 
 import { LABELS, ORDINALS, REPEATABLE } from "./schema.js";
 import { placesOptions } from "./places.js";
+import { answerOptions } from "./answers.js";
 
 export const NONE = "__none__";
 export const MAX_OPTIONS = 254;
@@ -96,11 +97,11 @@ function repeatedOptions(profile) {
       for (const [key, label] of section.fields) {
         const value = (entry[key] || "").toString().trim();
         if (!value) continue;
-        options[`${section.key}${index + 1}_${key}`] = {
-          field: `${label} of the ${ordinal} ${section.singular}` +
-            (subject && key !== section.summary ? ` (${subject})` : ""),
-          value,
-        };
+        const field = section.named && subject
+          ? (key === section.summary ? `${label} (${subject})` : `${subject} ${label.toLowerCase()}`)
+          : `${label} of the ${ordinal} ${section.singular}` +
+            (subject && key !== section.summary ? ` (${subject})` : "");
+        options[`${section.key}${index + 1}_${key}`] = { field, value };
       }
     });
   }
@@ -151,6 +152,7 @@ export function buildOptions(profile = {}, extraText = "") {
   }
   Object.assign(options, repeatedOptions(profile));
   Object.assign(options, placesOptions(profile.work_locations));
+  Object.assign(options, answerOptions(profile.custom_answers));
   Object.assign(options, extraSnippets(extraText));
   return Object.fromEntries(Object.entries(options).slice(0, MAX_OPTIONS));
 }

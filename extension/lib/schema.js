@@ -195,6 +195,17 @@ REPEATABLE.push(
       ["description", "What you did", "", true],
     ],
   },
+  {
+    // Named, not ordered: a form asks for your "SAT score", never for the
+    // score of your most recent test, so each entry is labelled by its test.
+    key: "tests", title: "Test scores", singular: "test", summary: "test", named: true,
+    fields: [
+      ["test", "Test", "SAT"],
+      ["score", "Score", "1550"],
+      ["date", "Date taken", "March 2022"],
+      ["breakdown", "Section scores / notes", "Math 800, Reading & Writing 750", true],
+    ],
+  },
 );
 
 export const ORDINALS = [
