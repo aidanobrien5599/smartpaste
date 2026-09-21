@@ -12,8 +12,10 @@ never invents a value and never eats the keystroke.
 1. `chrome://extensions` → **Developer mode** → **Load unpacked** → this folder.
 2. Click the icon → **Open settings**.
 3. Paste your API key from `console.typesafe.ai/keys`.
-4. Store your resume under **Documents**, press **Fill profile from this**,
-   then check what it drafted. ⌘S saves.
+4. Store your resume under **Documents** (first section), press **Fill profile
+   from this**, then check what it drafted. ⌘S saves. **Clear all fields**
+   empties the profile if you want to start over; it keeps your API key and
+   stored documents.
 
 Chrome does not reload an unpacked extension by itself. After pulling changes,
 press **Reload** on `chrome://extensions` or you are running the old code.
@@ -98,6 +100,27 @@ Choice per field: *which line contains this*. That is the old
 extraction-by-selection trick, kept where it belongs — run **once**, in
 settings, on something you read before saving. Fields you have already filled
 are never touched.
+
+**Reading the PDF.** pdf.js returns positioned fragments, not lines, so
+`lib/extract.js` rebuilds them. Three things matter on a real resume:
+
+- **Columns.** A right-aligned date sits on the same baseline as the job title,
+  so grouping by height alone produced `Software Engineer Intern May 2026 -
+  August 2026`. pdf.js emits the gap between them as a single 250pt-wide space
+  where a word space is ~3pt; anything wider than `max(15pt, 1.5 × font
+  size)` now starts a new line.
+- **Icons are identified by font, not by character.** FontAwesome maps its
+  phone and envelope glyphs onto ordinary letters — they arrive as `Ó` and `R`
+  — so no character-level cleanup could catch them. The page's loaded fonts
+  carry real names (`VOXUTP+FontAwesome`), so anything set in an icon font is
+  dropped. A dropped icon still occupies its place on the line; deleting it
+  outright left a hole wide enough to read as a column break.
+- **Spaces.** Fragments are grouped with a tolerance rather than exact
+  heights (a small-caps `A` + `IDAN` sits on a slightly different baseline),
+  and a visible gap with no space fragment gets its space back.
+
+The fragment-to-line logic is a pure function with its own tests
+(`test/extract.test.mjs`), built from fragments measured off a real resume.
 
 Four things the first real run got wrong, each fixed in code rather than by
 nudging the prompt:

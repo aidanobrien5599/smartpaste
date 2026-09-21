@@ -50,6 +50,8 @@
          background: linear-gradient(transparent, var(--bg) 22%);
          display: flex; align-items: center; gap: 14px; }
   .bar button { margin: 0; }
+  button.danger { background: transparent; color: #c0392b; border: 1px solid var(--line); }
+  button.danger:hover { border-color: #c0392b; }
   textarea.short { min-height: 78px; }
   [data-drafted] { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 6%, var(--bg)); }
   .entry { border: 1px solid var(--line); border-radius: 8px; padding: 14px;
@@ -82,6 +84,18 @@
   answers it. Nothing is generated — if your profile does not answer a field,
   it is left alone.</p>
 
+  <h2>Documents</h2>
+  <section>
+    <p class="hint">Stored in this browser and attached to a form's upload
+    fields when you hit Autofill. Nothing is uploaded to any server — the
+    file is handed straight to the page, the way a drag-and-drop would.</p>
+    <p class="hint"><b>Fill profile from this</b> reads your resume and drafts
+    the fields below. It is a draft: resume lines are unlabelled, so the picks
+    are guesses worth checking, and anything you have already typed is left
+    alone. Nothing saves until you hit Save profile.</p>
+    <div id="documents"></div>
+  </section>
+
   <h2>API key</h2>
   <section>
     <label class="field" for="key">TYPESAFE_API_KEY</label>
@@ -96,18 +110,6 @@
   <div id="groups"></div>
   <div id="repeatables"></div>
 
-  <h2>Documents</h2>
-  <section>
-    <p class="hint">Stored in this browser and attached to a form's upload
-    fields when you hit Autofill. Nothing is uploaded to any server — the
-    file is handed straight to the page, the way a drag-and-drop would.</p>
-    <p class="hint"><b>Fill profile from this</b> reads your resume and drafts
-    the fields above. It is a draft: resume lines are unlabelled, so the picks
-    are guesses worth checking, and anything you have already typed is left
-    alone. Nothing saves until you hit Save profile.</p>
-    <div id="documents"></div>
-  </section>
-
   <h2>Extra lines (optional)</h2>
   <section>
     <p class="hint">Anything above is a labelled answer and is used verbatim.
@@ -120,6 +122,7 @@
 
   <div class="bar">
     <button id="save">Save profile</button>
+    <button id="clear" class="danger">Clear all fields</button>
     <span class="status" id="save-status"></span>
   </div>
 </main>

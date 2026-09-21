@@ -276,6 +276,30 @@ $("save-key").addEventListener("click", async () => {
 
 $("save").addEventListener("click", save);
 
+/**
+ * Empty the profile: every labelled field, both repeated sections, and the
+ * extra lines. The API key and stored documents are separate things with
+ * their own Remove buttons, so they stay. Saved immediately -- a clear that
+ * only lasted until reload would look like it had failed.
+ */
+$("clear").addEventListener("click", async () => {
+  const ok = confirm(
+    "Clear every profile field, all education and experience entries, and " +
+      "the extra lines?\n\nYour API key and stored documents are kept. " +
+      "This cannot be undone."
+  );
+  if (!ok) return;
+  document.querySelectorAll("[data-key]").forEach((input) => {
+    input.value = "";
+    delete input.dataset.drafted;
+  });
+  $("extra").value = "";
+  state.profile = {};
+  renderRepeatables();
+  await chrome.storage.local.set({ profile: {}, extraText: "" });
+  say($("save-status"), "Cleared. Your API key and documents are untouched.");
+});
+
 // Ctrl/Cmd-S saves, because a form this long invites losing work.
 document.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === "s") {

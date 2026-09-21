@@ -98,3 +98,21 @@ test("extraSnippets: short company names survive when asked to", () => {
   assert.ok(!Object.values(extraSnippets("Netflix")).includes("Netflix"));
   assert.ok(Object.values(extraSnippets("Netflix", 0, 3)).includes("Netflix"));
 });
+
+test("refine: a line naming no place gives no location, not the line", () => {
+  assert.equal(refine("Location of the most recent school", "University of Wisconsin - Madison"), null);
+  assert.equal(refine("Location of the most recent role", "Los Gatos, CA"), "Los Gatos, CA");
+});
+
+test("refine: a major is the subject without the degree", () => {
+  assert.equal(refine("Major / discipline of the most recent school", "B.S. Computer Science"), "Computer Science");
+  assert.equal(refine("Major", "Bachelor of Science in Computer Science GPA: 3.9"), "Computer Science");
+  assert.equal(refine("Degree", "B.S. Computer Science GPA: 3.9/4.00"), "B.S. Computer Science");
+});
+
+test("resolve: a line that holds no such value is no answer", () => {
+  const opts = { s1: "University of Wisconsin - Madison" };
+  const r = resolve("Location of the most recent school",
+    { choice: "s1", probabilities: { s1: 0.95 }, confidence: 0.95 }, opts);
+  assert.equal(r.status, "none");
+});

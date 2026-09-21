@@ -28,6 +28,10 @@ const DATE = new RegExp(
   "gi"
 );
 const GPA = /\d\.\d+\s*(?:\/\s*\d(?:\.\d+)?)?/g;
+// Spelled-out forms first, and an abbreviation must end at a word boundary --
+// otherwise "B.A." with optional dots matches the "Ba" of "Bachelor".
+const DEGREE_PREFIX =
+  /^\s*(?:(?:Bachelor|Master)(?:'s)?(?:\s+of\s+(?:Science|Arts|Engineering))?|Ph\.?D\.?|[BM]\.?(?:S|A|Eng)\.?)(?=[\s,-]|$)\s*(?:in\s+|,\s*|-\s*)?/i;
 const DEGREE_TAIL =
   /\s*[,;(]?\s*\b(?:expected|expecting|anticipated|graduating|grad(?:uation)?|class of|in progress|gpa)\b.*$/i;
 // "Netflix Los Gatos, CA", "Intelligible AI Remote" -- a resume puts the
@@ -101,6 +105,10 @@ function matcher(pattern, minDigits = 0) {
   };
 }
 
+// An extractor returns DROP to say the chosen line does not hold the value at
+// all -- distinct from null, which means "no narrower value, keep the line".
+export const DROP = Symbol("drop");
+
 // Label keyword -> extractor. Order matters: "first name" before the generic
 // full-name rule, or every name field returns the whole header.
 const EXTRACTORS = [
@@ -114,7 +122,14 @@ const EXTRACTORS = [
   [["phone", "mobile", "telephone", "cell"], matcher(PHONE, MIN_PHONE_DIGITS)],
   [["gpa", "grade point"], matcher(GPA)],
   [["graduation", "grad date", "start date", "available", "date"], matcher(DATE)],
-  [["degree", "major", "discipline", "field of study"],
+  [["major", "discipline", "field of study", "concentration"],
+    (s) =>
+      s
+        .replace(DEGREE_TAIL, "")
+        .replace(DEGREE_PREFIX, "")
+        .trim()
+        .replace(/[,;-]+$/, "") || null],
+  [["degree"],
     (s) => s.replace(DEGREE_TAIL, "").trim().replace(/[,;-]+$/, "") || null],
   [["job title", "title", "position", "role at"],
     (s) => s.replace(TRAILING_RANGE, "").trim().replace(/[,;-]+$/, "") || null],
@@ -133,7 +148,7 @@ const EXTRACTORS = [
   [["location", "city and state", "office location"],
     (s) => {
       const splits = placeSplits(s);
-      if (!splits.length) return null; // blank beats wrong
+      if (!splits.length) return DROP; // blank beats wrong
       // A line that is nothing but a place is the whole answer. Otherwise
       // take the longest trailing place, which leaves a name in front.
       return splits[0].rest === "" ? splits[0].place : splits[0].place;
@@ -159,6 +174,7 @@ export function refine(label, option) {
   for (const [keywords, extract] of EXTRACTORS) {
     if (keywords.some((w) => low.includes(w))) {
       const value = extract(snippet, low);
+      if (value === DROP) return null;
       if (value) return value;
       break;
     }
@@ -175,7 +191,8 @@ export function resolve(label, answer, options) {
   const ranked = Object.entries(probabilities)
     .filter(([k]) => k !== NONE && k in options)
     .sort((a, b) => b[1] - a[1])
-    .map(([k, p]) => ({ value: refine(label, options[k]), p }));
+    .map(([k, p]) => ({ value: refine(label, options[k]), p }))
+    .filter((alternative) => alternative.value !== null);
 
   const choice = answer.choice;
   const confidence = Number(answer.confidence ?? 0);
@@ -186,10 +203,16 @@ export function resolve(label, answer, options) {
   if (certainty < MENU) {
     return { label, status: "none", value: null, confidence: certainty, alternatives: [] };
   }
+  // The chosen line may hold no such value at all (a school line asked for a
+  // location): that is no answer, not the whole line.
+  const value = refine(label, options[choice]);
+  if (value === null) {
+    return { label, status: "none", value: null, confidence: certainty, alternatives: [] };
+  }
   return {
     label,
     status: certainty >= AUTO ? "auto" : "pick",
-    value: refine(label, options[choice]),
+    value,
     confidence: certainty,
     alternatives: ranked.slice(0, 4),
   };
