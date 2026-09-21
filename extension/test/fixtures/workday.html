@@ -38,8 +38,8 @@ function closePops(){
 function place(pop, el){const r=el.getBoundingClientRect();pop.style.left=(scrollX+r.left)+"px";pop.style.top=(scrollY+r.bottom+2)+"px";document.body.appendChild(pop)}
 // Listbox button, virtualized: only ~12 items rendered around scrollTop.
 // Options nest: li[role=option] > div[promptOption], as on Workday.
-function listbox(btn, key){
-  btn.addEventListener("click",()=>{
+function listbox(btn, key, toggling){
+  const open=()=>{
     closePops();
     const items = LISTS[key];
     const pop=document.createElement("div");pop.className="pop";pop.dataset.automationId="activeListContainer";
@@ -53,12 +53,17 @@ function listbox(btn, key){
         const li=document.createElement("li");li.setAttribute("role","option");li.dataset.automationLabel=t;
         li.style.position="absolute";li.style.top=((start+i)*20)+"px";
         li.innerHTML='<div data-automation-id="promptOption" data-automation-label="'+t+'">'+t+'</div>';
-        li.addEventListener("click",()=>{btn.textContent=t;btn.setAttribute("aria-label",btn.dataset.q+" "+t+" Required");window.__model[key]=t;closePops()});
+        li.addEventListener("click",()=>{if(pop.dataset.closing)return;btn.textContent=t;btn.setAttribute("aria-label",btn.dataset.q+" "+t+" Required");window.__model[key]=t;closePops()});
         ul.appendChild(li);
       });
     };
     ul.addEventListener("scroll",render);place(pop,btn);render();
-  });
+  };
+  if (!toggling) { btn.addEventListener("click", open); return; }
+  // Phone Device Type, as it behaves live: opens on mousedown, and a click
+  // toggles it -- so mousedown-then-click opens and shuts it at once.
+  btn.addEventListener("mousedown", open);
+  btn.addEventListener("click", () => { if (btn.getAttribute("aria-expanded") === "true") closePops(); else open(); });
 }
 // Search prompt: Enter searches leaves; click with empty text shows categories.
 // Like the real one, its list reads "0 items selected" while empty, and a
@@ -158,7 +163,7 @@ function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__mod
  <button type="button" aria-haspopup="listbox" id="gender" data-q="Gender" aria-label="Gender Select One">Select One</button></div>
 <script>
 listbox(document.getElementById("country--country"),"country");
-listbox(document.getElementById("phoneNumber--phoneType"),"phoneType");
+listbox(document.getElementById("phoneNumber--phoneType"),"phoneType",true);
 listbox(document.getElementById("education-1--degree"),"degree");
 listbox(document.getElementById("q1"),"authorized");
 listbox(document.getElementById("gender"),"gender");

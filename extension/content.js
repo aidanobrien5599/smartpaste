@@ -1048,11 +1048,25 @@
     for (let i = 0; i < 20 && open(); i++) await sleep(25);
   }
 
-  async function surveyListbox(button, want) {
+  /**
+   * Open a dropdown button. A plain click first, as Simplify's Workday rules
+   * do: some of Workday's buttons (Phone Device Type) open on mousedown and
+   * toggle again on click, so a full pointer-and-mouse sequence opened the
+   * menu and shut it at once -- nothing to read, nothing picked. Only if a
+   * plain click opens nothing is the full sequence tried.
+   */
+  async function openListbox(button) {
     await settlePopups(button);
     button.focus();
+    fire(button, "click");
+    if ((await waitForOptions(button, 600)).length) return true;
+    await settlePopups(button);
     click(button);
-    const opened = (await waitForOptions(button)).length > 0;
+    return (await waitForOptions(button)).length > 0;
+  }
+
+  async function surveyListbox(button, want) {
+    const opened = await openListbox(button);
     const texts = opened ? await readMenu(button, want) : [];
     // The answer is right there: click it now rather than close, decide and
     // reopen. Only menus that need Jev pay for a second visit.
@@ -1071,10 +1085,7 @@
 
   async function applyListbox(button, texts, index) {
     if (index < 0) return false;
-    await settlePopups(button);
-    button.focus();
-    click(button);
-    if (!(await waitForOptions(button)).length) { closeMenu(button); return false; }
+    if (!(await openListbox(button))) { closeMenu(button); return false; }
     const node = await findOption(button, texts[index], texts.at?.get(texts[index]));
     if (!node) { closeMenu(button); return false; }
     await pickOption(node);
@@ -1128,9 +1139,7 @@
   /** A Workday dropdown: a button that opens a listbox. */
   async function setListbox(button, want) {
     if (normalize(button.textContent) === normalize(want)) return true;
-    button.focus();
-    click(button);
-    if (!(await waitForOptions(button)).length) { closeMenu(button); return false; }
+    if (!(await openListbox(button))) { closeMenu(button); return false; }
     const texts = await readMenu(button, want);
     const index = await chooseAmong(listboxLabel(button), want, texts);
     const node = index >= 0 && (await findOption(button, texts[index]));
@@ -1528,12 +1537,15 @@
       if (detached(live(entry))) { skipped++; continue; }
       const texts = entry.widget === "listbox"
         ? await surveyListbox(entry.element, want) : await surveyPrompt(entry.element, want);
+      // What the menu showed, for the console table: a failed dropdown is
+      // then diagnosable from one paste ("read 0" = it never opened).
+      const read = `${texts.length}: ${texts.slice(0, 4).join(" | ")}`.slice(0, 120);
       if (texts.done) {
-        timeline.push({ field: entry.label, kind: entry.widget, ms: Math.round(performance.now() - t), ok: true });
+        timeline.push({ field: entry.label, kind: entry.widget, ms: Math.round(performance.now() - t), ok: true, read });
         filled++;
         continue;
       }
-      menus.push({ entry, texts, decision: texts.length ? chooseAmong(entry.label, want, texts) : Promise.resolve(-1) });
+      menus.push({ entry, texts, read, decision: texts.length ? chooseAmong(entry.label, want, texts) : Promise.resolve(-1) });
     }
     // 4. Autocompletes type and wait on suggestions; they go after the rest.
     for (const entry of todo) {
@@ -1545,13 +1557,15 @@
         ? setToggle(entry, entry.result.value, decision)
         : setSelect(entry.element, entry.result.value, decision));
     }
-    for (const { entry, texts, decision } of menus) {
+    for (const { entry, texts, decision, read } of menus) {
+      const before = timeline.length;
       await timed(entry, `${entry.widget} (jev)`, async () => {
         const index = await decision;
         return entry.widget === "listbox"
           ? applyListbox(entry.element, texts, index)
           : applyPrompt(entry.element, entry.result.value, texts, index);
       });
+      if (timeline[before]) timeline[before].read = read;
     }
     // Where the time went, for when a page feels slow.
     if (timeline.length) {
