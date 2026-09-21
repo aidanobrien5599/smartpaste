@@ -263,9 +263,15 @@ deliver it.
 - The API key lives in `chrome.storage.local` and is read only by the
   background worker. Content scripts inherit the page's origin, so a fetch from
   one would hand the company you are applying to your key.
-- The content script is scoped to known ATS hosts rather than every site, so
-  field labels from unrelated pages are never sent anywhere. Add hosts to
-  `matches` in `manifest.json`.
+- It runs on every site, so an application hosted on a company's own domain,
+  or embedded in its careers page, works without anyone adding that domain to
+  a list. But it only talks to Jev on a page that is plainly a job
+  application, decided locally with no network call: a resume upload field,
+  or at least four application-type questions (three on a page whose URL or
+  title says "apply", "careers", "jobs"…), one of which goes beyond name,
+  email and phone. A contact form, a login, a checkout or a newsletter
+  signup has fields too, and their labels never leave the machine. On those
+  pages nothing is sent and no button appears.
 - React tracks its own value on the DOM node, so `el.value = x` reverts on
   blur. Insertion goes through the native setter and dispatches an `input`
   event, which is what React listens for.

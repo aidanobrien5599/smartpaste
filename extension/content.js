@@ -205,10 +205,55 @@
 
   /* ----------------------------------------------------------------- fetch */
 
+  /* ------------------------------------------------------ is this a job app? */
+
+  // The script runs on every site, like any autofill tool -- but it only talks
+  // to Jev on a page that is plainly a job application. Login, checkout and
+  // newsletter forms have fields too, and their labels have no business
+  // leaving the machine. This check is local: no network, no model.
+  const APPLICATION_TERMS = [
+    ["name", /\b(?:first|last|full|legal|preferred|given|family)\s*name\b|^name$/i],
+    ["email", /\be-?mail\b/i],
+    ["phone", /\b(?:phone|mobile|telephone|cell)\b/i],
+    ["resume", /\b(?:resume|r\u00e9sum\u00e9|cv|curriculum vitae|cover letter)\b/i],
+    ["links", /\b(?:linkedin|github|portfolio|personal website)\b/i],
+    ["authorization", /\b(?:authori[sz]ed to work|work authori[sz]ation|sponsorship|visa|right to work|legally (?:eligible|authori[sz]ed))\b/i],
+    ["eeo", /\b(?:veteran|disability|gender|race|ethnicity|hispanic|latino|pronouns)\b/i],
+    ["education", /\b(?:graduat\w*|degree|school|university|college|gpa|major|discipline)\b/i],
+    ["logistics", /\b(?:salary|compensation|start date|notice period|relocat\w*|how did you hear|referr\w*|years of experience)\b/i],
+    ["employment", /\b(?:current (?:company|employer|title)|employer|job title|most recent)\b/i],
+  ];
+  const IDENTITY = new Set(["name", "email", "phone"]);
+  const APPLY_PAGE = /\b(?:apply|application|careers?|jobs?|position|opening|recruit\w*|talent)\b/i;
+
+  function looksLikeApplication(fields) {
+    // A resume upload settles it.
+    const uploads = [...document.querySelectorAll(FILE_SELECTOR)].filter(nodeVisible);
+    if (uploads.some((input) => documentFor(fileHintTiers(input).join(" ")) === "resume")) return true;
+    const kinds = new Set();
+    for (const { label } of fields) {
+      for (const [kind, pattern] of APPLICATION_TERMS) if (pattern.test(label)) kinds.add(kind);
+    }
+    // Name, email and phone alone are a contact form, not an application.
+    const beyondIdentity = [...kinds].filter((k) => !IDENTITY.has(k)).length;
+    if (!beyondIdentity) return false;
+    const onApplyPage = APPLY_PAGE.test(location.href) || APPLY_PAGE.test(document.title);
+    return kinds.size >= (onApplyPage ? 3 : 4);
+  }
+
+  function forget() {
+    known = [];
+    lastSignature = "";
+    document.querySelector(".smartpaste-button")?.remove();
+  }
+
   async function scan() {
     if (scanning) return;
     const fields = collectFields();
-    if (fields.length < MIN_FIELDS) return;
+    if (fields.length < MIN_FIELDS || !looksLikeApplication(fields)) {
+      if (known.length) forget();
+      return;
+    }
     const signature = fields.map((f) => f.label).join("|");
     if (signature === lastSignature) return;
 
@@ -773,6 +818,7 @@
   async function showButton(count) {
     document.querySelector(".smartpaste-button")?.remove();
     const files = await countAttachable();
+    // Nothing answered and nothing to attach: no button at all.
     if (!count && !files) return;
     const button = document.createElement("button");
     button.className = "smartpaste-button";
