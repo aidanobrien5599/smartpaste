@@ -230,6 +230,24 @@ test("fill: Workday menus are read first and decided together, not one round tri
     assert.equal(await page.eval("window.__model.gender"), "I do not wish to answer");
   }));
 
+test("fill: every instant field is in before the first menu is opened", { skip }, () =>
+  withPage("workday.html", async (page) => {
+    await page.waitFor(BUTTON);
+    await page.eval("window.__jevDelay = 900");
+    // "How Did You Hear About Us?" is the first field on the page and a
+    // search picker; in field order it held up every text box below it.
+    await page.eval(`(() => {
+      window.__order = [];
+      const seen = new Set();
+      const note = (key) => { if (!seen.has(key)) { seen.add(key); window.__order.push(key); } };
+      document.addEventListener("blur", (e) => { if (e.target.id && e.target.value) note("text"); }, true);
+      new MutationObserver(() => { if (document.querySelector(".pop")) note("menu"); })
+        .observe(document.body, { childList: true });
+    })()`);
+    await autofill(page, 60000);
+    assert.deepEqual(await page.eval("window.__order"), ["text", "menu"]);
+  }));
+
 test("fill: a picker whose clicks never take is given up on, not retried for ages", { skip }, () =>
   withPage("workday.html", async (page) => {
     await page.waitFor(BUTTON);

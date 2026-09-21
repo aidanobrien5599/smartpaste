@@ -658,6 +658,11 @@
 
   /* ------------------------------------------------------- workday widgets */
 
+  const frames = (n) => new Promise((resolve) => {
+    const step = () => (--n > 0 ? requestAnimationFrame(step) : resolve());
+    requestAnimationFrame(step);
+  });
+
   const optionText = (node) =>
     (node.getAttribute("data-automation-label") || node.textContent).trim();
 
@@ -732,9 +737,9 @@
     for (let step = 0; step < 80; step++) {
       if (stopAt && texts.some((t) => normalize(t) === normalize(stopAt))) break;
       if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2) break;
-      pane.scrollTop += Math.max(40, pane.clientHeight * 0.8);
+      pane.scrollTop += Math.max(40, pane.clientHeight * 0.9);
       pane.dispatchEvent(new Event("scroll"));
-      await sleep(50);
+      await frames(2); // a virtualized list draws the new rows on the next frame
       add(optionsNear(anchor));
     }
     return texts;
@@ -891,9 +896,15 @@
   }
 
   /** Search a prompt for `want` and read the results, then close it. */
-  async function surveyPrompt(input, want) {
-    await typeLikeAPerson(input, want);
+  /** Put a search into a prompt at once; it only searches on Enter anyway. */
+  function searchPrompt(input, text) {
+    input.focus();
+    nativeSet(input, text);
     press(input, "Enter", 13);
+  }
+
+  async function surveyPrompt(input, want) {
+    searchPrompt(input, want);
     const found = (await waitForOptions(input, 2500)).length > 0;
     const texts = found ? await readMenu(input, want) : [];
     const exact = localMatch(texts, want);
@@ -912,8 +923,7 @@
 
   async function applyPrompt(input, want, texts, index) {
     if (index >= 0) {
-      await typeLikeAPerson(input, want);
-      press(input, "Enter", 13);
+      searchPrompt(input, want);
       if ((await waitForOptions(input, 2500)).length) {
         const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
         if (node) {
@@ -982,9 +992,8 @@
     const done = (ok) => { closeMenu(input); if (!ok) nativeSet(input, ""); return ok; };
     for (const probe of [want, narrowingToken(want), ""]) {
       if (Date.now() > deadline || asks >= PROMPT_ASKS) break;
-      await typeLikeAPerson(input, probe);
-      if (probe) press(input, "Enter", 13);
-      else click(input);
+      if (probe) searchPrompt(input, probe);
+      else { nativeSet(input, ""); click(input); }
       for (let depth = 0; depth < 3 && Date.now() < deadline; depth++) {
         if (!(await waitForOptions(input, 2500)).length) break;
         const texts = await readMenu(input, want);
@@ -1183,58 +1192,93 @@
     let skipped = 0;
     const count = (ok) => (ok ? filled++ : skipped++);
     const todo = known.filter((entry) => {
-      const pending = entry.result.status === "auto" && !isFilled(entry);
-      if (!pending) skipped++;
-      return pending;
+      const due = entry.result.status === "auto" && !isFilled(entry);
+      if (!due) skipped++;
+      return due;
     });
 
-    // Three passes, so no one field's Jev round trip holds up the rest.
-    // 1. Anything whose options are already on the page: start deciding now.
-    const decisions = new Map();
+    // Nothing waits on anything slower than itself. Instant fields go in
+    // one pass, as on Ashby; a Workday search picker waits on its server,
+    // and in field order it used to hold up every text box below it.
+    const timeline = [];
+    const timed = async (entry, kind, work) => {
+      const t = performance.now();
+      const ok = await work();
+      timeline.push({ field: entry.label, kind, ms: Math.round(performance.now() - t), ok });
+      count(ok);
+      return ok;
+    };
+    const isMenu = (entry) => entry.widget === "listbox" || entry.widget === "prompt";
+    const isTyped = (entry) =>
+      !entry.buttons && !isMenu(entry) && entry.widget !== "date" && entry.element.tagName !== "SELECT" &&
+      (isCombobox(entry.element) || looksLikeAutocomplete(entry.element));
+
+    // 1. Choices whose options are already on the page: plain matches are
+    //    clicked now, the rest go to Jev together in the background.
+    const pending = [];
     for (const entry of todo) {
       const texts = entry.buttons ? entry.options
         : entry.element.tagName === "SELECT" ? selectChoices(entry.element).map((o) => o.textContent.trim())
         : null;
-      if (texts) decisions.set(entry, chooseAmong(entry.label, entry.result.value, texts));
+      if (!texts) continue;
+      const decision = chooseAmong(entry.label, entry.result.value, texts);
+      if (localMatch(texts, entry.result.value) < 0) { pending.push([entry, decision]); continue; }
+      await timed(entry, entry.buttons ? "toggle" : "select", () => entry.buttons
+        ? setToggle(entry, entry.result.value, decision)
+        : setSelect(entry.element, entry.result.value, decision));
     }
-    // 2. Plain fields and dates need no decision: fill them straight away.
-    //    Menus must be opened to be read, one at a time, but each menu's
-    //    decision goes off in the background while the next is being read.
-    const menus = [];
+    // 2. Text and dates: no decision, no menu, no waiting.
     for (const entry of todo) {
-      if (decisions.has(entry)) continue;
-      const { element, result } = entry;
-      const want = result.value;
-      if (entry.widget === "listbox" || entry.widget === "prompt") {
-        const texts = entry.widget === "listbox"
-          ? await surveyListbox(element, want) : await surveyPrompt(element, want);
-        if (texts.done) { filled++; continue; }
-        menus.push({ entry, texts, decision: texts.length ? chooseAmong(entry.label, want, texts) : Promise.resolve(-1) });
-        continue;
-      }
-      if (entry.widget === "date" || isCombobox(element) || looksLikeAutocomplete(element)) {
-        count(await setValue(element, want));
-        continue;
-      }
+      if (entry.buttons || entry.element.tagName === "SELECT" || isMenu(entry) || isTyped(entry)) continue;
+      if (entry.widget === "date") { await timed(entry, "date", () => setDate(entry.element, entry.result.value)); continue; }
       // Focus and blur around a plain field: Workday, among others, only
       // commits what was typed when the field loses focus.
-      element.focus();
-      count(setValue(element, want));
-      element.blur();
+      await timed(entry, "text", () => {
+        entry.element.focus();
+        const ok = setValue(entry.element, entry.result.value);
+        entry.element.blur();
+        return ok;
+      });
     }
-    // 3. Click in the decisions as they arrive.
-    for (const [entry, decision] of decisions) {
-      count(entry.buttons
-        ? await setToggle(entry, entry.result.value, decision)
-        : await setSelect(entry.element, entry.result.value, decision));
+    // 3. Menus open one at a time. Read each; a plain match is clicked on
+    //    the spot, anything else is sent to Jev while the next is read.
+    const menus = [];
+    for (const entry of todo) {
+      if (!isMenu(entry)) continue;
+      const want = entry.result.value;
+      const t = performance.now();
+      const texts = entry.widget === "listbox"
+        ? await surveyListbox(entry.element, want) : await surveyPrompt(entry.element, want);
+      if (texts.done) {
+        timeline.push({ field: entry.label, kind: entry.widget, ms: Math.round(performance.now() - t), ok: true });
+        filled++;
+        continue;
+      }
+      menus.push({ entry, texts, decision: texts.length ? chooseAmong(entry.label, want, texts) : Promise.resolve(-1) });
+    }
+    // 4. Autocompletes type and wait on suggestions; they go after the rest.
+    for (const entry of todo) {
+      if (isTyped(entry)) await timed(entry, "typed", () => setValue(entry.element, entry.result.value));
+    }
+    // 5. Click in Jev's decisions as they arrive.
+    for (const [entry, decision] of pending) {
+      await timed(entry, entry.buttons ? "toggle (jev)" : "select (jev)", () => entry.buttons
+        ? setToggle(entry, entry.result.value, decision)
+        : setSelect(entry.element, entry.result.value, decision));
     }
     for (const { entry, texts, decision } of menus) {
       if (!entry.element.isConnected) { skipped++; continue; }
-      const index = await decision;
-      count(entry.widget === "listbox"
-        ? await applyListbox(entry.element, texts, index)
-        : await applyPrompt(entry.element, entry.result.value, texts, index));
+      await timed(entry, `${entry.widget} (jev)`, async () => {
+        const index = await decision;
+        return entry.widget === "listbox"
+          ? applyListbox(entry.element, texts, index)
+          : applyPrompt(entry.element, entry.result.value, texts, index);
+      });
     }
+    // Where the time went, for when a page feels slow.
+    console.info(`smartpaste: filled in ${Math.round(performance.now() - started)}ms`);
+    console.table(timeline);
+
     const parts = [`filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
     if (skipped) parts.push(`left ${skipped} for you`);
