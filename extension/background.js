@@ -477,7 +477,8 @@ async function profileBySegments(text) {
   }
 
   // 4. Assemble entries from the labels.
-  const experience = assemble(pieces.experience, "experience").map((e) => {
+  const assembledExperience = assemble(pieces.experience, "experience");
+  const experience = assembledExperience.map((e) => {
     const { start, end } = e.dates ? parseDates(e.dates) : { start: "", end: "" };
     return prune({ company: e.company, title: e.title, location: e.location,
       start_date: start, end_date: end, description: e.description.join(" ") });
@@ -517,6 +518,8 @@ async function profileBySegments(text) {
     lines: lines.length,
     // What Jev decided, line by line -- for the corpus scorer, not the UI.
     debug: {
+      // Each role's bullets as a list, for scorers that compare them one by one.
+      experienceBullets: assembledExperience.map((e) => e.description),
       headings: [...headings].map(([i, kind]) => `${kind}: ${lines[i]}`),
       pieces: Object.fromEntries(Object.entries(pieces).map(([k, list]) =>
         [k, list.map((p) => `${p.bullet ? "bullet" : p.label}: ${p.text.slice(0, 50)}`)])),

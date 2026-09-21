@@ -93,3 +93,37 @@ request, so anything over ~120 lines hit `max_tokens_exceeded`. Requests now
 split in half and retry when they are too large. It is also a point in favour
 of classifying lines instead: that asks many small questions over one copy of
 the document, rather than one large question per field.
+
+## Official grader (ResumeExtractBench)
+
+The benchmark ships its own deterministic grader: entities aligned by the
+Hungarian algorithm on Jaro-Winkler similarity, description token F1, and a
+headline F1 that is the mean of all nine schema sections.
+
+```bash
+corpus/external/bench-venv/bin/pip install git+https://github.com/careerflow/resume-extract-bench.git
+corpus/external/bench-venv/bin/resume-bench download
+node corpus/external/predict_bench.mjs     # runs the real drafter, writes their format
+corpus/external/bench-venv/bin/resume-bench grade-file corpus/results/bench-predictions.jsonl
+```
+
+Results (2026-09-20), Jev classification drafter:
+
+| | all 38 | the 10 with a text layer |
+|---|---|---|
+| Headline entity F1 | 0.084 | 0.318 |
+| experience F1 | 0.254 | **0.938** |
+| education F1 | 0.216 | 0.798 |
+| basics accuracy | 0.316 | 0.672 |
+| projects, summary, certifications, skills, awards, volunteering | 0 | 0 |
+
+Read the headline with its causes, which are coverage rather than parsing:
+28 of the 38 are scans with no text layer (every section scores 0 on those), and
+six of the nine sections are not extracted at all (each scores 0 everywhere).
+Where there is text and a section is extracted, the parse is strong --
+experience, the hardest section, is 0.94.
+
+Two caveats on any comparison. The drafter was tuned against these 38 resumes,
+so these numbers are optimistic. And the published leaderboard (top entries
+~0.94 headline) is computed over a 155-resume set that includes medium-
+difficulty resumes not in the public release, so it is not like for like.
