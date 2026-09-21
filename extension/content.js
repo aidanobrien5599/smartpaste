@@ -23,12 +23,19 @@
   const TOGGLE_SELECTOR =
     'button[aria-pressed], button[role="radio"], [role="radio"], [data-option]';
   const FIELD_ENTRY =
-    '[class*="fieldEntry"], [class*="field-entry"], [class*="formField"], fieldset';
+    '[class*="fieldEntry"], [class*="field-entry"], [class*="formField"], ' +
+    '.application-question, fieldset';
+  // Where a question keeps its text when the input has no label of its own.
+  // Lever wraps inputs in a <label> that also holds status text ("No location
+  // found. Try entering…"), and its custom questions have no label at all.
+  const QUESTION_BOX = '.application-question, [role="radiogroup"], fieldset';
+  const QUESTION_TEXT = '.application-label, legend, [class*="question-label"]';
   const FIELD_SELECTOR =
     'input:not([type]), input[type="text"], input[type="email"], ' +
     'input[type="tel"], input[type="url"], input[type="search"], textarea, select';
   const MIN_FIELDS = 2;
   const answers = new WeakMap(); // field element -> resolved answer
+  const asked = new WeakSet(); // fields sent to Jev, answered or not
   const cycle = new WeakMap(); // field element -> index into alternatives
   let known = []; // [{element, result}] for the autofill button
   let scanning = false;
@@ -36,11 +43,17 @@
 
   /* ---------------------------------------------------------------- labels */
 
+  function questionText(field) {
+    const box = field.closest(QUESTION_BOX);
+    return box ? box.querySelector(QUESTION_TEXT) : null;
+  }
+
   function labelFor(field) {
     const byFor =
       field.id && document.querySelector(`label[for="${CSS.escape(field.id)}"]`);
     const candidates = [
       byFor,
+      questionText(field),
       field.closest("label"),
       field.getAttribute("aria-label"),
       field.getAttribute("aria-labelledby") &&
@@ -71,7 +84,8 @@
     if (!text) return "";
     return text
       .replace(/\s+/g, " ")
-      .replace(/\s*(?:\*+|\(required\)|\(optional\)|required|optional)\s*$/i, "")
+      // "*", and Lever's heavy asterisk "✱"
+      .replace(/\s*(?:[*\u2731\u2217]+|\(required\)|\(optional\)|required|optional)\s*$/i, "")
       .replace(/[:*]\s*$/, "")
       .trim()
       .slice(0, 200);
@@ -137,9 +151,42 @@
   function toggleAnswered(field) {
     return field.buttons.some(
       (b) =>
+        b.checked ||
         b.getAttribute("aria-pressed") === "true" ||
         b.getAttribute("aria-checked") === "true"
     );
+  }
+
+  /**
+   * Native radio buttons, grouped by name. Lever asks its sponsorship question
+   * this way, and a radio is neither a text field nor a toggle button, so the
+   * question was simply never collected.
+   */
+  function collectRadioGroups() {
+    const groups = new Map();
+    for (const radio of document.querySelectorAll('input[type="radio"]')) {
+      if (!radio.name || radio.disabled) continue;
+      if (!groups.has(radio.name)) groups.set(radio.name, []);
+      groups.get(radio.name).push(radio);
+    }
+    const fields = [];
+    for (const radios of groups.values()) {
+      if (radios.length < 2 || radios.length > 12) continue;
+      const first = radios[0];
+      const label = clean(
+        questionText(first)?.textContent ||
+          first.closest("fieldset")?.querySelector("legend")?.textContent ||
+          ""
+      );
+      const options = radios.map((r) =>
+        clean(r.closest("label")?.textContent || r.value || "")
+      );
+      if (label.length < 2 || options.some((o) => !o)) continue;
+      const element = first.closest(QUESTION_BOX) || first.parentElement;
+      if (!nodeVisible(element)) continue;
+      fields.push({ element, label, options, buttons: radios, combobox: false });
+    }
+    return fields;
   }
 
   function collectFields() {
@@ -152,7 +199,8 @@
         combobox: isCombobox(element),
       }))
       .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label))
-      .concat(collectToggleGroups());
+      .concat(collectToggleGroups())
+      .concat(collectRadioGroups());
   }
 
   /* ----------------------------------------------------------------- fetch */
@@ -175,6 +223,7 @@
         if (reply && reply.error) note(reply.error, true);
         return;
       }
+      fields.forEach((f) => asked.add(f.element));
       reply.results.forEach((result, i) => {
         if (result.status !== "none") {
           answers.set(fields[i].element, result);
@@ -218,18 +267,120 @@
     return toggleAnswered(entry);
   }
 
-  function setValue(field, value) {
-    if (isCombobox(field)) return setCombobox(field, value); // async
-    if (field.tagName === "SELECT") {
-      const match = [...field.options].find(
-        (o) => o.textContent.trim() === value
-      );
-      if (!match) return false;
-      field.value = match.value;
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-      field.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
+  /**
+   * Type the way a keyboard does, one character at a time with a real keyCode.
+   *
+   * Some autocompletes ignore a synthetic "input" event and key off keydown's
+   * keyCode, which a constructed KeyboardEvent leaves at 0. Lever's location
+   * field showed no suggestions for nativeSet + input, and did for this.
+   */
+  async function typeLikeAPerson(field, text) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    const key = (type, ch) => {
+      const event = new KeyboardEvent(type, { key: ch, bubbles: true, cancelable: true });
+      const code = ch.toUpperCase().charCodeAt(0);
+      Object.defineProperty(event, "keyCode", { get: () => code });
+      Object.defineProperty(event, "which", { get: () => code });
+      field.dispatchEvent(event);
+    };
+    field.focus();
+    setter.call(field, "");
+    for (const ch of text) {
+      key("keydown", ch);
+      key("keypress", ch);
+      setter.call(field, field.value + ch);
+      field.dispatchEvent(new InputEvent("input", { bubbles: true, data: ch, inputType: "insertText" }));
+      key("keyup", ch);
+      await sleep(25);
     }
+  }
+
+  const AUTOCOMPLETE_HINT = /location|city|address|hometown/i;
+  const SUGGESTION_BOX =
+    '[role="listbox"], [class*="dropdown-results"], [class*="suggest"], ' +
+    '[class*="autocomplete"], [class*="typeahead"], [class*="pac-container"]';
+  const NOT_A_SUGGESTION = /^(?:no .* found|loading|searching)/i;
+
+  function looksLikeAutocomplete(field) {
+    if (field.getAttribute("aria-autocomplete")) return true;
+    const hints = [field.name, field.id, field.className, labelFor(field)].join(" ");
+    return AUTOCOMPLETE_HINT.test(hints);
+  }
+
+  /** Suggestions that appeared just below the field, in reading order. */
+  function suggestionsNear(field) {
+    const box = field.getBoundingClientRect();
+    const items = [];
+    for (const list of document.querySelectorAll(SUGGESTION_BOX)) {
+      const rect = list.getBoundingClientRect();
+      if (!rect.height || rect.top < box.top - 4 || rect.top > box.bottom + 400) continue;
+      const leaves = [...list.querySelectorAll('[role="option"], li, div')].filter(
+        (n) => !n.querySelector("li, div, [role='option']") && n.textContent.trim()
+      );
+      for (const leaf of leaves.length ? leaves : [list]) {
+        const text = leaf.textContent.trim();
+        if (!NOT_A_SUGGESTION.test(text)) items.push({ node: leaf, text });
+      }
+    }
+    return items;
+  }
+
+  /**
+   * A plain-text autocomplete: typed text alone is not an answer. Lever keeps
+   * the real value in a hidden selectedLocation that is only set by clicking
+   * a suggestion, so a field that merely looks filled is submitted empty.
+   */
+  async function setAutocomplete(field, value) {
+    await typeLikeAPerson(field, value);
+    let items = [];
+    for (let i = 0; i < 20 && !items.length; i++) {
+      await sleep(150);
+      items = suggestionsNear(field);
+    }
+    if (!items.length) return Boolean(field.value);
+    const want = normalize(value);
+    const pick =
+      items.find((i) => normalize(i.text) === want) ||
+      items.find((i) => normalize(i.text).startsWith(want)) ||
+      items[0];
+    fire(pick.node, "mousedown");
+    fire(pick.node, "mouseup");
+    fire(pick.node, "click");
+    await sleep(200);
+    return true;
+  }
+
+  /**
+   * A native <select>. Usually the background already chose among its own
+   * options, so the value matches exactly. When it does not -- a profile GPA
+   * of "3.9/4.00" against options "4.0 / 3.9 / 3.8" -- ask which option
+   * expresses it rather than giving up.
+   */
+  async function setSelect(field, value) {
+    const options = [...field.options].filter(
+      (o) => o.value !== "" && !/^(?:select|choose|please select|--)/i.test(o.textContent.trim())
+    );
+    const texts = options.map((o) => o.textContent.trim());
+    let index = texts.findIndex((t) => normalize(t) === normalize(value));
+    if (index < 0) {
+      const reply = await chrome.runtime.sendMessage({
+        type: "choose-option", label: labelFor(field), want: value, options: texts.slice(0, 200),
+      });
+      if (reply && reply.ok && reply.index >= 0) index = reply.index;
+    }
+    if (index < 0) return false;
+    field.value = options[index].value;
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+
+  function setValue(field, value) {
+    if (field.tagName === "INPUT" && !isCombobox(field) && looksLikeAutocomplete(field)) {
+      return setAutocomplete(field, value); // async
+    }
+    if (isCombobox(field)) return setCombobox(field, value); // async
+    if (field.tagName === "SELECT") return setSelect(field, value); // async
     const prototype =
       field instanceof HTMLTextAreaElement
         ? HTMLTextAreaElement.prototype
@@ -492,7 +643,21 @@
   }
 
   /** Fill everything the model was confident about, leaving the rest alone. */
+  /**
+   * Documents go first. Attaching a resume makes some sites (Lever, Ashby's
+   * dropzone) parse it and re-render the form, which throws away anything
+   * already typed and replaces the elements we were holding. So attach, give
+   * the parser a moment, then re-find the fields by label and fill those.
+   */
   async function fillPage() {
+    const attached = await attachDocuments();
+    if (attached) {
+      await sleep(2500);
+      const byLabel = new Map(known.map((k) => [k.label, k.result]));
+      known = collectFields()
+        .filter((f) => byLabel.has(f.label))
+        .map((f) => ({ ...f, result: byLabel.get(f.label) }));
+    }
     let filled = 0;
     let skipped = 0;
     for (const entry of known) {
@@ -511,7 +676,6 @@
       if (await setValue(element, result.value)) filled++;
       else skipped++;
     }
-    const attached = await attachDocuments();
     const parts = [`filled ${filled}`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
     if (skipped) parts.push(`left ${skipped} for you`);
@@ -524,8 +688,13 @@
 
     const field = event.target;
     const answer = answers.get(field);
-    // No confident answer: leave the keystroke alone and paste normally.
-    if (!answer || !answer.value) return;
+    // No confident answer: leave the keystroke alone and paste normally --
+    // but say so. Otherwise whatever was on the clipboard lands in the box
+    // and looks exactly like smartpaste put it there.
+    if (!answer || !answer.value) {
+      if (asked.has(field)) hint(field, "no answer in your profile — normal paste");
+      return;
+    }
 
     event.preventDefault();
     event.stopPropagation();
@@ -552,6 +721,17 @@
     field.title =
       `smartpaste: ⌘V inserts "${answer.value}" ` +
       `(${answer.confidence.toFixed(2)})`;
+  }
+
+  function hint(field, text) {
+    const badge = document.createElement("div");
+    badge.className = "smartpaste-flash smartpaste-muted";
+    badge.textContent = text;
+    const rect = field.getBoundingClientRect();
+    badge.style.top = `${window.scrollY + rect.top - 22}px`;
+    badge.style.left = `${window.scrollX + rect.left}px`;
+    document.body.appendChild(badge);
+    setTimeout(() => badge.remove(), 1600);
   }
 
   function flash(field, probability, position) {

@@ -29,6 +29,11 @@ field to cycle to the next most likely answer — that is how a low-confidence
 pick gets corrected, with no menu. A green left-edge marker means high
 confidence, amber means worth a look.
 
+When your profile has no answer for a field, ⌘V does an ordinary paste and
+says so — *"no answer in your profile — normal paste"*. Without that, whatever
+was on your clipboard lands in the box and looks exactly like smartpaste put
+it there.
+
 ## What Jev decides
 
 One `Choice` per field on the page, batched into a single call. The options are
@@ -179,6 +184,31 @@ surrounding text, and autofill dropzones are skipped outright.
 
 Live: **8 of 8 fields**, resume on `_systemfield_resume`, dropzone untouched.
 
+### Lever — labels full of status text, native radios, a hidden location
+
+- **Labels.** Lever wraps each input in a `<label>` that also holds status
+  text, so the label read *"Current location No location found. Try entering
+  a different location"*; its custom questions have no label at all. The
+  question's own text lives in `.application-label`, which is now looked up
+  first. It also marks required fields with `✱`, which is now stripped.
+- **Radio groups.** Sponsorship is a set of native `<input type=radio>`. A
+  radio is neither a text field nor a toggle button, so the question was never
+  collected. Radios are now grouped by name and answered by clicking.
+- **The location field** is a custom autocomplete, and the value Lever
+  submits lives in a hidden `selectedLocation` that is set only by *clicking a
+  suggestion*. Typed text alone looks filled and submits empty. Worse, the
+  widget ignores a synthetic `input` event entirely — it keys off `keydown`'s
+  `keyCode`, which a constructed `KeyboardEvent` leaves at 0 — so the text is
+  typed one character at a time with a real key code, and the suggestion
+  nearest the field is clicked.
+- **Documents go first.** Attaching a resume makes Lever parse it, and parsers
+  re-render forms. So Autofill now attaches, waits, re-finds the fields by
+  label, and only then fills them.
+
+Live: **10 of 10**, both radios answered, GPA `3.9` chosen from the native
+select's options for a profile value of `3.9/4.00`, and `selectedLocation`
+populated. Greenhouse and Ashby re-run clean afterwards.
+
 ### Autocompletes
 
 A field whose placeholder says *"Start typing…"* has an empty menu until you
@@ -221,3 +251,13 @@ deliver it.
   yourself, and every regex can spoil one.
 - It is a port of `smartpaste/answer.py`. They drift: the JS copy silently lost
   `end` from its end-of-range words. If you change one, change the other.
+
+## Tests
+
+```bash
+node --test extension/test/      # the lib: refine, resolve, buildOptions, unwrap
+```
+
+The DOM half is verified against live Greenhouse, Ashby and Lever pages rather
+than fixtures, because every real defect so far lived in how a specific site
+built its controls.

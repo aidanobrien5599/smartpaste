@@ -48,3 +48,5 @@ textarea[data-smartpaste="pick"] {
 }
 
 .smartpaste-button:hover { background: #111827; }
+
+.smartpaste-flash.smartpaste-muted { background: #6b7280; }
