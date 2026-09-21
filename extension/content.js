@@ -279,6 +279,13 @@
     return [];
   }
 
+  function isReactSelect(field) {
+    return (
+      field.classList.contains("select__input") ||
+      Boolean(field.closest(SELECT_SHELL))
+    );
+  }
+
   function currentValue(field) {
     const shown = field
       .closest(SELECT_SHELL)
@@ -319,9 +326,21 @@
     fire(field, "mouseup");
     fire(field, "click");
 
-    let nodes = await menuOptions(field);
+    let nodes = await menuOptions(field, 1500);
     let texts = nodes.map((n) => n.textContent.trim());
     const exact = () => texts.findIndex((t) => normalize(t) === normalize(want));
+
+    // An autocomplete has nothing to show until you type -- that is what a
+    // "Start typing..." placeholder means. Opening it yields an empty menu,
+    // so here typing is the only way to get any options at all.
+    if (!nodes.length) {
+      for (const probe of [want, narrowingToken(want)]) {
+        nativeSet(field, probe);
+        nodes = await menuOptions(field, 3000);
+        if (nodes.length) break;
+      }
+      texts = nodes.map((n) => n.textContent.trim());
+    }
 
     if (exact() < 0 && texts.length >= LONG_MENU) {
       nativeSet(field, narrowingToken(want));
@@ -337,8 +356,16 @@
       }
     }
     if (!nodes.length) {
-      field.blur();
-      return false;
+      // A plain autocomplete keeps what you typed, so leaving it is a real
+      // answer. A React Select discards it on blur, so leaving it would only
+      // look filled -- clear it and report the field as still needing you.
+      if (isReactSelect(field)) {
+        nativeSet(field, "");
+        field.blur();
+        return false;
+      }
+      nativeSet(field, want);
+      return Boolean(field.value);
     }
 
     let index = exact();

@@ -15,14 +15,16 @@ export const MAX_OPTIONS = 254;
 const BULLET_PREFIX = /^\s*(?:[-*•·▪●‣]|\d+[.)])\s+/;
 
 /** Free-form lines (resume bullets, extra notes) as unlabeled options. */
-export function extraSnippets(text, startIndex = 0) {
+export function extraSnippets(text, startIndex = 0, minLength = 8) {
   const out = {};
   if (!text) return out;
   let n = startIndex;
   const seen = new Set();
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim().replace(BULLET_PREFIX, "");
-    if (line.length < 8) continue;
+    // A company name can be very short. "Netflix" is seven characters, and
+    // dropping it loses the employer of the most recent role entirely.
+    if (line.length < minLength) continue;
     const key = line.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

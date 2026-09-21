@@ -1,5 +1,6 @@
 import { DOCUMENTS, GROUPS, ORDINALS, REPEATABLE } from "./lib/schema.js";
 import { humanSize, MAX_BYTES, toBase64 } from "./lib/documents.js";
+import { textFromStoredPdf } from "./lib/extract.js";
 
 let state = { profile: {}, documents: {} };
 
@@ -160,6 +161,14 @@ function renderDocuments() {
     pick.appendChild(file);
     row.append(title, name, pick);
 
+    if (stored && key === "resume") {
+      const draft = document.createElement("button");
+      draft.textContent = "Fill profile from this";
+      draft.title = "Read this PDF and draft your profile. You review it before saving.";
+      draft.addEventListener("click", () => draftFromResume(stored, draft));
+      row.appendChild(draft);
+    }
+
     if (stored) {
       const clear = document.createElement("button");
       clear.textContent = "Remove";
@@ -171,6 +180,60 @@ function renderDocuments() {
       row.appendChild(clear);
     }
     host.appendChild(row);
+  }
+}
+
+/**
+ * Draft the profile from the stored resume.
+ *
+ * Nothing is saved: values land in the form for you to read and correct, and
+ * fields you have already filled are never overwritten. A resume line is an
+ * unlabelled guess -- good enough for a first pass, not good enough to trust
+ * silently, which is why this is a button in settings and not something that
+ * happens on an application page.
+ */
+async function draftFromResume(stored, button) {
+  const original = button.textContent;
+  button.textContent = "Reading…";
+  button.disabled = true;
+  try {
+    const text = await textFromStoredPdf(stored);
+    button.textContent = "Asking Jev…";
+    const reply = await chrome.runtime.sendMessage({ type: "profile-from-resume", text });
+    if (!reply || !reply.ok) throw new Error(reply?.error || "No answer from the model.");
+
+    let added = 0;
+    let kept = 0;
+    for (const [key, value] of Object.entries(reply.fields)) {
+      const input = document.getElementById(`f-${key}`);
+      if (!input) continue;
+      if (input.value.trim()) { kept++; continue; }
+      input.value = value;
+      input.dataset.drafted = "1";
+      added++;
+    }
+    for (const [section, entries] of Object.entries(reply.sections)) {
+      if (!Array.isArray(state.profile[section])) state.profile[section] = [];
+      if (state.profile[section].some((e) => Object.values(e).some(Boolean))) {
+        kept += entries.length;
+        continue;
+      }
+      state.profile[section] = entries;
+      added += entries.length;
+    }
+    renderRepeatables();
+    say(
+      $("save-status"),
+      `Drafted ${added} field${added === 1 ? "" : "s"} from ${reply.lines} resume lines` +
+        (kept ? `, left ${kept} you had already filled.` : ".") +
+        " Check them, then Save profile.",
+      true
+    );
+  } catch (error) {
+    say($("save-status"), error.message, true);
+  } finally {
+    button.textContent = original;
+    button.disabled = false;
   }
 }
 

@@ -6,7 +6,8 @@
  * hand that page's context your API key. The key never leaves here.
  */
 
-import { asCriteria, buildOptions, NONE } from "./lib/profile.js";
+import { asCriteria, buildOptions, extraSnippets, NONE } from "./lib/profile.js";
+import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.js";
 import { resolve } from "./lib/resolve.js";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -128,7 +129,126 @@ async function answerFields(fields) {
   });
 }
 
+// A resume states who you are and what you have done. It does not state your
+// work authorization, your salary expectation, or when you could start.
+const RESUME_FIELDS = new Set([
+  "full_name", "first_name", "last_name", "preferred_name",
+  "email", "phone", "linkedin", "github", "portfolio", "other_link",
+]);
+
+const LINK_FIELDS = new Set(["linkedin", "github", "portfolio", "other_link"]);
+// A URL is one token with a dot in it. "…@gmail.com | fl LinkedIn | Github"
+// contains ".com" and would otherwise pass.
+const looksLikeUrl = (v) =>
+  typeof v === "string" && !/\s|@/.test(v) && /\.[a-z]{2,}/i.test(v);
+
+const ASK_RESUME =
+  "Which line of the applicant's resume contains this piece of information? " +
+  "The line need not equal it exactly -- a contact line containing the email, " +
+  "or a header containing the surname, is the right pick, because code " +
+  "extracts the exact substring afterwards. Choose the escape option if the " +
+  "resume does not state it.";
+
+/** The questions worth asking of a resume. */
+function resumeQuestions(criteria) {
+  const questions = {};
+  const plan = [];
+
+  // Ask only what a resume actually states. Everything else invites a
+  // confident wrong pick: asked for a home city, the model offered "Los Gatos,
+  // CA" -- which is where Netflix is, the only city on the page.
+  for (const field of FIELDS) {
+    if (!RESUME_FIELDS.has(field.key)) continue;
+    plan.push({ id: `p_${field.key}`, target: { key: field.key }, label: field.label });
+  }
+  for (const section of REPEATABLE) {
+    const count = section.key === "education" ? 2 : 3;
+    for (let i = 0; i < count; i++) {
+      for (const [key, label] of section.fields) {
+        plan.push({
+          id: `r_${section.key}_${i}_${key}`,
+          target: { section: section.key, index: i, key },
+          label: `${label} of the ${ORDINALS[i]} ${section.singular}`,
+        });
+      }
+    }
+  }
+  // A link question gets only link-shaped options. Offered everything, the
+  // model picks the contact line -- it says the word "LinkedIn" -- over the
+  // actual URL recovered from the PDF's annotations.
+  const linkCriteria = Object.fromEntries(
+    Object.entries(criteria).filter(([key, v]) => key === NONE || looksLikeUrl(v))
+  );
+
+  for (const item of plan) {
+    questions[item.id] = {
+      type: "choice",
+      instructions: { wanted: item.label, ask: ASK_RESUME },
+      criteria:
+        LINK_FIELDS.has(item.target.key) && Object.keys(linkCriteria).length > 1
+          ? linkCriteria
+          : criteria,
+    };
+  }
+  return { questions, plan };
+}
+
+/**
+ * Turn a resume into a draft profile.
+ *
+ * This is the original extraction-by-selection trick, kept where it belongs:
+ * run once, in settings, on something you review. Resume lines are unlabelled,
+ * so a pick is a guess at which line holds a value and refine() still has to
+ * cut the substring out -- exactly the unreliability that made this a bad
+ * basis for filling live forms. As a first draft you correct, it is ideal.
+ */
+async function profileFromResume(text) {
+  const { apiKey } = await loadOptions();
+  if (!apiKey) throw new Error("No API key — open smartpaste settings.");
+  const snippets = extraSnippets(text, 0, 3);
+  if (Object.keys(snippets).length < 4) {
+    throw new Error("Could not read enough text out of that PDF.");
+  }
+  const { questions, plan } = resumeQuestions(asCriteria(snippets));
+  const answers = await askBatched(apiKey, { resume_lines: snippets }, questions);
+
+  const fields = {};
+  const sections = {};
+  for (const item of plan) {
+    const answer = answers[item.id];
+    if (!answer) continue;
+    const resolved = resolve(item.label, answer, snippets);
+    if (resolved.status === "none" || !resolved.value) continue;
+    if (item.target.section) {
+      const { section, index, key } = item.target;
+      sections[section] = sections[section] || [];
+      sections[section][index] = sections[section][index] || {};
+      sections[section][index][key] = resolved.value;
+    } else {
+      // A link field must hold a link. Asked for "LinkedIn" the model picks
+      // the contact line, which says the word but carries no URL -- the real
+      // ones live in the PDF's annotations and arrive as separate lines.
+      if (LINK_FIELDS.has(item.target.key)) {
+        if (!looksLikeUrl(resolved.value)) continue;
+        // Two link fields holding the same URL means one of them guessed.
+        if (Object.values(fields).includes(resolved.value)) continue;
+      }
+      fields[item.target.key] = resolved.value;
+    }
+  }
+  for (const key of Object.keys(sections)) {
+    sections[key] = sections[key].filter((e) => e && Object.keys(e).length >= 2);
+  }
+  return { fields, sections, lines: Object.keys(snippets).length };
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "profile-from-resume") {
+    profileFromResume(message.text)
+      .then((draft) => sendResponse({ ok: true, ...draft }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   if (message.type === "answer-fields") {
     answerFields(message.fields)
       .then((results) => {

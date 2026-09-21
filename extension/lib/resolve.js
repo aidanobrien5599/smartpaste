@@ -36,7 +36,9 @@ const TRAILING_RANGE = new RegExp(
 );
 
 // A date range reads "Sep 2023 - May 2027": graduation is the end of it.
-const END_DATE_WORDS = ["graduation", "grad date", "completion", "expected"];
+const END_DATE_WORDS = [
+  "graduation", "grad date", "completion", "expected", "end date", "end of",
+];
 const NAME_SUFFIX = new Set(["jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "phd"]);
 
 function looksLikeName(s) {
