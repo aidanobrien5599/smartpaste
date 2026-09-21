@@ -237,6 +237,20 @@ export async function iconTester(page) {
   };
 }
 
+/**
+ * Page furniture is not content. A footer ("Updated October 2024") was being
+ * read as a job's date, and page 2's running header ("Priya Sharma · Current
+ * Employer: TechNova Inc.") as a company that opened a phantom entry. The
+ * bottom margin of every page, and the top margin of every page after the
+ * first, are dropped; page 1's top is where the name is, so it stays.
+ */
+export function inBody(item, height, pageNumber) {
+  const y = item.transform[5];
+  if (y < 0.04 * height) return false;
+  if (pageNumber > 1 && y > 0.94 * height) return false;
+  return true;
+}
+
 /** Hyperlinks live in annotations and never in the text layer. */
 async function pageLinks(page) {
   const found = [];
@@ -255,7 +269,8 @@ export async function textFromPdfBytes(bytes, lib) {
   for (let n = 1; n <= pdf.numPages; n++) {
     const page = await pdf.getPage(n);
     const { items } = await page.getTextContent();
-    lines.push(...linesFromItems(items, await iconTester(page)));
+    const height = page.view[3] - page.view[1];
+    lines.push(...linesFromItems(items.filter((item) => inBody(item, height, n)), await iconTester(page)));
     (await pageLinks(page)).forEach((url) => links.add(url));
   }
   return [...lines, ...links].join("\n");

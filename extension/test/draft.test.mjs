@@ -142,3 +142,11 @@ test("splitPieces keeps the new date spellings whole", () => {
   assert.deepEqual(splitPieces("Acme, March \u2013 June 2019"), ["Acme", "March \u2013 June 2019"]);
   assert.deepEqual(splitPieces("Acme, 2013/09 \u2013 2015/08"), ["Acme", "2013/09 \u2013 2015/08"]);
 });
+
+test("splitPieces: a bracket is one unit", () => {
+  assert.deepEqual(splitPieces("New York, NY (Remote from Jan 2019 – Dec 2020)"),
+    ["New York, NY (Remote from Jan 2019 – Dec 2020)"]);
+  assert.deepEqual(splitPieces("[Stealth Startup — NDA in effect], Jun 2019 – Feb 2020"),
+    ["[Stealth Startup — NDA in effect]", "Jun 2019 – Feb 2020"]);
+  assert.deepEqual(splitPieces("TechVenture, Remote"), ["TechVenture", "Remote"]);
+});

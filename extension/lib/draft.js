@@ -193,7 +193,7 @@ const COMPANY_SUFFIX =
   /^(?:Inc|Incorporated|LLC|L\.L\.C|Ltd|Limited|Corp|Corporation|Co|Company|PLC|LLP|LP|GmbH|AG|SE|SA|S\.A|SAS|S\.A\.S|SARL|BV|B\.V|NV|N\.V|AB|AS|A\/S|Oy|KK|K\.K|Pty(?: Ltd)?|Pvt(?: Ltd)?|SpA|S\.p\.A|Srl|S\.r\.l)\.?$/i;
 
 const PLACE_CODE =
-  /^(?:[A-Z]{2}|UK|U\.K\.|USA|U\.S\.A?\.|US|UAE|India|Canada|Germany|France|Spain|Italy|Ireland|Australia|Singapore|Japan|China|Netherlands|Switzerland|Sweden|Remote)$/;
+  /^(?:[A-Z]{2}|UK|U\.K\.|USA|U\.S\.A?\.|US|UAE|India|Canada|Germany|France|Spain|Italy|Ireland|Australia|Singapore|Japan|China|Netherlands|Switzerland|Sweden)$/;
 
 /**
  * Cut one line into pieces that each hold a single field.
@@ -213,7 +213,13 @@ export function splitPieces(line) {
   if (words.length > 8 && lower / words.length >= 0.4) return [line.replace(BULLET, "").trim()];
   if (isBullet(line)) return [line.replace(BULLET, "").trim()];
   const dates = [];
-  const bracketed = line.replace(/\([^()]*\)/g, (m) => m.replace(/,/g, "\u0002"));
+  // A bracket is one unit: "(Remote from Jan 2019 - 2020)" holds a date range
+  // and "[Stealth Startup - NDA in effect]" a dash, and neither is a boundary.
+  const brackets = [];
+  const bracketed = line.replace(/\([^()]*\)|\[[^\[\]]*\]/g, (m) => {
+    brackets.push(m);
+    return `\u0003${brackets.length - 1}\u0003`;
+  });
   const guarded = bracketed.replace(DATE_RANGE, (m) => {
     dates.push(m.trim());
     return `\u0001${dates.length - 1}\u0001`;
@@ -228,10 +234,10 @@ export function splitPieces(line) {
     if (piece === undefined || piece === "") continue;
     // A captured index is a protected date range.
     if (/^\d+$/.test(piece) && guarded.includes(`\u0001${piece}\u0001`)) {
-      pieces.push(dates[Number(piece)]);
+      pieces.push(dates[Number(piece)].replace(/\u0003(\d+)\u0003/g, (_, i) => brackets[Number(i)]));
       continue;
     }
-    piece = piece.replace(/\u0002/g, ",");
+    piece = piece.replace(/\u0003(\d+)\u0003/g, (_, i) => brackets[Number(i)]);
     // A separator stranded next to a date range: "· Toronto".
     piece = piece.replace(/^[\s|\u2022\u00b7\u2014\u2013;,]+|[\s|\u2022\u00b7\u2014\u2013;,]+$/g, "");
     if (!piece) continue;
@@ -241,7 +247,8 @@ export function splitPieces(line) {
       continue;
     }
     // Put a city's state or country back: "Towson" + "MD".
-    if (prev && PLACE_CODE.test(piece) && /^[A-Z][A-Za-z.' -]+$/.test(prev) && prev.split(" ").length <= 3) {
+    // Ignore a trailing bracket when checking for a state code: "NY (Remote from ...)".
+    if (prev && PLACE_CODE.test(piece.replace(/\s*[(\[].*$/, "")) && /^[A-Z][A-Za-z.' -]+$/.test(prev) && prev.split(" ").length <= 3) {
       pieces[pieces.length - 1] = `${prev}, ${piece}`;
       continue;
     }

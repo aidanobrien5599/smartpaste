@@ -119,3 +119,12 @@ test("a word hyphenated across the line break is rejoined", () => {
   const lines = linesFromItems([item("Stanford Graduate School of Busi-", 50, 500, 180), item("ness", 50, 488, 20)]);
   assert.deepEqual(lines, ["Stanford Graduate School of Business"]);
 });
+
+test("page furniture: footers everywhere, running headers after page 1", async () => {
+  const { inBody } = await import("../lib/extract.js");
+  const at = (y) => ({ transform: [1, 0, 0, 1, 50, y] });
+  assert.equal(inBody(at(20), 792, 1), false);   // footer
+  assert.equal(inBody(at(760), 792, 1), true);   // page 1 top: the name
+  assert.equal(inBody(at(760), 792, 2), false);  // page 2 running header
+  assert.equal(inBody(at(400), 792, 2), true);
+});
