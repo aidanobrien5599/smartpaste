@@ -196,6 +196,29 @@ test("fill: a site that rebuilds the form after reading the resume is refilled",
     assert.equal(await page.eval(value("input[name^=urls]")), "https://www.linkedin.com/in/aidanobrien5599");
   }));
 
+test("fill: a menu that re-renders while Jev decides still gets its click", { skip }, () =>
+  withPage("combobox.html", async (page) => {
+    // Figma, live: Location (City) failed after ~780ms. Its results render
+    // twice; the node read before Jev's ~350ms answer was gone by the click.
+    await page.waitFor(BUTTON);
+    await page.eval("window.__jevDelay = 500");
+    await autofill(page);
+    assert.equal(await page.eval(text("#loc-value")), "Madison, Wisconsin, United States");
+  }));
+
+test("fill: a form rebuilt after smartpaste scanned it is filled, not timed out on", { skip }, () =>
+  withPage("combobox.html#rehydrate", async (page) => {
+    // Figma, live: React threw the form away after the scan (hydration
+    // error #418) and the fill spent ~6s per dropdown on detached elements.
+    await page.waitFor(BUTTON);
+    await page.waitFor("window.__rebuilt === true", 5000);
+    const summary = await autofill(page);
+    assert.equal(await page.eval(value("#first_name")), "Aidan");
+    assert.equal(await page.eval(text("#grad-value")), "Spring 2027");
+    assert.equal(await page.eval(text("#loc-value")), "Madison, Wisconsin, United States");
+    assert.ok(Number(summary.match(/in ([0-9.]+)s/)[1]) < 2, summary);
+  }));
+
 test("fill: Ashby toggle buttons", { skip }, () =>
   withPage("ashby.html", async (page) => {
     await autofill(page);

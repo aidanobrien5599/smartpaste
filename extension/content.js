@@ -320,6 +320,26 @@
 
   let filling = false;
 
+  const detached = (entry) =>
+    !entry.element.isConnected || (entry.buttons || []).some((b) => !b.isConnected);
+
+  /**
+   * Swap in the page's current elements for any the page has thrown away.
+   * React discards and rebuilds a form when hydration fails (Figma, with
+   * Grammarly installed); holding the old nodes, a fill spent ~6s per
+   * dropdown on elements no longer on the page. Answers are keyed by label,
+   * so rebinding needs no new Jev call.
+   */
+  function rebind() {
+    if (!known.some(detached)) return false;
+    const byLabel = new Map(known.map((k) => [k.label, k.result]));
+    known = collectFields()
+      .filter((f) => byLabel.has(f.label))
+      .map((f) => ({ ...f, result: byLabel.get(f.label) }));
+    for (const k of known) answers.set(k.element, k.result);
+    return true;
+  }
+
   async function scan() {
     // A fill opens menus and types into search boxes; scanning that churn
     // would re-ask Jev about a half-open page.
@@ -330,7 +350,11 @@
       return;
     }
     const signature = fields.map((f) => f.label).join("|");
-    if (signature === lastSignature) return;
+    if (signature === lastSignature) {
+      // Same questions, maybe new elements: keep hold of the live ones.
+      if (rebind()) fields.forEach((f) => asked.add(f.element));
+      return;
+    }
 
     scanning = true;
     lastSignature = signature;
@@ -699,9 +723,18 @@
       return false;
     }
 
-    fire(nodes[index], "mousedown");
-    fire(nodes[index], "mouseup");
-    fire(nodes[index], "click");
+    // Jev takes a few hundred ms, and a menu can re-render its options in
+    // the meantime (Figma's location results render twice). A click on the
+    // replaced node reaches nothing, so click the option showing now.
+    let target = nodes[index];
+    if (!target.isConnected) {
+      const want = texts[index];
+      target = (await menuOptions(field, 1500)).find((n) => n.textContent.trim() === want);
+      if (!target) { field.blur(); return false; }
+    }
+    fire(target, "mousedown");
+    fire(target, "mouseup");
+    fire(target, "click");
     for (let i = 0; i < 16 && !currentValue(field); i++) await sleep(25);
     return Boolean(currentValue(field));
   }
@@ -1222,7 +1255,7 @@
       const started = performance.now();
       const attached = await attachDocuments();
       await fillFields(started, attached);
-      if (attached) await refillIfReparsed(started);
+      if (attached) await refillIfReparsed();
     } finally {
       filling = false;
       setTimeout(scan, 300);
@@ -1238,7 +1271,7 @@
    * on every page with an upload -- most of a 3s Ashby fill, where nothing
    * re-renders. Now: fill at once, then watch; refill only if it happened.
    */
-  async function refillIfReparsed(started) {
+  async function refillIfReparsed() {
     const filledNow = known.filter((k) => k.result.status === "auto" && isFilled(k));
     if (!filledNow.length) return;
     const deadline = Date.now() + REPARSE_WINDOW;
@@ -1247,16 +1280,14 @@
       const wiped = filledNow.some((k) => !k.element.isConnected || !isFilled(k));
       if (!wiped) continue;
       await sleep(500); // let the re-render finish
-      const byLabel = new Map(known.map((k) => [k.label, k.result]));
-      known = collectFields()
-        .filter((f) => byLabel.has(f.label))
-        .map((f) => ({ ...f, result: byLabel.get(f.label) }));
-      await fillFields(started, 0, "refilled after the site re-read your resume: ");
+      rebind();
+      await fillFields(performance.now(), 0, "refilled after the page rebuilt the form: ");
       return;
     }
   }
 
   async function fillFields(started, attached, prefix = "") {
+    rebind();
     let filled = 0;
     let skipped = 0;
     const count = (ok) => (ok ? filled++ : skipped++);
@@ -1270,9 +1301,19 @@
     // one pass, as on Ashby; a Workday search picker waits on its server,
     // and in field order it used to hold up every text box below it.
     const timeline = [];
+    // The page may rebuild the form mid-fill too: re-find by label, and never
+    // wait on a detached element (every one of its timeouts runs out).
+    const live = (entry) => {
+      if (!detached(entry)) return entry;
+      rebind();
+      const fresh = known.find((k) => k.label === entry.label);
+      if (fresh) Object.assign(entry, { element: fresh.element, buttons: fresh.buttons });
+      return entry;
+    };
     const timed = async (entry, kind, work) => {
       const t = performance.now();
-      const ok = await work();
+      live(entry);
+      const ok = detached(entry) ? false : await work();
       timeline.push({ field: entry.label, kind, ms: Math.round(performance.now() - t), ok });
       count(ok);
       return ok;
@@ -1316,6 +1357,7 @@
       if (!isMenu(entry)) continue;
       const want = entry.result.value;
       const t = performance.now();
+      if (detached(live(entry))) { skipped++; continue; }
       const texts = entry.widget === "listbox"
         ? await surveyListbox(entry.element, want) : await surveyPrompt(entry.element, want);
       if (texts.done) {
@@ -1336,7 +1378,6 @@
         : setSelect(entry.element, entry.result.value, decision));
     }
     for (const { entry, texts, decision } of menus) {
-      if (!entry.element.isConnected) { skipped++; continue; }
       await timed(entry, `${entry.widget} (jev)`, async () => {
         const index = await decision;
         return entry.widget === "listbox"
