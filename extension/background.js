@@ -14,6 +14,7 @@ import {
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
 import { resolve } from "./lib/resolve.js";
+import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const MODEL = "jev-latest";
@@ -36,7 +37,7 @@ async function loadOptions() {
     "profile",
     "extraText",
   ]);
-  return { apiKey, options: buildOptions(profile, extraText) };
+  return { apiKey, profile, options: buildOptions(profile, extraText) };
 }
 
 // A normal answer takes well under a second, but the API occasionally leaves a
@@ -123,8 +124,11 @@ async function askBatched(apiKey, state, questions) {
  * "Yes" and "I am authorized to work" are the same answer in different words,
  * and only the select knows which words it accepts.
  */
-async function answerFields(fields) {
-  const { apiKey, options } = await loadOptions();
+const YES_NO = { yes: "Yes", no: "No" };
+
+async function answerFields(fields, page = {}) {
+  const { apiKey, profile, options } = await loadOptions();
+  const history = workHistory(profile);
   if (!apiKey) throw new Error("No API key — open smartpaste settings.");
   if (!Object.keys(options).length) {
     throw new Error("Profile is empty — open smartpaste settings.");
@@ -133,6 +137,24 @@ async function answerFields(fields) {
   const criteria = asCriteria(options);
   const questions = {};
   fields.forEach((field, i) => {
+    // "Have you worked for us before?" is a judgement over the whole work
+    // history, which no single profile entry holds.
+    if (isPriorEmploymentQuestion(field.label)) {
+      const own = field.options && field.options.length;
+      const choices = { [NONE]: "Cannot tell which employer is meant" };
+      if (own) field.options.forEach((text, j) => { choices[`o${j}`] = text; });
+      else Object.assign(choices, YES_NO);
+      questions[`f${i}`] = {
+        type: "choice",
+        instructions: {
+          field: field.label, ask: ASK_HISTORY,
+          work_history: history.length ? history : "No jobs listed",
+          application_page: { url: page.url || "", title: page.title || "" },
+        },
+        criteria: choices,
+      };
+      return;
+    }
     if (field.options && field.options.length) {
       const choices = { [NONE]: "The profile does not say" };
       field.options.forEach((text, j) => {
@@ -158,6 +180,17 @@ async function answerFields(fields) {
     const answer = answers[`f${i}`];
     if (!answer) {
       return { label: field.label, status: "none", value: null, confidence: 0, alternatives: [] };
+    }
+    if (isPriorEmploymentQuestion(field.label) && !(field.options && field.options.length)) {
+      const confidence = Math.min(
+        Number(answer.probabilities?.[answer.choice] ?? 0),
+        Number(answer.confidence ?? 0)
+      );
+      const value = YES_NO[answer.choice];
+      if (!value || confidence < 0.4) {
+        return { label: field.label, status: "none", value: null, confidence, alternatives: [] };
+      }
+      return { label: field.label, status: confidence >= 0.85 ? "auto" : "pick", value, confidence, alternatives: [] };
     }
     if (field.options && field.options.length) {
       const index = Number(String(answer.choice).replace("o", ""));
@@ -601,7 +634,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.type === "answer-fields") {
-    answerFields(message.fields)
+    answerFields(message.fields, message.page)
       .then((results) => {
         const filled = results.filter((r) => r.status !== "none").length;
         if (sender.tab) {

@@ -81,6 +81,7 @@ export const GROUPS = [
     fields: [
       ["gender", "Gender", "Prefer not to say"],
       ["race", "Race / ethnicity", "Prefer not to say"],
+      ["hispanic_latino", "Hispanic or Latino?", "No"],
       ["veteran", "Veteran status", "I am not a protected veteran"],
       ["disability", "Disability status", "Prefer not to answer"],
     ],

@@ -338,6 +338,8 @@
       const reply = await chrome.runtime.sendMessage({
         type: "answer-fields",
         fields: fields.map((f) => ({ label: f.label, options: f.options })),
+        // Which employer "have you worked for us?" means.
+        page: { url: location.href, title: document.title },
       });
       if (!reply || !reply.ok) {
         if (reply && reply.error) note(reply.error, true);

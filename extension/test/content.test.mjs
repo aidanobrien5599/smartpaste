@@ -118,6 +118,10 @@ test("labels: Workday widgets, with repeat-panel prefixes", { skip }, () =>
     // A split date is one question, not a "Month" and a "Year".
     assert.ok(!labels.some((l) => /^(?:month|year)$/i.test(l)), labels.join(" | "));
     assert.equal(new Set(labels).size, labels.length, "two fields share a label");
+    // "Have you worked for us before?" needs to know who "us" is.
+    const sent = await page.eval("window.__messages.find(m => m.type === 'answer-fields').page");
+    assert.match(sent.url, /workday\.html$/);
+    assert.equal(sent.title, "Apply - Workday");
   }));
 
 test("labels: Lever question text, heavy asterisk stripped, radios grouped", { skip }, () =>
