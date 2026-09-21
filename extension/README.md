@@ -4,87 +4,183 @@ Click **Autofill**, or press **⌘V** in a single field, and Jev picks the entry
 from your profile that answers it.
 
 Jev never writes anything. It only chooses. If your profile does not answer a
-field, the field is left alone and ⌘V falls through to an ordinary paste — it
+field the field is left alone, and ⌘V falls through to an ordinary paste — it
 never invents a value and never eats the keystroke.
 
-## What Jev actually decides
+## Setup
 
-One `Choice` per field on the page, in a single batched call. The options are
+1. `chrome://extensions` → **Developer mode** → **Load unpacked** → this folder.
+2. Click the icon → **Open settings**.
+3. Paste your API key from `console.typesafe.ai/keys`.
+4. Store your resume under **Documents**, press **Fill profile from this**,
+   then check what it drafted. ⌘S saves.
+
+Chrome does not reload an unpacked extension by itself. After pulling changes,
+press **Reload** on `chrome://extensions` or you are running the old code.
+
+## Use
+
+On an application form a pill appears bottom-right: **Autofill N fields +
+N files**. One click fills everything the model was confident about, attaches
+your documents, and leaves alone anything you have already typed.
+
+For one-offs, click a field and press **⌘V**. Press it **again** in the same
+field to cycle to the next most likely answer — that is how a low-confidence
+pick gets corrected, with no menu. A green left-edge marker means high
+confidence, amber means worth a look.
+
+## What Jev decides
+
+One `Choice` per field on the page, batched into a single call. The options are
 every entry in your profile, each carrying its own label, plus an escape
 option. The question is literally *"which entry from the applicant's profile
-answers this field?"* — the meta-match, not a per-field rule anywhere in code.
+answers this field?"* — the match is the model's job, not a per-field rule
+anywhere in code.
+
+| probability | behaviour |
+|---|---|
+| `≥ 0.85` | filled silently |
+| `0.40 – 0.85` | filled, flagged as worth checking, alternatives kept |
+| `< 0.40`, or the escape option wins | **no value offered at all** |
+
+Thresholds live in `lib/resolve.js`.
 
 **Jev selects; it never composes.** Asked for `Name` with only a first and last
-name stored, it correctly returns nothing — handing back `Aidan` for a
-full-name box would be wrong, and the escape option exists so it declines
-rather than guesses. Joining them is code's job, so `lib/profile.js` derives
-the composed answers (`full_name` from first + last, first/last back out of a
+name stored it correctly returns nothing — handing back `Aidan` for a full-name
+box would be wrong. Joining them is code's job, so `lib/profile.js` derives the
+composed answers (`full_name` from first + last, first and last back out of a
 full name, `location` from city + state) and offers each as an option in its
-own right. Anything you typed explicitly always wins over a derived value.
+own right. Anything typed explicitly beats a derived value.
 
-That split is the whole design: the model judges, code composes and extracts.
+That split runs through everything: **the model judges, code composes and
+extracts.** It decides *which*; `refine()` cuts the substring out,
+`setCombobox` clicks the menu item, `derived()` joins the strings.
 
-## The flexibility catch-all
+## The profile
 
-Applications ask the same logistics question in endlessly different words —
-*"willing and able to relocate to New York City"*, *"in the office 3 days a
-week"*, *"can you work Pacific hours"*. The **Flexibility** group holds explicit
-stances for the common ones plus a deliberately scoped catch-all:
+41 fields across Identity, Location, Links, Work authorization, Flexibility,
+Logistics, Demographics and Written answers, plus **Education** and
+**Experience**, which take as many entries as you like, newest first. Blank
+fields are never offered.
+
+Each repeated entry's options carry an ordinal and their subject — *"Job title
+of the 2nd most recent role (Intelligible AI)"* — so a Workday form asking for
+`Employer 2` gets the right one. Against a numbered form with three roles, two
+sharing the title "Software Engineer Intern": **16 of 16 correct in 0.66s**.
+
+### Why a form and not a resume
+
+The first version parsed the resume into snippets and let Jev pick among them.
+It was unreliable, and the reason is worth stating: a parsed resume line is an
+**unlabelled fragment**. Adding a bare `June 2027` for a start date stole the
+answer to *Expected graduation date*, because nothing said which was which.
+Wrapped bullets arrived as half sentences. Icon fonts arrived as `/gtbGithub`.
+
+A profile field carries its own name into the question, so Jev matches on the
+label rather than inferring from content, and the value you typed is returned
+**verbatim** with no regex between it and the box. On the same form: parsed
+resume 13–16 of 19 with several picks at 0.75–0.89; structured profile **21 of
+21, every one at 0.99–1.00, in 0.81s**.
+
+The resume survives as optional **Extra lines**, for essay answers where an
+unlabelled bullet is genuinely what you want quoted back.
+
+### Fill profile from this
+
+Typing 41 fields is a lot, so the button beside your stored resume drafts them.
+It reads the PDF with a vendored pdf.js, splits it into lines, and asks Jev one
+Choice per field: *which line contains this*. That is the old
+extraction-by-selection trick, kept where it belongs — run **once**, in
+settings, on something you read before saving. Fields you have already filled
+are never touched.
+
+Four things the first real run got wrong, each fixed in code rather than by
+nudging the prompt:
+
+- Asked for a home city it answered `Los Gatos, CA` — where Netflix is, the
+  only city on the page. Resume questions are now limited to what a resume
+  states. Work authorisation, salary and availability are not on one.
+- Every experience end date equalled its start date. The JS port of `refine()`
+  had dropped `end` from its end-of-range words, so `May 2026 - August 2026`
+  returned the first date.
+- `Netflix` vanished: the splitter dropped lines under eight characters, and
+  that is seven.
+- Link fields got the whole contact line, which says the word "LinkedIn" but
+  carries no URL. Link questions now see only link-shaped options, so they get
+  the real URLs recovered from the PDF's annotations.
+
+### The flexibility catch-all
+
+Applications ask the same logistics question endlessly differently — *"willing
+and able to relocate to New York City"*, *"in the office 3 days a week"*, *"can
+you work Pacific hours"*. The **Flexibility** group holds explicit stances plus
+a deliberately scoped catch-all:
 
 > **Default answer on any other question about location, office attendance,
 > travel or schedule** — *"Yes, I am flexible and open to whatever the role
 > requires."*
 
-Scoping is the whole point. A blanket "say yes to anything unanswered" would
-also say yes to *"are you willing to work unpaid during a trial period?"* and
+The scoping is the design. A blanket "say yes to anything unanswered" would
+also agree to *"are you willing to work unpaid during a trial period?"* and
 *"do you agree to a background check?"*. Because the catch-all names its own
-domain, the escape option still wins outside it. Measured across ten
-questions: five logistics answered, and unpaid work, background checks,
-graduation date, sponsorship and salary all left alone or answered from their
-own fields.
+domain, the escape option still wins outside it. Across ten questions: five
+logistics answered, and unpaid work, background checks, graduation date,
+sponsorship and salary all declined or answered from their own fields.
 
-## Why a form and not a resume
+## Forms in the wild
 
-The first version parsed your resume PDF into snippets and let Jev pick among
-them. It was unreliable, and the reason is worth stating: a parsed resume line
-is an **unlabelled fragment**. Adding a bare `June 2027` for a start date stole
-the answer to *Expected graduation date*, because nothing said which was which.
-Wrapped bullets arrived as half-sentences. Icon fonts arrived as `/gtbGithub`.
+Every ATS builds its controls differently, and each one broke something.
 
-A profile field carries its own name into the question, so Jev matches on the
-label rather than inferring from content — and the value you typed is returned
-**verbatim**, with no regex between it and the box. Measured on the same form:
-parsed resume 13–16 of 19 fields with several at 0.75–0.89; structured profile
-**21 of 21, every one at 0.99–1.00, in 0.81s**.
+### Greenhouse — React Select
 
-The resume box is still there as *Extra lines*, for essay answers that want a
-real bullet quoted back. It is optional.
+No `<select>` elements at all. Every dropdown is a text input with
+`role="combobox"` whose menu exists only while open, linked by `aria-controls`.
 
-## Ashby
+- **Scope the menu.** A bare `[role="option"]` query sweeps up every open menu
+  on the page; a phone widget's 244 countries will swamp a Yes/No.
+- **Do not type the value in.** The menu's wording is its own. An expected
+  graduation of `May 2027` has to become `Spring 2027`, and typing the literal
+  value filters the menu to zero options — deleting the list the decision
+  needs. Open it, read it whole, let Jev choose. Typing survives only to narrow
+  a paged menu (a school list opens on *Aalborg University*), and then with one
+  distinctive word.
+- **Skip the hidden twin.** React Select renders a second, empty input for form
+  submission; it otherwise becomes a field labelled `Select...`.
 
-A third shape again. No `<select>`, no combobox — yes/no questions are two
-`<button aria-pressed>` over a hidden checkbox, so neither the buttons (not
-form controls) nor the checkbox (invisible) were ever seen. A container holding
-one `<label>` and two-to-eight toggle buttons is now read as a choice field and
-answered by clicking.
+Live: **16 of 16 fields plus the resume**, including `May 2027` → `Spring 2027`
+and `University of Wisconsin-Madison` → `University of Wisconsin - Madison`
+(note the spaced hyphen — exact matching could never have found it).
 
-Ashby also puts an **unlabelled "Autofill from resume" dropzone** above the real
-Resume field. Handing it the PDF makes Ashby parse it and re-render the form,
-wiping everything already filled — so file matching ranks evidence: what the
-input says about itself (id, name, aria-label, `label[for]`) beats surrounding
-text, and anything that looks like an autofill dropzone is skipped outright.
+### Ashby — buttons over a hidden checkbox
 
-Live result: **8 of 8 fields**, resume on `_systemfield_resume`, all three
-toggles set, dropzone untouched.
+Yes/No is two `<button aria-pressed>` over an invisible checkbox. Neither half
+is a visible form control, so three of eight questions were never seen. A
+container holding one `<label>` and two-to-eight toggle buttons is now read as
+a choice field and answered by clicking.
 
-## Repeated sections
+Ashby also puts an unlabelled **"Autofill from resume"** dropzone above the
+real Resume field. Handing it the PDF makes Ashby parse it and re-render the
+form, wiping everything already filled — so file matching ranks evidence: what
+an input says about *itself* (id, name, aria-label, `label[for]`) beats
+surrounding text, and autofill dropzones are skipped outright.
 
-Education and Experience take as many entries as you like, newest first. Each
-entry's options are labelled with an ordinal — *"Job title of the 2nd most
-recent role (Intelligible AI)"* — so a Workday form asking for `Employer 2` and
-`Job Title 2` gets the right one. Measured against a numbered Workday-shaped
-form with three roles, two of which share the same job title: **16 of 16
-correct in 0.66s**.
+Live: **8 of 8 fields**, resume on `_systemfield_resume`, dropzone untouched.
+
+### Autocompletes
+
+A field whose placeholder says *"Start typing…"* has an empty menu until you
+type, so opening it yields nothing. There, typing is the only way to get any
+options at all. If no menu ever appears, a plain autocomplete keeps the typed
+text — while a React Select is cleared, because there it would only *look*
+filled.
+
+### Native dropdowns
+
+A real `<select>` gets a different question again: not "which profile entry
+answers this" but "which of **these** options should be selected", with the
+select's own option list as the choices. "Yes" and "I am authorized to work in
+the US" are the same answer in different words, and only the dropdown knows
+which words it accepts.
 
 ## Documents
 
@@ -92,94 +188,23 @@ Store your resume, transcript and cover letter once. Autofill attaches them to
 the form's upload fields and leaves any other file input — a headshot, a work
 sample — alone.
 
-Matching looks at more than the label, because Greenhouse labels its resume
-upload **"Attach"** and puts the only real clue in the element's `id`. The id,
-name, aria-label and surrounding container text all count.
-
-Nothing is uploaded anywhere. The file is held in this browser and handed
-straight to the page through a `DataTransfer`, exactly as a drag-and-drop
-would deliver it.
-
-## Dropdowns
-
-Greenhouse has no `<select>` elements at all. Every dropdown is a React Select
-combobox: a text input with `role="combobox"` whose menu exists only while
-open, linked by `aria-controls`.
-
-Three things this forces:
-
-- **Scope the menu.** A bare `[role="option"]` query sweeps up every open menu
-  on the page — a phone widget's 244 countries will swamp a Yes/No.
-- **Do not type the value in.** The menu's wording is its own. An expected
-  graduation of `May 2027` has to become `Spring 2027`, and typing the literal
-  value filters the menu to zero options, destroying the list the decision
-  needs. Open it, read it whole, and let Jev choose. Typing is a fallback only
-  for a menu long enough to be paged — a school list opens on *Aalborg
-  University* and will never reach Wisconsin — and then one distinctive word
-  narrows it, never the whole value.
-- **Skip the hidden twin.** React Select renders a second, empty input for
-  form submission. It otherwise gets picked up as a field and labelled from the
-  `Select...` placeholder, sending seven junk questions per page.
-
-Measured on a live Greenhouse application: **15 of 15 fields plus the resume**,
-including `May 2027` → `Spring 2027` and `University of Wisconsin-Madison` →
-`University of Wisconsin - Madison` (note the spaced hyphen — exact matching
-could never have found it).
-
-## Native dropdowns
-
-A native `<select>` gets a different question: not "which profile entry answers this"
-but "which of **these** options should be selected", with the select's own
-option list as the choices. "Yes" and "I am authorized to work in the US" are
-the same answer in different words, and only the dropdown knows which words it
-accepts.
-
-## Install
-
-1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** →
-   choose this `extension/` folder.
-2. Click the extension icon → **Open settings**.
-3. Paste your **API key** (`console.typesafe.ai/keys`), then fill in the
-   profile form — 43 fields across identity, location, links, education, work
-   authorization, logistics, demographics and written answers. Blank fields are
-   simply never offered. ⌘S saves.
-
-## Use
-
-Open any application form. A pill appears bottom-right: **Autofill N fields**.
-Click it and every high-confidence field is filled at once — fields you have
-already typed in are never overwritten, and anything below the confidence bar
-is left for you.
-
-For one-offs, click a field and press **⌘V**. Press it **again** in the same
-field to cycle to the next most likely answer.
-
-## How it works
-
-The keystroke has to decide *synchronously* whether to intercept, and a Jev
-call takes ~500ms. So every field on the page is answered in **one batched call
-on page load** — questions are evaluated in parallel, so twenty cost about the
-same wall time as one. By the time you press ⌘V the answer is already cached,
-and the paste is instant.
-
-Reading labels from the DOM is the whole reason this belongs in a browser. The
-CLI had to guess which lines of copied page text were fields, and that was its
-weakest stage by a wide margin. Here the page simply says so.
+Nothing is uploaded anywhere. The file lives in this browser and is handed
+straight to the page through a `DataTransfer`, exactly as a drag-and-drop would
+deliver it.
 
 ## Notes
 
 - The API key lives in `chrome.storage.local` and is read only by the
   background worker. Content scripts inherit the page's origin, so a fetch from
-  one would hand the site you are applying on your key. It never goes there.
-- The content script is scoped to known ATS hosts (Greenhouse, Lever, Ashby,
-  Workday, …) rather than every site, so field labels from unrelated pages are
-  never sent anywhere. Add hosts to `matches` in `manifest.json` as needed.
+  one would hand the company you are applying to your key.
+- The content script is scoped to known ATS hosts rather than every site, so
+  field labels from unrelated pages are never sent anywhere. Add hosts to
+  `matches` in `manifest.json`.
 - React tracks its own value on the DOM node, so `el.value = x` reverts on
   blur. Insertion goes through the native setter and dispatches an `input`
   event, which is what React listens for.
-- `refine()` now applies only to unlabelled *Extra lines*. Labelled profile
-  values bypass it entirely — no regex can improve a value you typed yourself,
-  and every regex can spoil one.
-- The Python CLI still uses the older resume-parsing path. `sp doctor` and
-  `sp triage` have no browser equivalent and remain useful; `sp` itself is
-  superseded by this.
+- `refine()` applies only to unlabelled **Extra lines** and to resume drafting.
+  Labelled profile values bypass it — no regex can improve a value you typed
+  yourself, and every regex can spoil one.
+- It is a port of `smartpaste/answer.py`. They drift: the JS copy silently lost
+  `end` from its end-of-range words. If you change one, change the other.
