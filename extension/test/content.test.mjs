@@ -18,7 +18,8 @@ async function withPage(fixture, fn) {
 }
 
 const BUTTON = "document.querySelector('.smartpaste-button')?.textContent";
-const asked = `(window.__messages.find(m => m.type === 'answer-fields')?.fields || []).map(f => f.label)`;
+// null until the first scan has asked (an empty array would read as ready).
+const asked = `window.__messages.find(m => m.type === 'answer-fields')?.fields.map(f => f.label) ?? null`;
 
 /** Click Autofill and wait for its summary note. */
 async function autofill(page, timeout = 30000) {
@@ -145,6 +146,11 @@ test("fill: Greenhouse text, selects, React revert, and documents", { skip }, ()
     assert.equal(await page.eval(value("#gpa")), "3.9");
     assert.equal(await page.eval(value("#auth")), "Yes");
     assert.equal(await page.eval(value("#spon")), "No");
+    // Revealed by the Hispanic answer mid-fill, then filled in a follow-up.
+    assert.equal(await page.eval(value("#hispanic")), "No");
+    await page.waitFor("document.getElementById('race')?.value", 5000);
+    assert.equal(await page.eval(value("#race")), "White");
+    assert.match(await page.eval("document.querySelector('.smartpaste-note').textContent"), / · then new questions: filled 1 /);
     // The fixture reverts a naive el.value on blur; the native setter survives it.
     await page.eval("document.getElementById('first_name').focus(); document.getElementById('first_name').blur()");
     assert.equal(await page.eval(value("#first_name")), "Aidan");

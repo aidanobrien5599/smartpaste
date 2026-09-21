@@ -319,6 +319,7 @@
   }
 
   let filling = false;
+  let lastSummary = "";
 
   const detached = (entry) =>
     !entry.element.isConnected || (entry.buttons || []).some((b) => !b.isConnected);
@@ -359,32 +360,39 @@
     scanning = true;
     lastSignature = signature;
     try {
-      const reply = await chrome.runtime.sendMessage({
-        type: "answer-fields",
-        fields: fields.map((f) => ({ label: f.label, options: f.options })),
-        // Which employer "have you worked for us?" means.
-        page: { url: location.href, title: document.title },
-      });
-      if (!reply || !reply.ok) {
-        if (reply && reply.error) note(reply.error, true);
-        return;
-      }
-      fields.forEach((f) => asked.add(f.element));
-      reply.results.forEach((result, i) => {
-        if (result.status !== "none") {
-          answers.set(fields[i].element, result);
-          mark(fields[i].element, result);
-        }
-      });
-      known = fields
-        .map((f, i) => ({ ...f, result: reply.results[i] }))
-        .filter((f) => f.result && f.result.status !== "none");
+      const answered = await answer(fields);
+      if (!answered) return;
+      known = answered;
       showButton(known.length);
     } catch (error) {
       // An extension reload orphans this script; staying quiet is correct.
     } finally {
       scanning = false;
     }
+  }
+
+  /** Ask for answers to `fields`; returns those with one, or null on error. */
+  async function answer(fields) {
+    const reply = await chrome.runtime.sendMessage({
+      type: "answer-fields",
+      fields: fields.map((f) => ({ label: f.label, options: f.options })),
+      // Which employer "have you worked for us?" means.
+      page: { url: location.href, title: document.title },
+    });
+    if (!reply || !reply.ok) {
+      if (reply && reply.error) note(reply.error, true);
+      return null;
+    }
+    fields.forEach((f) => asked.add(f.element));
+    reply.results.forEach((result, i) => {
+      if (result.status !== "none") {
+        answers.set(fields[i].element, result);
+        mark(fields[i].element, result);
+      }
+    });
+    return fields
+      .map((f, i) => ({ ...f, result: reply.results[i] }))
+      .filter((f) => f.result && f.result.status !== "none");
   }
 
   /* --------------------------------------------------------------- pasting */
@@ -1255,10 +1263,36 @@
       const started = performance.now();
       const attached = await attachDocuments();
       await fillFields(started, attached);
+      // Newly revealed questions first -- they are the user's to see now --
+      // then keep watch for a resume re-parse, over those fields too.
+      await fillRevealed();
       if (attached) await refillIfReparsed();
     } finally {
       filling = false;
       setTimeout(scan, 300);
+    }
+  }
+
+  /**
+   * Questions that only appear once another is answered: Greenhouse asks
+   * "Please identify your race" after "Are you Hispanic/Latino?" is No.
+   * They were not on the page when the fill began, so after it, look again;
+   * answer and fill whatever is new, a few rounds deep.
+   */
+  async function fillRevealed() {
+    const seen = new Set(lastSignature.split("|"));
+    for (let round = 0; round < 3; round++) {
+      await sleep(250); // let the page reveal what the last answers unlock
+      const fields = collectFields();
+      const fresh = fields.filter((f) => !seen.has(f.label));
+      lastSignature = fields.map((f) => f.label).join("|");
+      if (!fresh.length) return;
+      fresh.forEach((f) => seen.add(f.label));
+      const answered = await answer(fresh);
+      if (!answered || !answered.length) continue;
+      known = known.concat(answered);
+      await fillFields(performance.now(), 0, "then new questions: ",
+        new Set(answered.map((k) => k.label)));
     }
   }
 
@@ -1286,12 +1320,13 @@
     }
   }
 
-  async function fillFields(started, attached, prefix = "") {
+  async function fillFields(started, attached, prefix = "", only = null) {
     rebind();
     let filled = 0;
     let skipped = 0;
     const count = (ok) => (ok ? filled++ : skipped++);
     const todo = known.filter((entry) => {
+      if (only && !only.has(entry.label)) return false;
       const due = entry.result.status === "auto" && !isFilled(entry);
       if (!due) skipped++;
       return due;
@@ -1399,7 +1434,10 @@
     // diagnosed from a screenshot.
     const slow = timeline.filter((t) => t.ms >= 700).sort((a, b) => b.ms - a.ms).slice(0, 3);
     const why = slow.map((t) => `${t.field.slice(0, 28)} ${(t.ms / 1000).toFixed(1)}s${t.ok ? "" : " ✗"}`);
-    note(parts.join(", ") + (why.length ? ` · slowest: ${why.join(", ")}` : ""), false, why.length ? 12000 : 4000);
+    const summary = parts.join(", ") + (why.length ? ` · slowest: ${why.join(", ")}` : "");
+    // A follow-up round adds to the fill's summary rather than replacing it.
+    lastSummary = only && lastSummary ? `${lastSummary} · ${summary}` : summary;
+    note(lastSummary, false, why.length || only ? 12000 : 4000);
   }
 
   function onKeyDown(event) {
@@ -1511,14 +1549,27 @@
     if (message.type === "fill-page") fillPage();
   });
 
+  // After the page's load event: long enough for a server-rendered React app
+  // to take the page over ("hydrate").
+  const SETTLE_MS = 300;
+
   function start() {
     document.addEventListener("keydown", onKeyDown, true);
-    let debounce;
-    new MutationObserver(() => {
-      clearTimeout(debounce);
-      debounce = setTimeout(scan, 600);
-    }).observe(document.documentElement, { childList: true, subtree: true });
-    scan();
+    // Touch nothing until the page's own app has taken over. On Greenhouse,
+    // scanning at DOMContentLoaded put our marks and button into the page
+    // before React hydrated it: React hit a mismatch (error #418), threw the
+    // form away and rebuilt it, and a click that came that early reached no
+    // handler and filled nothing.
+    const begin = () => {
+      let debounce;
+      new MutationObserver(() => {
+        clearTimeout(debounce);
+        debounce = setTimeout(scan, 600);
+      }).observe(document.documentElement, { childList: true, subtree: true });
+      scan();
+    };
+    if (document.readyState === "complete") setTimeout(begin, SETTLE_MS);
+    else addEventListener("load", () => setTimeout(begin, SETTLE_MS), { once: true });
   }
 
   // Tests (extension/test/content.test.mjs) reach the pure helpers here.

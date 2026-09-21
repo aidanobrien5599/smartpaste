@@ -31,6 +31,7 @@ const ANSWERS = [
   [/sponsorship/i, "No"],
   [/relocat/i, "Yes"],
   [/gender/i, "Prefer not to say"],
+  [/hispanic/i, "No"], [/identify your race/i, "White"],
   [/linkedin/i, "https://www.linkedin.com/in/aidanobrien5599"],
   [/graduat/i, "May 2027"],
   [/location/i, "Madison, WI"],

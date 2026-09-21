@@ -53,6 +53,19 @@ input,textarea{width:100%;padding:8px;font:14px system-ui}
 <option>I am not a protected veteran</option>
 <option>I don't wish to answer</option></select>
 
+<!-- Revealed only once Hispanic/Latino is answered No, as on Greenhouse. -->
+<label for="hispanic">Are you Hispanic/Latino?</label>
+<select id="hispanic"><option value="">Please select</option><option>Yes</option><option>No</option><option>Decline To Self Identify</option></select>
+<div id="race-box"></div>
+<script>
+document.getElementById("hispanic").addEventListener("change", (e) => {
+  document.getElementById("race-box").innerHTML = e.target.value === "No" ? `
+    <label for="race">Please identify your race</label>
+    <select id="race"><option value="">Please select</option><option>American Indian or Alaskan Native</option>
+    <option>Asian</option><option>Black or African American</option><option>White</option>
+    <option>Two or More Races</option><option>Decline To Self Identify</option></select>` : "";
+});
+</script>
 <label for="prefill">City</label>
 <input id="prefill" type="text" value="Already typed">
 
