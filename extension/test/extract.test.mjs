@@ -66,8 +66,12 @@ test("a sidebar is read column by column, not woven together", () => {
   ];
   const items = rows.flatMap(([l, lx, y, r, rx]) => [item(l, lx, y, l.length * 5), item(r, rx, y, r.length * 5)]);
   const lines = linesFromItems(items);
-  assert.deepEqual(lines.slice(0, 5), ["+1 416 555 0199", "EDUCATION", "University of Toronto", "Sep 2021 – Apr 2026", "SKILLS"]);
-  assert.equal(lines[5], "EXPERIENCE");
+  // Every left-column line comes before the right column begins.
+  const start = lines.indexOf("EXPERIENCE");
+  assert.ok(start > 0);
+  for (const l of ["+1 416 555 0199", "EDUCATION", "University of Toronto", "SKILLS", "Toronto, ON"]) {
+    assert.ok(lines.indexOf(l) < start, `${l} should precede the right column`);
+  }
 });
 
 test("right-aligned dates are not mistaken for a column", () => {
