@@ -145,6 +145,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
+  if (message.type === "choose-option") {
+    (async () => {
+      const { apiKey, options } = await loadOptions();
+      const criteria = { [NONE]: "None of these is the intended answer" };
+      message.options.slice(0, 200).forEach((text, i) => {
+        criteria[`o${i}`] = text;
+      });
+      const answers = await callJev(
+        apiKey,
+        { applicant_profile: options, intended_answer: message.want },
+        {
+          pick: {
+            type: "choice",
+            instructions: {
+              field: message.label,
+              intended_answer: message.want,
+              ask:
+                "The applicant intends the answer above. Which of this " +
+                "dropdown's options expresses it? The wording will differ.",
+            },
+            criteria,
+          },
+        }
+      );
+      const answer = answers.pick;
+      const confidence = Math.min(
+        Number(answer.probabilities?.[answer.choice] ?? 0),
+        Number(answer.confidence ?? 0)
+      );
+      const index =
+        answer.choice === NONE || confidence < 0.5
+          ? -1
+          : Number(String(answer.choice).replace("o", ""));
+      sendResponse({ ok: true, index, confidence });
+    })().catch(() => sendResponse({ ok: false, index: -1 }));
+    return true;
+  }
   if (message.type === "fill-page") {
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       if (tab) chrome.tabs.sendMessage(tab.id, { type: "fill-page" });

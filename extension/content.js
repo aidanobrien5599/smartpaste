@@ -14,6 +14,11 @@
 
 (() => {
   const FILE_SELECTOR = 'input[type="file"]';
+  // React Select renders a text input with role=combobox plus a second, empty
+  // input for form submission. Only the first is a field; the second is noise.
+  const COMBO_SELECTOR = 'input[role="combobox"], input.select__input';
+  const SELECT_SHELL = '[class*="select__control"], [class*="select-shell"]';
+  const JUNK_LABELS = /^(?:select\.{0,3}|choose\.{0,3}|please select|search|--)$/i;
   const FIELD_SELECTOR =
     'input:not([type]), input[type="text"], input[type="email"], ' +
     'input[type="tel"], input[type="url"], input[type="search"], textarea, select';
@@ -67,8 +72,15 @@
       .slice(0, 200);
   }
 
+  function isCombobox(field) {
+    return field.matches(COMBO_SELECTOR);
+  }
+
   function visible(field) {
     if (field.disabled || field.readOnly) return false;
+    // The hidden twin inside a React Select is not a field of its own; it
+    // otherwise gets picked up and labelled from the "Select..." placeholder.
+    if (field.closest(SELECT_SHELL) && !isCombobox(field)) return false;
     const rect = field.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   }
@@ -89,8 +101,9 @@
         element,
         label: labelFor(element),
         options: selectOptions(element),
+        combobox: isCombobox(element),
       }))
-      .filter((f) => f.label.length >= 2);
+      .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label));
   }
 
   /* ----------------------------------------------------------------- fetch */
@@ -138,6 +151,7 @@
    * the native setter and dispatching an input event is what React listens for.
    */
   function setValue(field, value) {
+    if (isCombobox(field)) return setCombobox(field, value); // async
     if (field.tagName === "SELECT") {
       const match = [...field.options].find(
         (o) => o.textContent.trim() === value
@@ -159,6 +173,129 @@
     return true;
   }
 
+  /* ------------------------------------------------------------- comboboxes */
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const fire = (node, type) =>
+    node.dispatchEvent(
+      new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+    );
+  const normalize = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  function nativeSet(field, value) {
+    const prototype =
+      field instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value").set.call(field, value);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  /**
+   * Read a combobox's menu, scoped by aria-controls.
+   *
+   * Scoping matters: a bare [role=option] query sweeps up every open menu on
+   * the page, and a phone widget's 244 countries will happily swamp a Yes/No.
+   * Options can also load asynchronously -- a school list arrives well after
+   * the menu opens -- so this polls rather than sleeping once.
+   */
+  async function menuOptions(field, timeout = 2500) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const id = field.getAttribute("aria-controls");
+      const list = id && document.getElementById(id);
+      const nodes = list ? [...list.querySelectorAll('[role="option"]')] : [];
+      if (nodes.length) return nodes;
+      await sleep(120);
+    }
+    return [];
+  }
+
+  function currentValue(field) {
+    const shown = field
+      .closest(SELECT_SHELL)
+      ?.querySelector('[class*="single-value"], [class*="multi-value__label"]');
+    return shown ? shown.textContent.trim() : "";
+  }
+
+  // A Choice takes 255 options; a long menu still fits with room to spare.
+  const MAX_MENU = 150;
+  // Below this the whole menu is on screen and typing can only do harm.
+  const LONG_MENU = 40;
+
+  /** The most distinctive word in a value, for narrowing a long menu. */
+  function narrowingToken(want) {
+    const words = want.match(/[A-Za-z]{4,}/g) || [];
+    const skip = /^(the|and|for|university|college|school|degree|bachelor|master)$/i;
+    return (
+      words.find((w) => !skip.test(w)) || words[0] || want.slice(0, 12)
+    );
+  }
+
+  /**
+   * Pick `want` out of a combobox.
+   *
+   * Do not type the value in. A menu's wording is its own: an expected
+   * graduation of "May 2027" has to become "Spring 2027", and typing the
+   * literal value filters that menu to nothing, destroying the very list the
+   * decision needs. So the menu is opened and read whole, an exact match wins
+   * if there is one, and otherwise Jev chooses among what is actually there.
+   *
+   * Typing is only a fallback, and only for a menu long enough to be paged --
+   * a school list opens on "Aalborg University" and will never show Wisconsin
+   * on its own. Then one distinctive word narrows it, never the whole value.
+   */
+  async function setCombobox(field, want) {
+    field.focus();
+    fire(field, "mousedown");
+    fire(field, "mouseup");
+    fire(field, "click");
+
+    let nodes = await menuOptions(field);
+    let texts = nodes.map((n) => n.textContent.trim());
+    const exact = () => texts.findIndex((t) => normalize(t) === normalize(want));
+
+    if (exact() < 0 && texts.length >= LONG_MENU) {
+      nativeSet(field, narrowingToken(want));
+      const narrowed = await menuOptions(field, 3000);
+      if (narrowed.length) {
+        nodes = narrowed;
+        texts = nodes.map((n) => n.textContent.trim());
+      } else {
+        // The narrowing matched nothing; restore the full menu.
+        nativeSet(field, "");
+        nodes = await menuOptions(field);
+        texts = nodes.map((n) => n.textContent.trim());
+      }
+    }
+    if (!nodes.length) {
+      field.blur();
+      return false;
+    }
+
+    let index = exact();
+    if (index < 0 && texts.length === 1) index = 0;
+    if (index < 0) {
+      const reply = await chrome.runtime.sendMessage({
+        type: "choose-option",
+        label: labelFor(field),
+        want,
+        options: texts.slice(0, MAX_MENU),
+      });
+      if (reply && reply.ok && reply.index >= 0) index = reply.index;
+    }
+    if (index < 0 || !nodes[index]) {
+      field.blur();
+      return false;
+    }
+
+    fire(nodes[index], "mousedown");
+    fire(nodes[index], "mouseup");
+    fire(nodes[index], "click");
+    await sleep(200);
+    return Boolean(currentValue(field));
+  }
+
   /* ----------------------------------------------------------- attachments */
 
   const DOC_KEYWORDS = [
@@ -166,6 +303,20 @@
     ["transcript", ["transcript", "academic record"]],
     ["cover_letter", ["cover letter", "coverletter"]],
   ];
+
+  /**
+   * Everything that might name a file input. Greenhouse labels its resume
+   * upload "Attach" and puts the only real clue in the element's id.
+   */
+  function fileHints(input) {
+    return [
+      labelFor(input),
+      input.id || "",
+      input.name || "",
+      input.getAttribute("aria-label") || "",
+      input.closest("[class*='field'], fieldset, div")?.textContent?.slice(0, 120) || "",
+    ].join(" ");
+  }
 
   function documentFor(label) {
     const low = (label || "").toLowerCase();
@@ -194,7 +345,7 @@
     const { documents = {} } = await chrome.storage.local.get("documents");
     let attached = 0;
     for (const input of inputs) {
-      const key = documentFor(labelFor(input) + " " + (input.name || ""));
+      const key = documentFor(fileHints(input));
       const stored = key && documents[key];
       if (!stored) continue;
       try {
@@ -220,8 +371,12 @@
     let skipped = 0;
     for (const { element, result } of known) {
       if (result.status !== "auto") { skipped++; continue; }
-      if (element.value && element.value.trim()) { skipped++; continue; }
-      if (setValue(element, result.value)) filled++;
+      const alreadySet = isCombobox(element)
+        ? Boolean(currentValue(element))
+        : Boolean(element.value && element.value.trim());
+      if (alreadySet) { skipped++; continue; }
+      if (await setValue(element, result.value)) filled++;
+      else skipped++;
     }
     const attached = await attachDocuments();
     const parts = [`filled ${filled}`];
@@ -300,7 +455,7 @@
     if (!inputs.length) return 0;
     const { documents = {} } = await chrome.storage.local.get("documents");
     return inputs.filter((el) => {
-      const key = documentFor(labelFor(el) + " " + (el.name || ""));
+      const key = documentFor(fileHints(el));
       return key && documents[key];
     }).length;
   }
@@ -325,13 +480,18 @@
     if (message.type === "fill-page") fillPage();
   });
 
-  document.addEventListener("keydown", onKeyDown, true);
+  function start() {
+    document.addEventListener("keydown", onKeyDown, true);
+    let debounce;
+    new MutationObserver(() => {
+      clearTimeout(debounce);
+      debounce = setTimeout(scan, 600);
+    }).observe(document.documentElement, { childList: true, subtree: true });
+    scan();
+  }
 
-  let debounce;
-  new MutationObserver(() => {
-    clearTimeout(debounce);
-    debounce = setTimeout(scan, 600);
-  }).observe(document.documentElement, { childList: true, subtree: true });
-
-  scan();
+  // The manifest runs this at document_idle, but an injected or early copy can
+  // land before <html> exists, and observe() throws on a null root.
+  if (document.documentElement) start();
+  else document.addEventListener("DOMContentLoaded", start, { once: true });
 })();

@@ -36,8 +36,12 @@ correct in 0.66s**.
 ## Documents
 
 Store your resume, transcript and cover letter once. Autofill attaches them to
-the form's upload fields, matching on the field's label, and leaves any other
-file input — a headshot, a work sample — alone.
+the form's upload fields and leaves any other file input — a headshot, a work
+sample — alone.
+
+Matching looks at more than the label, because Greenhouse labels its resume
+upload **"Attach"** and puts the only real clue in the element's `id`. The id,
+name, aria-label and surrounding container text all count.
 
 Nothing is uploaded anywhere. The file is held in this browser and handed
 straight to the page through a `DataTransfer`, exactly as a drag-and-drop
@@ -45,7 +49,33 @@ would deliver it.
 
 ## Dropdowns
 
-A `<select>` gets a different question: not "which profile entry answers this"
+Greenhouse has no `<select>` elements at all. Every dropdown is a React Select
+combobox: a text input with `role="combobox"` whose menu exists only while
+open, linked by `aria-controls`.
+
+Three things this forces:
+
+- **Scope the menu.** A bare `[role="option"]` query sweeps up every open menu
+  on the page — a phone widget's 244 countries will swamp a Yes/No.
+- **Do not type the value in.** The menu's wording is its own. An expected
+  graduation of `May 2027` has to become `Spring 2027`, and typing the literal
+  value filters the menu to zero options, destroying the list the decision
+  needs. Open it, read it whole, and let Jev choose. Typing is a fallback only
+  for a menu long enough to be paged — a school list opens on *Aalborg
+  University* and will never reach Wisconsin — and then one distinctive word
+  narrows it, never the whole value.
+- **Skip the hidden twin.** React Select renders a second, empty input for
+  form submission. It otherwise gets picked up as a field and labelled from the
+  `Select...` placeholder, sending seven junk questions per page.
+
+Measured on a live Greenhouse application: **15 of 15 fields plus the resume**,
+including `May 2027` → `Spring 2027` and `University of Wisconsin-Madison` →
+`University of Wisconsin - Madison` (note the spaced hyphen — exact matching
+could never have found it).
+
+## Native dropdowns
+
+A native `<select>` gets a different question: not "which profile entry answers this"
 but "which of **these** options should be selected", with the select's own
 option list as the choices. "Yes" and "I am authorized to work in the US" are
 the same answer in different words, and only the dropdown knows which words it
