@@ -1213,6 +1213,9 @@
    */
 
   async function fillPage() {
+    // The fill command reaches every frame; one with no form (a reCAPTCHA or
+    // proxy iframe) has nothing to do and nothing to report.
+    if (!known.length && !document.querySelector(FILE_SELECTOR)) return;
     if (filling) return;
     filling = true;
     try {
@@ -1342,8 +1345,10 @@
       });
     }
     // Where the time went, for when a page feels slow.
-    console.info(`smartpaste: filled in ${Math.round(performance.now() - started)}ms`);
-    console.table(timeline);
+    if (timeline.length) {
+      console.info(`smartpaste: filled in ${Math.round(performance.now() - started)}ms`);
+      console.table(timeline);
+    }
     if (window.__smartpasteTest) window.__smartpasteTest.timeline = timeline;
 
     const parts = [`${prefix}filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
