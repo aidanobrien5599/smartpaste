@@ -36,7 +36,10 @@
   const DATE_WRAPPER = '[data-automation-id="dateInputWrapper"]';
   const DATE_PART = '[data-automation-id^="dateSection"]';
   const EMPTY_BUTTON = /^(?:select one|select|choose one|choose|--)?$/i;
-  const OPTION = '[role="option"], [data-automation-id="promptOption"]';
+  const OPTION = '[role="option"], [data-automation-id*="promptOption"]';
+  // A Workday result row: a radio circle plus a promptOption label. The row
+  // takes the click; the label inside it does not.
+  const PROMPT_LEAF = '[data-automation-id="promptLeafNode"]';
   // Where a question keeps its text when the input has no label of its own.
   // Lever wraps inputs in a <label> that also holds status text ("No location
   // found. Try entering…"), and its custom questions have no label at all.
@@ -315,8 +318,12 @@
     document.querySelector(".smartpaste-button")?.remove();
   }
 
+  let filling = false;
+
   async function scan() {
-    if (scanning) return;
+    // A fill opens menus and types into search boxes; scanning that churn
+    // would re-ask Jev about a half-open page.
+    if (scanning || filling) return;
     const fields = collectFields();
     if (fields.length < MIN_FIELDS || !looksLikeApplication(fields)) {
       if (known.length) forget();
@@ -784,9 +791,44 @@
     fire(node, "click");
   }
 
+  const ACTIVE_POPUP =
+    '[data-automation-activepopup="true"], [data-automation-id="activeListContainer"]';
+
+  /** Close a menu. Workday's popups can ignore Escape; a click outside shuts them. */
   function closeMenu(field) {
     press(document.activeElement || field, "Escape", 27);
     field.blur();
+    if ([...document.querySelectorAll(ACTIVE_POPUP)].some(nodeVisible)) {
+      const outside = document.querySelector("#mainContent, main");
+      if (outside) click(outside);
+    }
+  }
+
+  /** The element that actually takes an option's click. */
+  const optionTarget = (node) => node.closest(PROMPT_LEAF) || node.closest('[role="option"]') || node;
+
+  function optionPicked(node) {
+    const target = optionTarget(node);
+    return target.getAttribute("data-automation-checked") === "Checked" ||
+      target.getAttribute("aria-selected") === "true" ||
+      target.getAttribute("aria-checked") === "true";
+    // Not a ticked radio inside it: a bare radio ticks itself when clicked,
+    // whether or not the widget took the choice.
+  }
+
+  /**
+   * Click an option where it listens: the row, not the label inside it. If
+   * the row did not take it, its own radio / checkbox is the last resort --
+   * never a second click on the row, which would untick a multiselect.
+   */
+  async function pickOption(node) {
+    const target = optionTarget(node);
+    target.scrollIntoView({ block: "nearest" });
+    click(target);
+    await sleep(200);
+    if (!target.isConnected || optionPicked(node)) return;
+    const box = target.querySelector('input[type="radio"], input[type="checkbox"]');
+    if (box && !box.checked) { click(box); await sleep(200); }
   }
 
   /**
@@ -811,9 +853,7 @@
     if (!(await waitForOptions(button)).length) { closeMenu(button); return false; }
     const node = await findOption(button, texts[index], texts.at?.get(texts[index]));
     if (!node) { closeMenu(button); return false; }
-    node.scrollIntoView({ block: "nearest" });
-    click(node);
-    await sleep(150);
+    await pickOption(node);
     return !EMPTY_BUTTON.test(button.textContent.trim());
   }
 
@@ -836,9 +876,10 @@
       if ((await waitForOptions(input, 2500)).length) {
         const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
         if (node) {
-          click(node);
-          await sleep(300);
-          if (promptChosen(input)) { input.blur(); return true; }
+          await pickOption(node);
+          if (promptChosen(input) || optionPicked(node)) { closeMenu(input); return true; }
+          // Clicked and nothing took: retrying is what froze the page.
+          if (sameMenu(input, texts)) { closeMenu(input); nativeSet(input, ""); return false; }
         }
       }
       closeMenu(input);
@@ -880,29 +921,49 @@
    * and when nothing matches, open the prompt empty and walk its categories
    * ("Job Board" > "LinkedIn Jobs") instead.
    */
+  // How long one picker may hold the page, and how many Jev questions it
+  // may ask. Without a cap a click that never takes meant 3 searches x 3
+  // levels of re-asking with the menu open -- the page froze for ~20s.
+  const PROMPT_BUDGET = 6000;
+  const PROMPT_ASKS = 2;
+
+  /** Whether the menu still shows exactly `texts`: a click changed nothing. */
+  function sameMenu(anchor, texts) {
+    const now = optionsNear(anchor).map(optionText);
+    return now.length > 0 && now.every((t) => texts.includes(t));
+  }
+
   async function setPrompt(input, want) {
     if (promptChosen(input)) return true;
     const label = labelFor(input);
+    const deadline = Date.now() + PROMPT_BUDGET;
+    let asks = 0;
+    const done = (ok) => { closeMenu(input); if (!ok) nativeSet(input, ""); return ok; };
     for (const probe of [want, narrowingToken(want), ""]) {
+      if (Date.now() > deadline || asks >= PROMPT_ASKS) break;
       await typeLikeAPerson(input, probe);
       if (probe) press(input, "Enter", 13);
       else click(input);
-      for (let depth = 0; depth < 3; depth++) {
+      for (let depth = 0; depth < 3 && Date.now() < deadline; depth++) {
         if (!(await waitForOptions(input, 2500)).length) break;
         const texts = await readMenu(input, want);
-        const index = await chooseAmong(label, want, texts);
-        const node = index >= 0 && (await findOption(input, texts[index]));
+        const exact = texts.findIndex((t) => normalize(t) === normalize(want));
+        if (exact < 0 && asks >= PROMPT_ASKS) return done(false);
+        if (exact < 0) asks++;
+        const index = exact >= 0 ? exact : await chooseAmong(label, want, texts);
+        if (index < 0) return done(false); // Jev saw the options: none fits
+        const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
         if (!node) break;
-        click(node);
-        await sleep(400);
-        if (promptChosen(input)) { input.blur(); return true; }
-        // A category opened its children in place; choose again among those.
+        await pickOption(node);
+        if (promptChosen(input) || optionPicked(node)) return done(true);
+        // A category opens its children in place; anything else means the
+        // click did not take, and asking again would only click again.
+        if (sameMenu(input, texts)) return done(false);
       }
       closeMenu(input);
-      await sleep(150);
+      await sleep(100);
     }
-    nativeSet(input, "");
-    return false;
+    return done(false);
   }
 
   const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -1055,6 +1116,17 @@
   const QUIET_UPLOAD = '[data-automation-id="file-upload-input-ref"]';
 
   async function fillPage() {
+    if (filling) return;
+    filling = true;
+    try {
+      await fillFields();
+    } finally {
+      filling = false;
+      setTimeout(scan, 300);
+    }
+  }
+
+  async function fillFields() {
     const quiet = [...document.querySelectorAll(FILE_SELECTOR)]
       .filter((el) => !el.files.length).every((el) => el.matches(QUIET_UPLOAD));
     const attached = await attachDocuments();
@@ -1248,7 +1320,7 @@
   // Tests (extension/test/content.test.mjs) reach the pure helpers here.
   // The flag is only ever set by the test stub, never by a real page.
   if (window.__smartpasteTest) {
-    Object.assign(window.__smartpasteTest, { dateParts, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize });
+    Object.assign(window.__smartpasteTest, { dateParts, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize, setPrompt });
   }
 
   // The manifest runs this at document_idle, but an injected or early copy can

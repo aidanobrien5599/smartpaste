@@ -53,21 +53,34 @@ function listbox(btn, key){
   });
 }
 // Search prompt: Enter searches leaves; click with empty text shows categories.
-// Like the real one, its list reads "0 items selected" while empty, and its
-// options react to pointerdown, not click.
+// Like the real one, its list reads "0 items selected" while empty, and a
+// result is a promptLeafNode row that marks itself data-automation-checked.
+// A "broken" prompt never takes a click, to prove a fill cannot hang on one.
 function prompt(input, key, source){
   const box=input.closest('[data-automation-id="multiSelectContainer"]');
+  const broken = source==="broken";
+  let search = false;
   const show=(opts,onpick)=>{
     closePops();
     const pop=document.createElement("div");pop.className="pop";pop.dataset.automationId="activeListContainer";
     const lb=document.createElement("div");lb.setAttribute("role","listbox");pop.appendChild(lb);
-    if(!opts.length){lb.innerHTML="<div>No Items.</div>"}
-    for(const o of opts){const d=document.createElement("div");d.dataset.automationId="promptOption";d.dataset.automationLabel=o;d.setAttribute("role","option");d.textContent=o;d.addEventListener("pointerdown",()=>onpick(o));lb.appendChild(d)}
+    if(!opts.length){lb.innerHTML="<div>No Items.</div>"} else if (search) lb.innerHTML="<div>Search Results ("+opts.length+")</div>";
+    for(const o of opts){
+      // Real shape: a leaf row holding a radio circle and a label. Only the
+      // row takes the click; the label swallows its own.
+      const leaf=document.createElement("div");leaf.dataset.automationId="promptLeafNode";
+      leaf.innerHTML='<input type="radio" tabindex="-1">';
+      const d=document.createElement("div");d.dataset.automationId="promptOption";d.dataset.automationLabel=o;d.setAttribute("role","option");d.textContent=o;
+      d.addEventListener("click",e=>e.stopPropagation());
+      leaf.appendChild(d);
+      leaf.addEventListener("click",()=>{ if(broken) return; leaf.dataset.automationChecked="Checked"; onpick(o); });
+      lb.appendChild(leaf);
+    }
     place(pop,input);
   };
   const pick=(o)=>{box.querySelector('[data-automation-id="selectedItemList"]').innerHTML='<p>1 item selected</p><div data-automation-id="selectedItem">'+o+'</div>';window.__model[key]=o;input.value="";closePops()};
-  const leaves = source==="source" ? Object.values(PROMPTS).flat() : SCHOOLS;
-  input.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); const q=input.value.toLowerCase(); show(leaves.filter(l=>l.toLowerCase().includes(q)),pick);} });
+  const leaves = source==="source" ? Object.values(PROMPTS).flat() : source==="broken" ? ["Career Fair","Career Site","Other"] : SCHOOLS;
+  input.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); const q=input.value.toLowerCase(); search=true; show(leaves.filter(l=>l.toLowerCase().includes(q)),pick); search=false;} });
   input.addEventListener("click",()=>{ if(input.value) return;
     if(source==="source") show(Object.keys(PROMPTS),(cat)=>show(PROMPTS[cat],pick)); else show(leaves,pick); });
 }
@@ -78,6 +91,10 @@ function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__mod
 <div data-automation-id="formField-source"><label for="source--source">How Did You Hear About Us?<abbr>*</abbr></label>
  <div data-automation-id="multiSelectContainer"><div data-automation-id="selectedItemList"><p>0 items selected</p></div>
  <div data-automation-id="multiselectInputContainer"><input type="text" id="source--source" data-uxi-widget-type="selectinput" data-automation-id="searchBox" placeholder="Search"></div></div></div>
+
+<div data-automation-id="formField-referral"><label for="referral--referral">Where did you first see this job?</label>
+ <div data-automation-id="multiSelectContainer"><div data-automation-id="selectedItemList"><p>0 items selected</p></div>
+ <div data-automation-id="multiselectInputContainer"><input type="text" id="referral--referral" data-uxi-widget-type="selectinput" data-automation-id="searchBox" placeholder="Search"></div></div></div>
 
 <div data-automation-id="formField-countryDropdown"><label for="country--country">Country<abbr>*</abbr></label>
  <button type="button" aria-haspopup="listbox" id="country--country" data-q="Country" aria-label="Country Select One Required" value="">Select One</button></div>
@@ -133,6 +150,7 @@ listbox(document.getElementById("q1"),"authorized");
 listbox(document.getElementById("gender"),"gender");
 prompt(document.getElementById("source--source"),"source","source");
 prompt(document.getElementById("education-1--school"),"school","school");
+prompt(document.getElementById("referral--referral"),"referral","broken");
 for (const id of ["name--legalName--firstName","name--legalName--lastName","emailAddress--emailAddress","phoneNumber--phoneNumber","workExperience-1--jobTitle","workExperience-1--companyName","workExperience-2--jobTitle","workExperience-2--companyName"]) commitOnBlur(document.getElementById(id),id);
 document.querySelectorAll('[data-automation-id^="dateSection"]').forEach((el,i)=>commitOnBlur(el,"date"+i+"_"+el.dataset.automationId));
 document.querySelector('[data-automation-id="file-upload-input-ref"]').addEventListener("change",e=>{window.__model.resume=e.target.files[0]?.name});

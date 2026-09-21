@@ -190,7 +190,9 @@ test("fill: a whole Workday page", { skip }, () =>
         resume: "resume.pdf",
         dates: ["05", "2026", "2027"], radio: "pw-no",
       });
-    assert.match(summary, /filled 18, attached 1 file/);
+    // 18 filled; the "broken" prompt never takes a click and is left for you.
+    assert.match(summary, /filled 18, attached 1 file, left 1 for you/);
+    assert.equal(await page.eval("document.querySelectorAll('.pop').length"), 0, "a menu was left open");
     // The long list reached Jev shortlisted, not as 237 options.
     const country = await page.eval("window.__messages.find(m => m.type === 'choose-option' && m.label === 'Country')");
     assert.ok(country.options.length <= 5, country.options);
@@ -207,6 +209,23 @@ test("fill: Workday menus are read first and decided together, not one round tri
     assert.ok(await page.eval("window.__maxInFlight") >= 3, "choose-option calls ran one at a time");
     assert.ok(elapsed < 8000, `a Workday page took ${elapsed}ms to fill`);
     assert.equal(await page.eval("window.__model.gender"), "I do not wish to answer");
+  }));
+
+test("fill: a picker whose clicks never take is given up on, not retried for ages", { skip }, () =>
+  withPage("workday.html", async (page) => {
+    await page.waitFor(BUTTON);
+    await page.eval("window.__jevDelay = 900");
+    let took = await page.eval(`(async () => {
+      const t = performance.now();
+      const ok = await window.__smartpasteTest.setPrompt(document.getElementById("referral--referral"), "Career Site");
+      return { ms: performance.now() - t, ok, open: document.querySelectorAll(".pop").length };
+    })()`);
+    assert.deepEqual({ ok: took.ok, open: took.open }, { ok: false, open: 0 });
+    took = took.ms;
+    assert.ok(took < 7000, `the broken picker held the page for ${Math.round(took)}ms`);
+    assert.equal(await page.eval("window.__model.referral"), undefined);
+    const asks = await page.eval("window.__messages.filter(m => m.type === 'choose-option').length");
+    assert.ok(asks <= 2, `asked Jev ${asks} times about one picker`);
   }));
 
 test("an Email Address field is not mistaken for a location autocomplete", { skip }, () =>
