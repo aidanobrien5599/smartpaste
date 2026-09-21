@@ -362,18 +362,8 @@
    * the native setter and dispatching an input event is what React listens for.
    */
   /** Click the button in a toggle group that expresses `want`. */
-  async function setToggle(entry, want) {
-    const texts = entry.options;
-    let index = texts.findIndex((t) => normalize(t) === normalize(want));
-    if (index < 0) {
-      const reply = await chrome.runtime.sendMessage({
-        type: "choose-option",
-        label: entry.label,
-        want,
-        options: texts,
-      });
-      if (reply && reply.ok && reply.index >= 0) index = reply.index;
-    }
+  async function setToggle(entry, want, decided) {
+    const index = await (decided ?? chooseAmong(entry.label, want, entry.options));
     if (index < 0 || !entry.buttons[index]) return false;
     entry.buttons[index].click();
     await sleep(150);
@@ -404,7 +394,7 @@
       setter.call(field, field.value + ch);
       field.dispatchEvent(new InputEvent("input", { bubbles: true, data: ch, inputType: "insertText" }));
       key("keyup", ch);
-      await sleep(25);
+      await sleep(8);
     }
   }
 
@@ -416,6 +406,9 @@
 
   function looksLikeAutocomplete(field) {
     if (field.getAttribute("aria-autocomplete")) return true;
+    // "Email Address" is not a place, and waiting on it for suggestions that
+    // never come cost three seconds a form.
+    if (field.type === "email" || /e-?mail/i.test(labelFor(field))) return false;
     const hints = [field.name, field.id, field.className, labelFor(field)].join(" ");
     return AUTOCOMPLETE_HINT.test(hints);
   }
@@ -469,18 +462,16 @@
    * of "3.9/4.00" against options "4.0 / 3.9 / 3.8" -- ask which option
    * expresses it rather than giving up.
    */
-  async function setSelect(field, value) {
-    const options = [...field.options].filter(
+  function selectChoices(field) {
+    return [...field.options].filter(
       (o) => o.value !== "" && !/^(?:select|choose|please select|--)/i.test(o.textContent.trim())
     );
+  }
+
+  async function setSelect(field, value, decided) {
+    const options = selectChoices(field);
     const texts = options.map((o) => o.textContent.trim());
-    let index = texts.findIndex((t) => normalize(t) === normalize(value));
-    if (index < 0) {
-      const reply = await chrome.runtime.sendMessage({
-        type: "choose-option", label: labelFor(field), want: value, options: texts.slice(0, 200),
-      });
-      if (reply && reply.ok && reply.index >= 0) index = reply.index;
-    }
+    const index = await (decided ?? chooseAmong(labelFor(field), value, texts));
     if (index < 0) return false;
     field.value = options[index].value;
     field.dispatchEvent(new Event("input", { bubbles: true }));
@@ -713,9 +704,18 @@
   async function readMenu(anchor, stopAt) {
     let nodes = optionsNear(anchor);
     const texts = [];
-    const add = (list) => list.forEach((n) => { const t = optionText(n); if (!texts.includes(t)) texts.push(t); });
+    // Where each option was seen, so clicking it later is one jump, not a
+    // second scroll through the whole list.
+    texts.at = new Map();
+    let pane = null;
+    const add = (list) => list.forEach((n) => {
+      const t = optionText(n);
+      if (texts.includes(t)) return;
+      texts.push(t);
+      texts.at.set(t, pane ? pane.scrollTop : 0);
+    });
     add(nodes);
-    const pane = nodes.length && scroller(nodes[0]);
+    pane = nodes.length && scroller(nodes[0]);
     if (!pane) return texts;
     pane.scrollTop = 0;
     for (let step = 0; step < 80; step++) {
@@ -730,12 +730,17 @@
   }
 
   /** The node for option `text`, scrolling it into existence if need be. */
-  async function findOption(anchor, text) {
+  async function findOption(anchor, text, seenAt) {
     const here = () => optionsNear(anchor).find((n) => optionText(n) === text);
     if (here()) return here();
     const first = optionsNear(anchor)[0];
     const pane = first && scroller(first);
     if (!pane) return null;
+    if (seenAt !== undefined) {
+      pane.scrollTop = seenAt;
+      pane.dispatchEvent(new Event("scroll"));
+      for (let i = 0; i < 5; i++) { await sleep(40); if (here()) return here(); }
+    }
     pane.scrollTop = 0;
     for (let step = 0; step < 80; step++) {
       pane.dispatchEvent(new Event("scroll"));
@@ -767,8 +772,14 @@
     return reply && reply.ok && reply.index >= 0 ? pool[reply.index] : -1;
   }
 
+  /** A whole click, pointer events included: Workday's pickers act on pointerdown. */
   function click(node) {
+    const pointer = (type) => node.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, view: window, pointerType: "mouse", isPrimary: true, button: 0,
+    }));
+    pointer("pointerdown");
     fire(node, "mousedown");
+    pointer("pointerup");
     fire(node, "mouseup");
     fire(node, "click");
   }
@@ -776,6 +787,64 @@
   function closeMenu(field) {
     press(document.activeElement || field, "Escape", 27);
     field.blur();
+  }
+
+  /**
+   * Read a dropdown's options, then close it. Filling a page reads every menu
+   * first and asks Jev about all of them at once, instead of holding each
+   * menu open through its own round trip.
+   */
+  async function surveyListbox(button, want) {
+    button.focus();
+    click(button);
+    const opened = (await waitForOptions(button)).length > 0;
+    const texts = opened ? await readMenu(button, want) : [];
+    closeMenu(button);
+    await sleep(80);
+    return texts;
+  }
+
+  async function applyListbox(button, texts, index) {
+    if (index < 0) return false;
+    button.focus();
+    click(button);
+    if (!(await waitForOptions(button)).length) { closeMenu(button); return false; }
+    const node = await findOption(button, texts[index], texts.at?.get(texts[index]));
+    if (!node) { closeMenu(button); return false; }
+    node.scrollIntoView({ block: "nearest" });
+    click(node);
+    await sleep(150);
+    return !EMPTY_BUTTON.test(button.textContent.trim());
+  }
+
+  /** Search a prompt for `want` and read the results, then close it. */
+  async function surveyPrompt(input, want) {
+    await typeLikeAPerson(input, want);
+    press(input, "Enter", 13);
+    const found = (await waitForOptions(input, 2500)).length > 0;
+    const texts = found ? await readMenu(input, want) : [];
+    closeMenu(input);
+    nativeSet(input, "");
+    await sleep(80);
+    return texts;
+  }
+
+  async function applyPrompt(input, want, texts, index) {
+    if (index >= 0) {
+      await typeLikeAPerson(input, want);
+      press(input, "Enter", 13);
+      if ((await waitForOptions(input, 2500)).length) {
+        const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
+        if (node) {
+          click(node);
+          await sleep(300);
+          if (promptChosen(input)) { input.blur(); return true; }
+        }
+      }
+      closeMenu(input);
+    }
+    // No hit by searching, or a category: the slow, step-by-step path.
+    return setPrompt(input, want);
   }
 
   /** A Workday dropdown: a button that opens a listbox. */
@@ -794,9 +863,15 @@
     return !EMPTY_BUTTON.test(button.textContent.trim());
   }
 
+  /**
+   * Whether a prompt holds a choice. Its list is never empty -- an empty one
+   * says "0 items selected" -- so count selected items, or read that count.
+   */
   function promptChosen(input) {
     const box = input.closest('[data-automation-id="multiSelectContainer"]') || input.parentElement;
-    return box.querySelector('[data-automation-id="selectedItem"], [data-automation-id="selectedItemList"] > *');
+    if (box.querySelector('[data-automation-id="selectedItem"]')) return true;
+    const count = (input.closest(FIELD_ENTRY) || box).textContent.match(/(\d+)\s+items?\s+selected/i);
+    return count ? Number(count[1]) > 0 : false;
   }
 
   /**
@@ -975,9 +1050,15 @@
    * already typed and replaces the elements we were holding. So attach, give
    * the parser a moment, then re-find the fields by label and fill those.
    */
+  // Uploads known not to re-render the form around them: Workday's in-form
+  // resume box just stores the file, so waiting on it is dead time.
+  const QUIET_UPLOAD = '[data-automation-id="file-upload-input-ref"]';
+
   async function fillPage() {
+    const quiet = [...document.querySelectorAll(FILE_SELECTOR)]
+      .filter((el) => !el.files.length).every((el) => el.matches(QUIET_UPLOAD));
     const attached = await attachDocuments();
-    if (attached) {
+    if (attached && !quiet) {
       await sleep(2500);
       const byLabel = new Map(known.map((k) => [k.label, k.result]));
       known = collectFields()
@@ -986,21 +1067,58 @@
     }
     let filled = 0;
     let skipped = 0;
-    for (const entry of known) {
+    const count = (ok) => (ok ? filled++ : skipped++);
+    const todo = known.filter((entry) => {
+      const pending = entry.result.status === "auto" && !isFilled(entry);
+      if (!pending) skipped++;
+      return pending;
+    });
+
+    // Three passes, so no one field's Jev round trip holds up the rest.
+    // 1. Anything whose options are already on the page: start deciding now.
+    const decisions = new Map();
+    for (const entry of todo) {
+      const texts = entry.buttons ? entry.options
+        : entry.element.tagName === "SELECT" ? selectChoices(entry.element).map((o) => o.textContent.trim())
+        : null;
+      if (texts) decisions.set(entry, chooseAmong(entry.label, entry.result.value, texts));
+    }
+    // 2. Plain fields and dates need no decision: fill them straight away.
+    //    Menus must be opened to be read, one at a time, but each menu's
+    //    decision goes off in the background while the next is being read.
+    const menus = [];
+    for (const entry of todo) {
+      if (decisions.has(entry)) continue;
       const { element, result } = entry;
-      if (result.status !== "auto" || isFilled(entry)) { skipped++; continue; }
-      if (entry.buttons) {
-        if (await setToggle(entry, result.value)) filled++;
-        else skipped++;
+      const want = result.value;
+      if (entry.widget === "listbox" || entry.widget === "prompt") {
+        const texts = entry.widget === "listbox"
+          ? await surveyListbox(element, want) : await surveyPrompt(element, want);
+        menus.push({ entry, texts, decision: texts.length ? chooseAmong(entry.label, want, texts) : Promise.resolve(-1) });
+        continue;
+      }
+      if (entry.widget === "date" || isCombobox(element) || looksLikeAutocomplete(element)) {
+        count(await setValue(element, want));
         continue;
       }
       // Focus and blur around a plain field: Workday, among others, only
       // commits what was typed when the field loses focus.
-      const plain = element.matches("input, textarea") && !entry.widget && !isCombobox(element);
-      if (plain) element.focus();
-      if (await setValue(element, result.value)) filled++;
-      else skipped++;
-      if (plain) element.blur();
+      element.focus();
+      count(setValue(element, want));
+      element.blur();
+    }
+    // 3. Click in the decisions as they arrive.
+    for (const [entry, decision] of decisions) {
+      count(entry.buttons
+        ? await setToggle(entry, entry.result.value, decision)
+        : await setSelect(entry.element, entry.result.value, decision));
+    }
+    for (const { entry, texts, decision } of menus) {
+      if (!entry.element.isConnected) { skipped++; continue; }
+      const index = await decision;
+      count(entry.widget === "listbox"
+        ? await applyListbox(entry.element, texts, index)
+        : await applyPrompt(entry.element, entry.result.value, texts, index));
     }
     const parts = [`filled ${filled}`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
@@ -1125,6 +1243,12 @@
       debounce = setTimeout(scan, 600);
     }).observe(document.documentElement, { childList: true, subtree: true });
     scan();
+  }
+
+  // Tests (extension/test/content.test.mjs) reach the pure helpers here.
+  // The flag is only ever set by the test stub, never by a real page.
+  if (window.__smartpasteTest) {
+    Object.assign(window.__smartpasteTest, { dateParts, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize });
   }
 
   // The manifest runs this at document_idle, but an injected or early copy can

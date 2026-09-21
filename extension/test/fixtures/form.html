@@ -1,0 +1,80 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply — Software Engineer, New Grad</title>
+<style>body{font:15px system-ui;max-width:640px;margin:40px auto}
+label{display:block;margin:14px 0 4px;font-size:13px;color:#444}
+input,textarea{width:100%;padding:8px;font:14px system-ui}
+.req{color:#c00}</style></head>
+<body>
+<h1>Software Engineer, New Grad (2027)</h1>
+
+<!-- label[for] — the Greenhouse shape -->
+<label for="first_name">First Name <span class="req">*</span></label>
+<input id="first_name" name="first_name" type="text">
+
+<label for="last_name">Last Name <span class="req">*</span></label>
+<input id="last_name" name="last_name" type="text">
+
+<label for="email">Email <span class="req">*</span></label>
+<input id="email" name="email" type="email">
+
+<label for="phone">Phone <span class="req">*</span></label>
+<input id="phone" name="phone" type="tel">
+
+<!-- aria-label only -->
+<input id="linkedin" type="url" aria-label="LinkedIn Profile">
+
+<!-- placeholder only -->
+<input id="site" type="url" placeholder="Personal website">
+
+<!-- wrapping label -->
+<label>Expected graduation date <span class="req">*</span>
+  <input id="grad" type="text">
+</label>
+
+<!-- preceding sibling div, no label element at all -->
+<div>Current GPA</div>
+<input id="gpa" type="text">
+
+<label for="sponsor">Will you now or in the future require sponsorship for employment visa status? <span class="req">*</span></label>
+<input id="sponsor" type="text">
+
+<label for="why">Why do you want to work here? <span class="req">*</span></label>
+<textarea id="why"></textarea>
+
+<label for="auth">Are you legally authorized to work in the United States? <span class="req">*</span></label>
+<select id="auth"><option value="">Please select</option><option>Yes</option><option>No</option></select>
+
+<label for="spon">Will you now or in the future require sponsorship for employment visa status? <span class="req">*</span></label>
+<select id="spon"><option value="">Please select</option><option>Yes</option><option>No</option></select>
+
+<label for="vet">Veteran status</label>
+<select id="vet"><option value="">Please select</option>
+<option>I identify as one or more of the classifications of a protected veteran</option>
+<option>I am not a protected veteran</option>
+<option>I don't wish to answer</option></select>
+
+<label for="prefill">City</label>
+<input id="prefill" type="text" value="Already typed">
+
+<!-- must be ignored -->
+<label for="resume">Resume/CV <span class="req">*</span></label>
+<input id="resume" type="file">
+<label for="transcript">Unofficial transcript</label>
+<input id="transcript" type="file">
+<label for="headshot">Headshot (we should not touch this)</label>
+<input id="headshot" type="file">
+<input id="hidden_tok" type="hidden" value="x">
+<label for="pw">Password</label>
+<input id="pw" type="password">
+
+<script>
+// Mimic React's value tracker: a naive `el.value = x` is reverted on blur,
+// so only the native-setter + input-event path survives.
+for (const id of ["first_name","email"]) {
+  const el = document.getElementById(id);
+  let react = "";
+  el.addEventListener("input", (e) => { if (e.isTrusted === false) react = el.value; });
+  el.addEventListener("blur", () => { el.value = react; });
+}
+</script>
+</body></html>

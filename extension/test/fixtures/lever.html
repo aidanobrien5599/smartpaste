@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><title>Apply - Lever</title>
+<body style="font:14px system-ui;max-width:600px;margin:30px auto">
+<!-- Lever: wrapping labels, questions with no label, native radios -->
+<div class="application-question"><label><div class="application-label">Full name ✱</div><input name="name" type="text"></label></div>
+<div class="application-question"><label><div class="application-label">Email ✱</div><input name="email" type="email"></label></div>
+<div class="application-question"><div class="application-label">LinkedIn URL</div><input name="urls[LinkedIn]" type="text"></div>
+<div class="application-question" id="auth"><div class="application-label">Are you authorized to work in the US? ✱</div>
+  <ul><li><label><input type="radio" name="cards[auth]" value="Yes"> Yes</label></li>
+      <li><label><input type="radio" name="cards[auth]" value="No"> No</label></li></ul></div>
+</body>

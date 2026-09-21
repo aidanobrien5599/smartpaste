@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Apply - Ashby</title>
+<body style="font:14px system-ui;max-width:600px;margin:30px auto">
+<!-- Ashby: Yes/No as buttons over a hidden checkbox, one label per entry -->
+<div class="_fieldEntry_1"><label for="_systemfield_name">Name</label><input id="_systemfield_name" type="text"></div>
+<div class="_fieldEntry_1"><label for="_systemfield_email">Email</label><input id="_systemfield_email" type="email"></div>
+<div class="_fieldEntry_1" id="sponsor"><label>Will you now or in the future require visa sponsorship?</label>
+  <input type="checkbox" style="display:none">
+  <button type="button" aria-pressed="false">Yes</button><button type="button" aria-pressed="false">No</button></div>
+<div class="_fieldEntry_1" id="relocate"><label>Are you open to relocating to New York?</label>
+  <button type="button" aria-pressed="false">Yes, I am</button><button type="button" aria-pressed="false">No, I am not</button></div>
+<script>
+document.querySelectorAll("button[aria-pressed]").forEach((b) => b.addEventListener("click", () => {
+  b.parentElement.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+}));
+</script></body>

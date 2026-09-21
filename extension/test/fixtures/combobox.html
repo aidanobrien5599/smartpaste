@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><title>Job Application - Greenhouse</title>
+<body style="font:14px system-ui;max-width:600px;margin:30px auto">
+<!-- Greenhouse's React Select: an input role=combobox whose menu is found via aria-controls.
+     A decoy menu with 200 options is always open elsewhere, to prove scoping. -->
+<label for="first_name">First Name</label><input id="first_name" type="text">
+<label for="email">Email</label><input id="email" type="email">
+<div class="select__control"><label for="grad" id="grad-label">When do you expect to graduate?</label>
+  <input id="grad" class="select__input" role="combobox" aria-controls="grad-menu" aria-labelledby="grad-label" type="text">
+  <div class="select__single-value" id="grad-value"></div></div>
+<div id="grad-menu"></div>
+<div class="select__control"><label for="loc" id="loc-label">Current Location</label>
+  <input id="loc" class="select__input" role="combobox" aria-controls="loc-menu" placeholder="Start typing..." type="text">
+  <div class="select__single-value" id="loc-value"></div></div>
+<div id="loc-menu"></div>
+<div id="decoy" role="listbox"></div>
+<script>
+const decoy = document.getElementById("decoy");
+for (let i = 0; i < 200; i++) decoy.insertAdjacentHTML("beforeend", `<div role="option">Country ${i}</div>`);
+function combo(id, all, needsTyping) {
+  const input = document.getElementById(id), menu = document.getElementById(id + "-menu");
+  const render = (q) => {
+    menu.innerHTML = "";
+    const list = needsTyping && !q ? [] : all.filter((o) => o.toLowerCase().includes((q || "").toLowerCase()));
+    for (const o of list) {
+      const d = document.createElement("div"); d.setAttribute("role", "option"); d.textContent = o;
+      d.addEventListener("click", () => { document.getElementById(id + "-value").textContent = o; input.value = ""; menu.innerHTML = ""; });
+      menu.appendChild(d);
+    }
+  };
+  input.addEventListener("click", () => render(input.value));
+  input.addEventListener("input", () => render(input.value));
+}
+combo("grad", ["Fall 2026", "Spring 2027", "Fall 2027", "Spring 2028"], false);
+combo("loc", ["Madison, Wisconsin, United States", "Madison, Alabama, United States"], true);
+</script></body>
