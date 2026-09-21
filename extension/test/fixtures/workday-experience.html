@@ -1,0 +1,167 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply - Workday</title>
+<style>body{font:14px system-ui;max-width:640px;margin:30px auto}
+[data-automation-id^="formField"]{margin:10px 0}
+label{display:block;font-size:12px;color:#444}
+input[type=text],textarea{padding:6px;width:260px}
+.pop{position:absolute;background:#fff;border:1px solid #999;z-index:9;width:280px}
+.pop ul{list-style:none;margin:0;padding:0;max-height:200px;overflow-y:auto;position:relative}
+.pop li,.pop [data-automation-id=promptOption]{height:20px;padding:0 6px;cursor:pointer}
+.date input{width:50px}</style></head>
+<body>
+<h2>My Experience</h2>
+<!-- Workday's My Experience step: sections start empty; each entry is a
+     panel that exists only after its section's Add button is clicked. -->
+<script>
+window.__model = {};
+const COUNTRIES = [];
+for (const a of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") for (let i=0;i<9;i++) COUNTRIES.push(a+"land "+i);
+COUNTRIES.push("United Kingdom","United States of America","Uruguay"); COUNTRIES.sort();
+const LISTS = {
+  country: COUNTRIES,
+  phoneType: ["Home","Mobile","Work"],
+  degree: ["Associate's","Bachelor of Science","Bachelor of Arts","Master of Science","PhD"],
+  authorized: ["Yes","No"],
+  gender: ["Male","Female","I do not wish to answer"],
+};
+const PROMPTS = {
+  "Job Board": ["Indeed","LinkedIn Jobs","Glassdoor"],
+  "University": ["Career Fair","Handshake"],
+  "Referral": ["Employee Referral"],
+};
+const SKILLS = ["Python","Python (Programming Language)","TypeScript","Java","JavaScript","React.js","SQL"];
+const SCHOOLS = ["University of Wisconsin - Madison","University of Wisconsin - Milwaukee","Wisconsin Lutheran College"];
+// Like Workday: the open popup is marked data-automation-activepopup="true"
+// and its button aria-expanded="true". A closing popup stays on screen for
+// a moment as it animates out, still showing its options.
+function closePops(){
+  document.querySelectorAll("[aria-expanded=true]").forEach(b=>b.setAttribute("aria-expanded","false"));
+  document.querySelectorAll(".pop").forEach(p=>{ if(p.dataset.closing) return; p.dataset.closing="1"; p.dataset.automationActivepopup="false"; setTimeout(()=>p.remove(),250); });
+}
+function place(pop, el){const r=el.getBoundingClientRect();pop.style.left=(scrollX+r.left)+"px";pop.style.top=(scrollY+r.bottom+2)+"px";document.body.appendChild(pop)}
+// Listbox button, virtualized: only ~12 items rendered around scrollTop.
+// Options nest: li[role=option] > div[promptOption], as on Workday.
+function listbox(btn, key, toggling){
+  const open=()=>{
+    closePops();
+    const items = LISTS[key];
+    const pop=document.createElement("div");pop.className="pop";pop.dataset.automationId="activeListContainer";
+    pop.dataset.automationActivepopup="true";btn.setAttribute("aria-expanded","true");
+    const ul=document.createElement("ul");ul.setAttribute("role","listbox");pop.appendChild(ul);
+    const spacer=document.createElement("div");spacer.style.height=(items.length*20)+"px";ul.appendChild(spacer);
+    const render=()=>{
+      ul.querySelectorAll("li").forEach(l=>l.remove());
+      const start=Math.floor(ul.scrollTop/20);
+      items.slice(start,start+12).forEach((t,i)=>{
+        const li=document.createElement("li");li.setAttribute("role","option");li.dataset.automationLabel=t;
+        li.style.position="absolute";li.style.top=((start+i)*20)+"px";
+        li.innerHTML='<div data-automation-id="promptOption" data-automation-label="'+t+'">'+t+'</div>';
+        li.addEventListener("click",()=>{if(pop.dataset.closing)return;btn.textContent=t;btn.setAttribute("aria-label",btn.dataset.q+" "+t+" Required");window.__model[key]=t;closePops()});
+        ul.appendChild(li);
+      });
+    };
+    ul.addEventListener("scroll",render);place(pop,btn);render();
+  };
+  if (!toggling) { btn.addEventListener("click", open); return; }
+  // Phone Device Type, as it behaves live: opens on mousedown, and a click
+  // toggles it -- so mousedown-then-click opens and shuts it at once.
+  btn.addEventListener("mousedown", open);
+  btn.addEventListener("click", () => { if (btn.getAttribute("aria-expanded") === "true") closePops(); else open(); });
+}
+// Search prompt: Enter searches leaves; click with empty text shows categories.
+// Like the real one, its list reads "0 items selected" while empty, and a
+// result is a promptLeafNode row that marks itself data-automation-checked.
+// A "broken" prompt never takes a click, to prove a fill cannot hang on one.
+function prompt(input, key, source){
+  const box=input.closest('[data-automation-id="multiSelectContainer"]');
+  const broken = source==="broken";
+  let search = false;
+  const show=(opts,onpick)=>{
+    closePops();
+    const pop=document.createElement("div");pop.className="pop";pop.dataset.automationId="activeListContainer";
+    const lb=document.createElement("div");lb.setAttribute("role","listbox");pop.appendChild(lb);
+    if(!opts.length){lb.innerHTML="<div>No Items.</div>"} else if (search) lb.innerHTML="<div>Search Results ("+opts.length+")</div>";
+    for(const o of opts){
+      // Real shape: a leaf row holding a radio circle and a label. Only the
+      // row takes the click; the label swallows its own.
+      const leaf=document.createElement("div");leaf.dataset.automationId="promptLeafNode";leaf.setAttribute("role","option");
+      leaf.innerHTML='<input type="radio" tabindex="-1">';
+      const d=document.createElement("div");d.dataset.automationId="promptOption";d.dataset.automationLabel=o;d.textContent=o;
+      d.addEventListener("click",e=>e.stopPropagation());
+      leaf.appendChild(d);
+      leaf.addEventListener("click",()=>{ if(broken) return; leaf.dataset.automationChecked="Checked"; onpick(o); });
+      lb.appendChild(leaf);
+    }
+    place(pop,input);
+  };
+  const pick=(o)=>{const list=box.querySelector('[data-automation-id="selectedItemList"]');
+    if(source==="skills"){ list.querySelector("p")?.remove(); list.insertAdjacentHTML("beforeend",'<div data-automation-id="selectedItem">'+o+'</div>'); (window.__model[key]=window.__model[key]||[]).push(o); }
+    else { list.innerHTML='<p>1 item selected</p><div data-automation-id="selectedItem">'+o+'</div>'; window.__model[key]=o; }
+    input.value="";closePops()};
+  const leaves = source==="source" ? Object.values(PROMPTS).flat() : source==="broken" ? ["Career Fair","Career Site","Other"] : source==="skills" ? SKILLS : source==="field" ? ["Computer Science","Computer Engineering","Mathematics"] : SCHOOLS;
+  input.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); const q=input.value.toLowerCase(); search=true; show(leaves.filter(l=>l.toLowerCase().includes(q)),pick); search=false;} });
+  input.addEventListener("click",()=>{ if(input.value) return;
+    if(source==="source") show(Object.keys(PROMPTS),(cat)=>show(PROMPTS[cat],pick)); else show(leaves,pick); });
+}
+// Text inputs commit to the model on blur only, like Workday.
+function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__model[key]=input.value})}
+</script>
+<div role="group" aria-labelledby="Work-Experience-section"><h3 id="Work-Experience-section">Work Experience</h3>
+  <div class="panels"></div><button type="button" data-automation-id="add-button" aria-label="Add Work Experience">Add</button></div>
+<div role="group" aria-labelledby="Education-section"><h3 id="Education-section">Education</h3>
+  <div class="panels"></div><button type="button" data-automation-id="add-button" aria-label="Add Education">Add</button></div>
+<div role="group" aria-labelledby="Websites-section"><h3 id="Websites-section">Websites</h3>
+  <div class="panels"></div><button type="button" data-automation-id="add-button" aria-label="Add Websites">Add</button></div>
+
+<div data-automation-id="formField-skills"><label for="skills--skills">Type to Add Skills</label>
+ <div data-automation-id="multiSelectContainer"><div data-automation-id="selectedItemList"><p>0 items selected</p></div>
+ <div data-automation-id="multiselectInputContainer"><input type="text" id="skills--skills" data-uxi-widget-type="selectinput" data-automation-id="searchBox" placeholder="Search"></div></div></div>
+
+<div data-automation-id="resumeUpload"><h4>Resume/CV</h4><div data-automation-id="file-upload-drop-zone">Drop file here
+ <input type="file" data-automation-id="file-upload-input-ref" style="position:absolute;opacity:0;width:1px;height:1px"></div></div>
+
+<script>
+// Month / Year boxes marked only by aria-label, as on this step.
+const monthYear = (id, label) => `<div data-automation-id="formField-${id}"><label>${label}</label>
+  <div class="date"><input type="text" role="spinbutton" aria-label="Month" placeholder="MM" data-k="${id}-m"><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y"></div></div>`;
+const year = (id, label) => `<div data-automation-id="formField-${id}"><label>${label}</label>
+  <div class="date"><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y"></div></div>`;
+const text = (id, label, tag) => `<div data-automation-id="formField-${id}"><label for="${id}">${label}</label><${tag||"input"} type="text" id="${id}"></${tag||"input"}></div>`;
+const BUILD = {
+  "Work-Experience": (n) => text(`we${n}-title`, "Job Title") + text(`we${n}-company`, "Company") + text(`we${n}-location`, "Location") +
+    `<div data-automation-id="formField-currentlyWorkHere"><label><input type="checkbox" data-automation-id="currentlyWorkHere" id="we${n}-current"> I currently work here</label></div>` +
+    monthYear(`we${n}-from`, "From") + monthYear(`we${n}-to`, "To") + text(`we${n}-desc`, "Role Description", "textarea"),
+  "Education": (n) => `<div data-automation-id="formField-school"><label for="ed${n}-school">School or University</label>
+      <div data-automation-id="multiSelectContainer"><div data-automation-id="selectedItemList"><p>0 items selected</p></div>
+      <div data-automation-id="multiselectInputContainer"><input type="text" id="ed${n}-school" data-uxi-widget-type="selectinput" data-automation-id="searchBox" placeholder="Search"></div></div></div>
+    <div data-automation-id="formField-degree"><label for="ed${n}-degree">Degree</label>
+      <button type="button" aria-haspopup="listbox" id="ed${n}-degree" data-q="Degree" aria-label="Degree Select One Required">Select One</button></div>` +
+    text(`ed${n}-gpa`, "Overall Result (GPA)") + year(`ed${n}-from`, "From") + year(`ed${n}-to`, "To (Actual or Expected)"),
+  "Websites": (n) => `<div data-automation-id="formField-url"><label for="web${n}">URL</label><input type="text" id="web${n}" data-automation-id="website"></div>`,
+};
+window.__added = {};
+document.querySelectorAll('[role="group"][aria-labelledby$="-section"]').forEach((section) => {
+  const name = section.getAttribute("aria-labelledby").replace(/-section$/, "");
+  const add = section.querySelector("button");
+  add.addEventListener("click", () => {
+    const n = section.querySelectorAll(".panels > [role=group]").length + 1;
+    window.__added[name] = n;
+    // a moment later, as Workday's panels arrive
+    setTimeout(() => {
+      section.querySelector(".panels").insertAdjacentHTML("beforeend",
+        `<div role="group" aria-labelledby="${name}-${n}-panel"><h4 id="${name}-${n}-panel">${name.replace("-", " ")} ${n}</h4>${BUILD[name](n)}</div>`);
+      add.setAttribute("aria-label", `Add Another ${name.replace("-", " ")}`);
+      add.textContent = "Add Another";
+      const panel = section.querySelector(`[aria-labelledby="${name}-${n}-panel"]`);
+      panel.querySelectorAll("button[aria-haspopup=listbox]").forEach((b) => listbox(b, "degree"));
+      panel.querySelectorAll("input[data-uxi-widget-type=selectinput]").forEach((i) => prompt(i, `school${n}`, "school"));
+      panel.querySelectorAll("input[type=text], textarea").forEach((i) => { if (!i.dataset.uxiWidgetType) commitOnBlur(i, i.id || i.dataset.k); });
+      panel.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => { window.__model[c.id] = c.checked; }));
+    }, 150);
+  });
+});
+prompt(document.getElementById("skills--skills"), "skills", "skills");
+document.querySelector('[data-automation-id="file-upload-input-ref"]').addEventListener("change", (e) => { window.__model.resume = e.target.files[0]?.name; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePops(); });
+</script>
+</body></html>

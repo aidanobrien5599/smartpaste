@@ -34,7 +34,11 @@
     'input[data-uxi-widget-type="selectinput"], ' +
     '[data-automation-id="multiSelectContainer"] input[type="text"]';
   const DATE_WRAPPER = '[data-automation-id="dateInputWrapper"]';
-  const DATE_PART = '[data-automation-id^="dateSection"]';
+  // Workday marks date boxes either way: dateSectionMonth-input, or just an
+  // aria-label of Month / Day / Year (its My Experience step).
+  const DATE_PART = '[data-automation-id^="dateSection"], input[aria-label="Month"], ' +
+    'input[aria-label="Day"], input[aria-label="Year"]';
+  const dateWrappers = new WeakSet();
   const EMPTY_BUTTON = /^(?:select one|select|choose one|choose|--)?$/i;
   const OPTION = '[role="option"], [data-automation-id*="promptOption"]';
   // A Workday result row: a radio circle plus a promptOption label. The row
@@ -252,8 +256,13 @@
       if (!nodeVisible(button) || button.disabled || button.closest(".smartpaste-button")) continue;
       fields.push({ element: button, label: listboxLabel(button), options: null, combobox: false, widget: "listbox" });
     }
-    for (const wrapper of document.querySelectorAll(DATE_WRAPPER)) {
-      if (!nodeVisible(wrapper)) continue;
+    const wrappers = new Set();
+    for (const part of document.querySelectorAll(DATE_PART)) {
+      const wrapper = part.closest(DATE_WRAPPER) || part.closest('[data-automation-id^="formField"]') || part.parentElement;
+      if (wrapper && nodeVisible(wrapper)) wrappers.add(wrapper);
+    }
+    for (const wrapper of wrappers) {
+      dateWrappers.add(wrapper);
       fields.push({ element: wrapper, label: dateLabel(wrapper), options: null, combobox: false, widget: "date" });
     }
     return fields;
@@ -294,6 +303,28 @@
     return fields;
   }
 
+  // A lone checkbox is a yes/no question -- "I currently work here" -- unless
+  // it is a consent. Those are the applicant's to tick, never ours.
+  const CONSENT = /agree|consent|terms|privacy|acknowledg|certif|attest|marketing|newsletter|subscribe|remember me|sms|text messages?|contact me/i;
+
+  function collectSingleCheckboxes() {
+    const byName = new Map();
+    for (const box of document.querySelectorAll('input[type="checkbox"]')) {
+      const key = box.name || box.id || box;
+      byName.set(key, (byName.get(key) || 0) + 1);
+    }
+    const fields = [];
+    for (const box of document.querySelectorAll('input[type="checkbox"]')) {
+      if (box.disabled || byName.get(box.name || box.id || box) !== 1) continue;
+      const label = labelFor(box);
+      if (label.length < 3 || CONSENT.test(label)) continue;
+      const shown = box.closest("label, [data-automation-id^='formField']") || box;
+      if (!nodeVisible(shown) && !nodeVisible(box)) continue;
+      fields.push({ element: box, label, options: ["Yes", "No"], buttons: [box], combobox: false, single: true });
+    }
+    return fields;
+  }
+
   /** A write-in ("Other: ___") inside a choice question is not that question. */
   function insideChoiceQuestion(element) {
     const box = element.closest(QUESTION_BOX);
@@ -315,6 +346,7 @@
       .concat(collectToggleGroups())
       .concat(collectRadioGroups())
       .concat(collectCheckboxGroups())
+      .concat(collectSingleCheckboxes())
       .map((f) => ({ ...f, label: sectionPrefix(f.element) + f.label }));
   }
 
@@ -390,11 +422,14 @@
     // would re-ask Jev about a half-open page.
     if (scanning || filling) return;
     const fields = collectFields();
-    if (fields.length < MIN_FIELDS || !looksLikeApplication(fields)) {
+    // Workday's My Experience starts as empty sections with Add buttons: few
+    // or no fields, but a whole resume's worth of entries to add.
+    const entries = fields.length < MIN_FIELDS || !looksLikeApplication(fields) ? await entriesToAdd() : 0;
+    if ((fields.length < MIN_FIELDS || !looksLikeApplication(fields)) && !entries) {
       if (known.length) forget();
       return;
     }
-    const signature = fields.map((f) => f.label).join("|");
+    const signature = fields.map((f) => f.label).join("|") + (entries ? `|+${entries}` : "");
     if (signature === lastSignature) {
       // Same questions, maybe new elements: keep hold of the live ones.
       if (rebind()) fields.forEach((f) => asked.add(f.element));
@@ -404,7 +439,7 @@
     scanning = true;
     lastSignature = signature;
     try {
-      const answered = await answer(fields);
+      const answered = fields.length ? await answer(fields) : [];
       if (!answered) return;
       known = answered;
       showButton(known.length);
@@ -587,8 +622,10 @@
 
   function setValue(field, value) {
     if (field.matches(LISTBOX_BUTTON)) return setListbox(field, value); // async
-    if (field.matches(DATE_WRAPPER)) return setDate(field, value); // async
-    if (field.matches(PROMPT_INPUT)) return setPrompt(field, value); // async
+    if (dateWrappers.has(field)) return setDate(field, value); // async
+    if (field.matches(PROMPT_INPUT)) {
+      return /\bskills?\b/i.test(labelFor(field)) ? setMultiPrompt(field, value) : setPrompt(field, value); // async
+    }
     if (field.tagName === "INPUT" && !isCombobox(field) && looksLikeAutocomplete(field)) {
       return setAutocomplete(field, value); // async
     }
@@ -1211,6 +1248,39 @@
     return done(false);
   }
 
+  /** "Languages: Python, Java\nFrameworks: React" -> ["Python", "Java", "React"]. */
+  function listItems(text, max = 10) {
+    const items = [];
+    for (const line of String(text).split(/\n+/)) {
+      for (const piece of line.replace(/^[^:,]{1,30}:\s*/, "").split(/\s*[,;•|]\s*/)) {
+        const item = piece.replace(/\s*\([^)]*\)/g, "").trim();
+        if (item && item.length <= 40 && !items.some((i) => i.toLowerCase() === item.toLowerCase())) items.push(item);
+      }
+    }
+    return items.slice(0, max);
+  }
+
+  /**
+   * Workday's Skills box is a search prompt that holds many picks: add each
+   * skill on its own -- search, then take the result that is that skill.
+   * A skill with no plain match is skipped rather than guessed.
+   */
+  async function setMultiPrompt(input, value) {
+    let added = 0;
+    for (const item of listItems(value)) {
+      searchPrompt(input, item);
+      if (!(await waitForOptions(input, 1500)).length) { closeMenu(input); continue; }
+      const texts = await readMenu(input, item);
+      const index = localMatch(texts, item);
+      const node = index >= 0 && (await findOption(input, texts[index], texts.at?.get(texts[index])));
+      if (node) { await pickOption(node); added++; }
+      closeMenu(input);
+      nativeSet(input, "");
+      await sleep(80);
+    }
+    return added > 0;
+  }
+
   const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
   /**
@@ -1262,7 +1332,7 @@
   async function setDate(wrapper, value) {
     const parts = dateParts(value);
     if (!parts) return false;
-    const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"]`);
+    const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"], input[aria-label="${name}"]`);
     const month = box("Month");
     const day = box("Day");
     const year = box("Year");
@@ -1277,7 +1347,7 @@
     const { element } = entry;
     if (entry.buttons) return toggleAnswered(entry);
     if (element.matches(LISTBOX_BUTTON)) return !EMPTY_BUTTON.test(element.textContent.trim());
-    if (element.matches(DATE_WRAPPER)) return [...element.querySelectorAll(DATE_PART)].some((p) => p.value);
+    if (dateWrappers.has(element)) return [...element.querySelectorAll(DATE_PART)].some((p) => p.value);
     if (element.matches(PROMPT_INPUT)) return Boolean(promptChosen(element));
     if (isCombobox(element)) return Boolean(currentValue(element));
     return Boolean(element.value && element.value.trim());
@@ -1311,7 +1381,10 @@
       // Resume field -- which hands the file to the site's own parser, which
       // re-renders the form and wipes everything already filled.
       [explicit, input.id || "", input.name || "",
-       input.getAttribute("aria-label") || ""].join(" "),
+       input.getAttribute("aria-label") || "",
+       // Workday: <div data-automation-id="resumeUpload"> around a bare input
+       input.closest('[data-automation-id*="resume" i], [aria-labelledby*="resume" i]')
+         ?.getAttribute("data-automation-id") || ""].join(" "),
       [labelFor(input),
        (input.closest(FIELD_ENTRY) || input.closest("[class*='field'], fieldset"))
          ?.textContent?.slice(0, 140) || ""].join(" "),
@@ -1391,14 +1464,83 @@
    * the parser a moment, then re-find the fields by label and fill those.
    */
 
+  /* ------------------------------------------------------ repeated entries */
+
+  // Workday's My Experience step starts with empty sections: each job,
+  // school or website exists only once you click its section's Add button.
+  // Nothing to fill until then, so the whole step used to be skipped.
+  const LINK_KEYS = ["linkedin", "github", "portfolio", "other_link"];
+  const ENTRY_SECTIONS = [
+    { test: /experience|employment|work.?history|where.*worked/i, count: (p) => (p.experience || []).length },
+    { test: /education|school/i, count: (p) => (p.education || []).length },
+    { test: /website/i, count: (p) => LINK_KEYS.filter((k) => String(p[k] || "").trim()).length },
+  ];
+  const MAX_ENTRIES = 4;
+
+  /** Sections with an Add button, and how many panels each should hold. */
+  async function entryPlan() {
+    const sections = [...document.querySelectorAll('[role="group"][aria-labelledby$="-section"]')].filter(nodeVisible);
+    if (!sections.length) return [];
+    let profile = {};
+    try { ({ profile = {} } = await chrome.storage.local.get("profile")); } catch { return []; }
+    const plan = [];
+    for (const section of sections) {
+      const id = section.getAttribute("aria-labelledby");
+      const kind = ENTRY_SECTIONS.find((k) => k.test.test(`${id} ${document.getElementById(id)?.textContent || ""}`));
+      if (!kind) continue;
+      // Panels are "Work-Experience-1-panel", "Work-Experience-2-panel"...
+      const prefix = id.replace(/section$/, "");
+      const panels = () => document.querySelectorAll(
+        `[role="group"][aria-labelledby^="${CSS.escape(prefix)}"][aria-labelledby$="-panel"]`).length;
+      const want = Math.min(kind.count(profile), MAX_ENTRIES);
+      if (panels() < want) plan.push({ section, panels, want });
+    }
+    return plan;
+  }
+
+  /** How many entries a fill would add: counted on the button. */
+  async function entriesToAdd() {
+    return (await entryPlan()).reduce((sum, p) => sum + p.want - p.panels(), 0);
+  }
+
+  /** Click Add until each section holds one panel per profile entry. */
+  async function addEntries() {
+    let added = 0;
+    for (const { section, panels, want } of await entryPlan()) {
+      for (let guard = 0; panels() < want && guard < MAX_ENTRIES; guard++) {
+        const add = [...section.querySelectorAll("button")].find((b) =>
+          b.getAttribute("data-automation-id") === "add-button" ||
+          /^add\b/i.test(b.getAttribute("aria-label") || b.textContent.trim()));
+        if (!add) break;
+        const before = panels();
+        fire(add, "click");
+        for (let i = 0; i < 40 && panels() === before; i++) await sleep(50);
+        if (panels() === before) break;
+        added++;
+      }
+    }
+    return added;
+  }
+
   async function fillPage() {
     // The fill command reaches every frame; one with no form (a reCAPTCHA or
     // proxy iframe) has nothing to do and nothing to report.
-    if (!known.length && !document.querySelector(FILE_SELECTOR)) return;
+    if (!known.length && !document.querySelector(FILE_SELECTOR) &&
+        !document.querySelector('[role="group"][aria-labelledby$="-section"]')) return;
     if (filling) return;
     filling = true;
     try {
       const started = performance.now();
+      // New entries first: their fields need answers before anything fills.
+      if (await addEntries()) {
+        await sleep(300);
+        const fields = collectFields();
+        const answered = await answer(fields);
+        if (answered) {
+          known = answered;
+          lastSignature = fields.map((f) => f.label).join("|");
+        }
+      }
       const attached = await attachDocuments();
       await fillFields(started, attached);
       // Newly revealed questions first -- they are the user's to see now --
@@ -1491,7 +1633,8 @@
       count(ok);
       return ok;
     };
-    const isMenu = (entry) => entry.widget === "listbox" || entry.widget === "prompt";
+    const isSkills = (entry) => entry.widget === "prompt" && /\bskills?\b/i.test(entry.label);
+    const isMenu = (entry) => (entry.widget === "listbox" || entry.widget === "prompt") && !isSkills(entry);
     const isTyped = (entry) =>
       !entry.buttons && !isMenu(entry) && entry.widget !== "date" && entry.element.tagName !== "SELECT" &&
       (isCombobox(entry.element) || looksLikeAutocomplete(entry.element));
@@ -1502,6 +1645,14 @@
     for (const entry of todo) {
       if (entry.multi) {
         await timed(entry, "checkboxes", () => setChecks(entry, entry.result.value));
+        continue;
+      }
+      if (entry.single) {
+        await timed(entry, "checkbox", async () => {
+          const box = entry.buttons[0];
+          if (/^y/i.test(entry.result.value) && !box.checked) box.click();
+          return true; // "No" is an unticked box: nothing to do
+        });
         continue;
       }
       const texts = entry.buttons ? entry.options
@@ -1516,7 +1667,7 @@
     }
     // 2. Text and dates: no decision, no menu, no waiting.
     for (const entry of todo) {
-      if (entry.buttons || entry.element.tagName === "SELECT" || isMenu(entry) || isTyped(entry)) continue;
+      if (entry.buttons || entry.element.tagName === "SELECT" || isMenu(entry) || isTyped(entry) || isSkills(entry)) continue;
       if (entry.widget === "date") { await timed(entry, "date", () => setDate(entry.element, entry.result.value)); continue; }
       // Focus and blur around a plain field: Workday, among others, only
       // commits what was typed when the field loses focus.
@@ -1550,6 +1701,7 @@
     // 4. Autocompletes type and wait on suggestions; they go after the rest.
     for (const entry of todo) {
       if (isTyped(entry)) await timed(entry, "typed", () => setValue(entry.element, entry.result.value));
+      if (isSkills(entry)) await timed(entry, "skills", () => setMultiPrompt(entry.element, entry.result.value));
     }
     // 5. Click in Jev's decisions as they arrive.
     for (const [entry, decision] of pending) {
@@ -1678,13 +1830,15 @@
   async function showButton(count) {
     document.querySelector(".smartpaste-button")?.remove();
     const files = await countAttachable();
-    // Nothing answered and nothing to attach: no button at all.
-    if (!count && !files) return;
+    const entries = await entriesToAdd();
+    // Nothing answered, nothing to attach, nothing to add: no button at all.
+    if (!count && !files && !entries) return;
     const button = document.createElement("button");
     button.className = "smartpaste-button";
     button.textContent =
       `Autofill ${count} field${count === 1 ? "" : "s"}` +
-      (files ? ` + ${files} file${files === 1 ? "" : "s"}` : "");
+      (files ? ` + ${files} file${files === 1 ? "" : "s"}` : "") +
+      (entries ? ` + ${entries} entr${entries === 1 ? "y" : "ies"}` : "");
     button.addEventListener("click", (event) => {
       event.preventDefault();
       fillPage();

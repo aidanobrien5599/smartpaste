@@ -315,6 +315,31 @@ test("fill: a whole Workday page", { skip }, () =>
     assert.deepEqual(asked.sort(), ["Education 1: Degree", "Gender"]);
   }));
 
+test("fill: Workday My Experience -- entries added, then filled", { skip }, () =>
+  withPage("workday-experience.html", async (page) => {
+    // Its sections start empty: each job, school and website exists only
+    // after its Add button is clicked, so nothing here was ever filled.
+    const summary = await autofill(page, 60000);
+    assert.deepEqual(await page.eval("window.__added"), { "Work-Experience": 2, Education: 1, Websites: 2 });
+    const model = await page.eval("window.__model");
+    const want = {
+      "we1-title": "Software Engineer Intern", "we1-company": "Netflix", "we1-location": "Los Gatos, CA",
+      "we1-from-m": "05", "we1-from-y": "2026", "we1-to-m": "08", "we1-to-y": "2026",
+      "we1-desc": "Drove $15M+ in projected savings.",
+      "we2-title": "Founding Engineer", "we2-company": "Intelligible AI", "we2-from-m": "12", "we2-from-y": "2025",
+      "ed1-gpa": "3.9", "ed1-from-y": "2023", "ed1-to-y": "2027",
+      school1: "University of Wisconsin - Madison", degree: "Bachelor of Science",
+      web1: "https://www.linkedin.com/in/aidanobrien5599", web2: "https://github.com/aidanobrien5599",
+      resume: "resume.pdf",
+    };
+    for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model[key])}`);
+    // Skills one at a time; one with no plain match (Next.js) is skipped.
+    assert.deepEqual(model.skills, ["Python", "TypeScript", "Java", "React.js"]);
+    // "I currently work here" is No for both: left unticked.
+    assert.equal(await page.eval("document.querySelectorAll('[data-automation-id=currentlyWorkHere]:checked').length"), 0);
+    assert.match(summary, /^filled \d+ in/);
+  }));
+
 test("fill: Workday menus are read first and decided together, not one round trip each", { skip }, () =>
   withPage("workday.html", async (page) => {
     await page.waitFor(BUTTON);

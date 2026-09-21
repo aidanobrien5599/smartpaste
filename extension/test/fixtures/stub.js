@@ -10,6 +10,14 @@ window.__inFlight = 0;
 window.__maxInFlight = 0;
 window.__model = window.__model || {};
 const ANSWERS = [
+  // My Experience (workday-experience.html); specific ones first.
+  [/Work Experience 1: Location/, "Los Gatos, CA"], [/Work Experience 2: Location/, "Remote"],
+  [/Work Experience \d: I currently work here/, "No"],
+  [/Work Experience 1: To/, "August 2026"], [/Work Experience 2: From/, "Dec 2025"], [/Work Experience 2: To/, "May 2026"],
+  [/Work Experience 1: Role Description/, "Drove $15M+ in projected savings."], [/Work Experience 2: Role Description/, "Built data ingestion pipelines."],
+  [/Education 1: Overall Result/, "3.9"], [/Education 1: From/, "2023"],
+  [/Websites 1: URL/, "https://www.linkedin.com/in/aidanobrien5599"], [/Websites 2: URL/, "https://github.com/aidanobrien5599"],
+  [/Add Skills/, "Languages: Python, TypeScript, Java\nFrameworks: React, Next.js"],
   [/hear about/i, "LinkedIn"],
   [/first see this job/i, "Career Site"],
   [/^date$/i, "09/21/2026"], [/available start/i, "May 15, 2027"],
@@ -87,7 +95,13 @@ window.chrome = {
     },
   },
   storage: { local: { async get() {
-    return { documents: { resume: { name: "resume.pdf", type: "application/pdf", data: btoa("%PDF-1.4 resume") },
+    return {
+      profile: {
+        experience: [{ company: "Netflix", title: "Software Engineer Intern" }, { company: "Intelligible AI", title: "Founding Engineer" }],
+        education: [{ school: "University of Wisconsin - Madison" }],
+        linkedin: "https://www.linkedin.com/in/aidanobrien5599", github: "https://github.com/aidanobrien5599",
+      },
+      documents: { resume: { name: "resume.pdf", type: "application/pdf", data: btoa("%PDF-1.4 resume") },
                           transcript: { name: "transcript.pdf", type: "application/pdf", data: btoa("%PDF-1.4 transcript") } } };
   } } },
 };

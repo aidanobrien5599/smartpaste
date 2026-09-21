@@ -135,8 +135,9 @@ export const REPEATABLE = [
       ["major", "Major / discipline", "Computer Science"],
       ["minor", "Minor", ""],
       ["gpa", "GPA", "3.9/4.00"],
-      ["start_date", "Start date", "September 2023"],
-      ["end_date", "Graduation date", "May 2027"],
+      // Workday asks for these as a bare "From" and "To (Actual or Expected)".
+      ["start_date", "Start date (from)", "September 2023"],
+      ["end_date", "Graduation date (to, actual or expected)", "May 2027"],
       ["location", "Location", "Madison, WI"],
       ["coursework", "Relevant coursework", "Algorithms, Operating Systems, …"],
     ],

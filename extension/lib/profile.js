@@ -141,6 +141,20 @@ function derived(profile) {
   return out;
 }
 
+/**
+ * Workday's Websites section is a list of bare "URL" boxes, one per Add.
+ * Numbered in a fixed order, "Websites 2: URL" has one right answer.
+ */
+const WEBSITES = [["linkedin", "LinkedIn"], ["github", "GitHub"], ["portfolio", "portfolio"], ["other_link", "other site"]];
+
+function websiteOptions(profile) {
+  const options = {};
+  WEBSITES.filter(([key]) => String(profile[key] || "").trim()).forEach(([key, name], i) => {
+    options[`website${i + 1}`] = { field: `URL of website ${i + 1} (${name})`, value: String(profile[key]).trim() };
+  });
+  return options;
+}
+
 /** The full option set: labelled profile fields first, then free-form lines. */
 export function buildOptions(profile = {}, extraText = "") {
   const options = {};
@@ -151,6 +165,7 @@ export function buildOptions(profile = {}, extraText = "") {
     options[key] = { field: LABELS[key] || key, value: String(value).trim() };
   }
   Object.assign(options, repeatedOptions(profile));
+  Object.assign(options, websiteOptions(profile));
   Object.assign(options, placesOptions(profile.work_locations));
   Object.assign(options, answerOptions(profile.custom_answers));
   Object.assign(options, extraSnippets(extraText));
