@@ -24,7 +24,19 @@
     'button[aria-pressed], button[role="radio"], [role="radio"], [data-option]';
   const FIELD_ENTRY =
     '[class*="fieldEntry"], [class*="field-entry"], [class*="formField"], ' +
-    '.application-question, fieldset';
+    '[data-automation-id^="formField"], .application-question, fieldset';
+  // Workday builds its forms from widgets rather than form controls: a
+  // dropdown is a <button> that opens a listbox, a searchable picker is a text
+  // input that only takes a value by choosing from its results, and a date is
+  // split into month / day / year boxes.
+  const LISTBOX_BUTTON = 'button[aria-haspopup="listbox"]';
+  const PROMPT_INPUT =
+    'input[data-uxi-widget-type="selectinput"], ' +
+    '[data-automation-id="multiSelectContainer"] input[type="text"]';
+  const DATE_WRAPPER = '[data-automation-id="dateInputWrapper"]';
+  const DATE_PART = '[data-automation-id^="dateSection"]';
+  const EMPTY_BUTTON = /^(?:select one|select|choose one|choose|--)?$/i;
+  const OPTION = '[role="option"], [data-automation-id="promptOption"]';
   // Where a question keeps its text when the input has no label of its own.
   // Lever wraps inputs in a <label> that also holds status text ("No location
   // found. Try entering…"), and its custom questions have no label at all.
@@ -179,7 +191,11 @@
           ""
       );
       const options = radios.map((r) =>
-        clean(r.closest("label")?.textContent || r.value || "")
+        clean(
+          r.closest("label")?.textContent ||
+            (r.id && document.querySelector(`label[for="${CSS.escape(r.id)}"]`)?.textContent) ||
+            r.value || ""
+        )
       );
       if (label.length < 2 || options.some((o) => !o)) continue;
       const element = first.closest(QUESTION_BOX) || first.parentElement;
@@ -189,18 +205,70 @@
     return fields;
   }
 
+  /**
+   * Which entry of a repeated section a field sits in. Workday asks "Job
+   * Title" once per "Work Experience 1", "Work Experience 2"...; without the
+   * panel's heading every one of them reads as the same question.
+   */
+  function sectionPrefix(element) {
+    const group = element.closest('[role="group"][aria-labelledby]');
+    const heading = group && document.getElementById(group.getAttribute("aria-labelledby"));
+    const text = heading ? clean(heading.textContent) : "";
+    return /\d/.test(text) && text.length < 60 ? `${text}: ` : "";
+  }
+
+  /** A listbox button's question. Its aria-label also holds its current value. */
+  function listboxLabel(button) {
+    const byFor =
+      button.id && document.querySelector(`label[for="${CSS.escape(button.id)}"]`);
+    const entry = button.closest(FIELD_ENTRY);
+    const inEntry = entry && entry.querySelectorAll("label, legend").length === 1
+      ? entry.querySelector("label, legend") : null;
+    const text = clean((byFor || inEntry)?.textContent || "");
+    if (text) return text;
+    return clean(
+      (button.getAttribute("aria-label") || "")
+        .replace(button.textContent.trim(), "")
+        .replace(/\b(?:select one|required)\b/gi, "")
+    );
+  }
+
+  /** A date split into boxes is one question, labelled by its form field. */
+  function dateLabel(wrapper) {
+    const part = wrapper.querySelector(DATE_PART);
+    const byFor = part && part.id && document.querySelector(`label[for="${CSS.escape(part.id)}"]`);
+    const entry = wrapper.closest(FIELD_ENTRY);
+    return clean((byFor || entry?.querySelector("label, legend"))?.textContent || "");
+  }
+
+  function collectWidgets() {
+    const fields = [];
+    for (const button of document.querySelectorAll(LISTBOX_BUTTON)) {
+      if (!nodeVisible(button) || button.disabled || button.closest(".smartpaste-button")) continue;
+      fields.push({ element: button, label: listboxLabel(button), options: null, combobox: false, widget: "listbox" });
+    }
+    for (const wrapper of document.querySelectorAll(DATE_WRAPPER)) {
+      if (!nodeVisible(wrapper)) continue;
+      fields.push({ element: wrapper, label: dateLabel(wrapper), options: null, combobox: false, widget: "date" });
+    }
+    return fields;
+  }
+
   function collectFields() {
     return [...document.querySelectorAll(FIELD_SELECTOR)]
-      .filter(visible)
+      .filter((element) => visible(element) && !element.matches(DATE_PART))
       .map((element) => ({
         element,
         label: labelFor(element),
         options: selectOptions(element),
         combobox: isCombobox(element),
+        widget: element.matches(PROMPT_INPUT) ? "prompt" : null,
       }))
+      .concat(collectWidgets())
       .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label))
       .concat(collectToggleGroups())
-      .concat(collectRadioGroups());
+      .concat(collectRadioGroups())
+      .map((f) => ({ ...f, label: sectionPrefix(f.element) + f.label }));
   }
 
   /* ----------------------------------------------------------------- fetch */
@@ -344,7 +412,7 @@
   const SUGGESTION_BOX =
     '[role="listbox"], [class*="dropdown-results"], [class*="suggest"], ' +
     '[class*="autocomplete"], [class*="typeahead"], [class*="pac-container"]';
-  const NOT_A_SUGGESTION = /^(?:no .* found|loading|searching)/i;
+  const NOT_A_SUGGESTION = /^(?:no .* found|no items|loading|searching)/i;
 
   function looksLikeAutocomplete(field) {
     if (field.getAttribute("aria-autocomplete")) return true;
@@ -421,6 +489,9 @@
   }
 
   function setValue(field, value) {
+    if (field.matches(LISTBOX_BUTTON)) return setListbox(field, value); // async
+    if (field.matches(DATE_WRAPPER)) return setDate(field, value); // async
+    if (field.matches(PROMPT_INPUT)) return setPrompt(field, value); // async
     if (field.tagName === "INPUT" && !isCombobox(field) && looksLikeAutocomplete(field)) {
       return setAutocomplete(field, value); // async
     }
@@ -587,6 +658,216 @@
     return Boolean(currentValue(field));
   }
 
+  /* ------------------------------------------------------- workday widgets */
+
+  const optionText = (node) =>
+    (node.getAttribute("data-automation-label") || node.textContent).trim();
+
+  function press(field, key, keyCode) {
+    for (const type of ["keydown", "keypress", "keyup"]) {
+      const event = new KeyboardEvent(type, { key, bubbles: true, cancelable: true });
+      Object.defineProperty(event, "keyCode", { get: () => keyCode });
+      Object.defineProperty(event, "which", { get: () => keyCode });
+      field.dispatchEvent(event);
+    }
+  }
+
+  /**
+   * Options showing in whatever menu just opened for `anchor`. The menu is
+   * portalled to the end of <body>, so it is found by position, not nesting:
+   * the visible options nearest the thing that opened it.
+   */
+  function optionsNear(anchor) {
+    const box = anchor.getBoundingClientRect();
+    return [...document.querySelectorAll(OPTION)].filter((node) => {
+      if (node.parentElement?.closest(OPTION) || node.querySelector(OPTION)) return false;
+      const rect = node.getBoundingClientRect();
+      if (!rect.height) return false;
+      return rect.bottom > box.top - 500 && rect.top < box.bottom + 700 &&
+        !NOT_A_SUGGESTION.test(optionText(node));
+    });
+  }
+
+  async function waitForOptions(anchor, timeout = 2500) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const nodes = optionsNear(anchor);
+      if (nodes.length) return nodes;
+      await sleep(120);
+    }
+    return [];
+  }
+
+  function scroller(node) {
+    for (let el = node.parentElement; el && el !== document.body; el = el.parentElement) {
+      if (el.scrollHeight > el.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(el).overflowY)) return el;
+    }
+    return null;
+  }
+
+  /**
+   * Every option in a menu, including the ones not rendered yet. Workday only
+   * draws the rows in view, so a 250-country list shows a dozen until you
+   * scroll -- reading it means scrolling it. Stops early on `stopAt`.
+   */
+  async function readMenu(anchor, stopAt) {
+    let nodes = optionsNear(anchor);
+    const texts = [];
+    const add = (list) => list.forEach((n) => { const t = optionText(n); if (!texts.includes(t)) texts.push(t); });
+    add(nodes);
+    const pane = nodes.length && scroller(nodes[0]);
+    if (!pane) return texts;
+    pane.scrollTop = 0;
+    for (let step = 0; step < 80; step++) {
+      if (stopAt && texts.some((t) => normalize(t) === normalize(stopAt))) break;
+      if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2) break;
+      pane.scrollTop += Math.max(40, pane.clientHeight * 0.8);
+      pane.dispatchEvent(new Event("scroll"));
+      await sleep(50);
+      add(optionsNear(anchor));
+    }
+    return texts;
+  }
+
+  /** The node for option `text`, scrolling it into existence if need be. */
+  async function findOption(anchor, text) {
+    const here = () => optionsNear(anchor).find((n) => optionText(n) === text);
+    if (here()) return here();
+    const first = optionsNear(anchor)[0];
+    const pane = first && scroller(first);
+    if (!pane) return null;
+    pane.scrollTop = 0;
+    for (let step = 0; step < 80; step++) {
+      pane.dispatchEvent(new Event("scroll"));
+      await sleep(50);
+      if (here()) return here();
+      if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2) break;
+      pane.scrollTop += Math.max(40, pane.clientHeight * 0.8);
+    }
+    return null;
+  }
+
+  /**
+   * Which of `texts` is `want`: exact first, then Jev. A long list is cut to
+   * the options sharing a word with the answer, since "United States" has to
+   * find "United States of America" in 250 countries and a Choice takes 255.
+   */
+  async function chooseAmong(label, want, texts) {
+    const exact = texts.findIndex((t) => normalize(t) === normalize(want));
+    if (exact >= 0) return exact;
+    let pool = texts.map((t, i) => i);
+    if (pool.length > MAX_MENU) {
+      const words = (want.toLowerCase().match(/[a-z0-9]{3,}/g) || []);
+      const shared = pool.filter((i) => words.some((w) => texts[i].toLowerCase().includes(w)));
+      pool = (shared.length ? shared : pool).slice(0, MAX_MENU);
+    }
+    const reply = await chrome.runtime.sendMessage({
+      type: "choose-option", label, want, options: pool.map((i) => texts[i]),
+    });
+    return reply && reply.ok && reply.index >= 0 ? pool[reply.index] : -1;
+  }
+
+  function click(node) {
+    fire(node, "mousedown");
+    fire(node, "mouseup");
+    fire(node, "click");
+  }
+
+  function closeMenu(field) {
+    press(document.activeElement || field, "Escape", 27);
+    field.blur();
+  }
+
+  /** A Workday dropdown: a button that opens a listbox. */
+  async function setListbox(button, want) {
+    if (normalize(button.textContent) === normalize(want)) return true;
+    button.focus();
+    click(button);
+    if (!(await waitForOptions(button)).length) { closeMenu(button); return false; }
+    const texts = await readMenu(button, want);
+    const index = await chooseAmong(listboxLabel(button), want, texts);
+    const node = index >= 0 && (await findOption(button, texts[index]));
+    if (!node) { closeMenu(button); return false; }
+    node.scrollIntoView({ block: "nearest" });
+    click(node);
+    await sleep(250);
+    return !EMPTY_BUTTON.test(button.textContent.trim());
+  }
+
+  function promptChosen(input) {
+    const box = input.closest('[data-automation-id="multiSelectContainer"]') || input.parentElement;
+    return box.querySelector('[data-automation-id="selectedItem"], [data-automation-id="selectedItemList"] > *');
+  }
+
+  /**
+   * A Workday search prompt ("How did you hear about us?", School). Typed
+   * text is not an answer; it only searches, on Enter. Pick from the results,
+   * and when nothing matches, open the prompt empty and walk its categories
+   * ("Job Board" > "LinkedIn Jobs") instead.
+   */
+  async function setPrompt(input, want) {
+    if (promptChosen(input)) return true;
+    const label = labelFor(input);
+    for (const probe of [want, narrowingToken(want), ""]) {
+      await typeLikeAPerson(input, probe);
+      if (probe) press(input, "Enter", 13);
+      else click(input);
+      for (let depth = 0; depth < 3; depth++) {
+        if (!(await waitForOptions(input, 2500)).length) break;
+        const texts = await readMenu(input, want);
+        const index = await chooseAmong(label, want, texts);
+        const node = index >= 0 && (await findOption(input, texts[index]));
+        if (!node) break;
+        click(node);
+        await sleep(400);
+        if (promptChosen(input)) { input.blur(); return true; }
+        // A category opened its children in place; choose again among those.
+      }
+      closeMenu(input);
+      await sleep(150);
+    }
+    nativeSet(input, "");
+    return false;
+  }
+
+  const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+  /** "May 2027", "05/2027", "2027-05", "2027" -> {month, year}. */
+  function dateParts(value) {
+    const text = String(value || "");
+    const year = text.match(/\b(19|20)\d{2}\b/);
+    if (!year) return null;
+    const named = text.match(/\b([A-Za-z]{3})[a-z]*\.?\b/g)?.map((w) => MONTH_NAMES.indexOf(w.slice(0, 3).toLowerCase())).find((i) => i >= 0);
+    const numeric = text.match(/\b(\d{1,2})[/.-](?:19|20)\d{2}\b/) || text.match(/\b(?:19|20)\d{2}[/.-](\d{1,2})\b/);
+    const month = named !== undefined && named >= 0 ? named + 1 : numeric ? Number(numeric[1]) : null;
+    return { year: year[0], month: month && month <= 12 ? month : null };
+  }
+
+  /** A Workday date: separate month / day / year boxes. */
+  async function setDate(wrapper, value) {
+    const parts = dateParts(value);
+    if (!parts) return false;
+    const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"]`);
+    const month = box("Month");
+    const day = box("Day");
+    const year = box("Year");
+    if (month && !parts.month) return false; // "Present", or a year alone
+    if (month) { await typeLikeAPerson(month, String(parts.month).padStart(2, "0")); month.blur(); }
+    if (day) { await typeLikeAPerson(day, "01"); day.blur(); }
+    if (year) { await typeLikeAPerson(year, parts.year); year.blur(); }
+    return Boolean(year ? year.value : month?.value);
+  }
+
+  function isFilled(entry) {
+    const { element } = entry;
+    if (entry.buttons) return toggleAnswered(entry);
+    if (element.matches(LISTBOX_BUTTON)) return !EMPTY_BUTTON.test(element.textContent.trim());
+    if (element.matches(DATE_WRAPPER)) return [...element.querySelectorAll(DATE_PART)].some((p) => p.value);
+    if (element.matches(PROMPT_INPUT)) return Boolean(promptChosen(element));
+    if (isCombobox(element)) return Boolean(currentValue(element));
+    return Boolean(element.value && element.value.trim());
+  }
+
   /* ----------------------------------------------------------- attachments */
 
   const DOC_KEYWORDS = [
@@ -707,19 +988,19 @@
     let skipped = 0;
     for (const entry of known) {
       const { element, result } = entry;
-      if (result.status !== "auto") { skipped++; continue; }
+      if (result.status !== "auto" || isFilled(entry)) { skipped++; continue; }
       if (entry.buttons) {
-        if (toggleAnswered(entry)) { skipped++; continue; }
         if (await setToggle(entry, result.value)) filled++;
         else skipped++;
         continue;
       }
-      const alreadySet = isCombobox(element)
-        ? Boolean(currentValue(element))
-        : Boolean(element.value && element.value.trim());
-      if (alreadySet) { skipped++; continue; }
+      // Focus and blur around a plain field: Workday, among others, only
+      // commits what was typed when the field loses focus.
+      const plain = element.matches("input, textarea") && !entry.widget && !isCombobox(element);
+      if (plain) element.focus();
       if (await setValue(element, result.value)) filled++;
       else skipped++;
+      if (plain) element.blur();
     }
     const parts = [`filled ${filled}`];
     if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
