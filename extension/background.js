@@ -8,6 +8,10 @@
 
 import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.js";
 import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.js";
+import {
+  assemble, cleanGpa, DEGREES, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
+  parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
+} from "./lib/draft.js";
 import { resolve } from "./lib/resolve.js";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -286,9 +290,228 @@ async function profileFromResume(text) {
   return { fields, sections, lines: Object.keys(snippets).length };
 }
 
+/* ------------------------------------------------------------------------
+ * Drafting by classification ("segments" engine). See lib/draft.js for why.
+ * ---------------------------------------------------------------------- */
+
+const choice = (instructions, criteria) => ({ type: "choice", instructions, criteria });
+const label = (answer, floor = 0) =>
+  answer && Math.min(answer.confidence ?? 0, answer.probabilities?.[answer.choice] ?? 0) >= floor
+    ? answer.choice
+    : null;
+
+/**
+ * Contact details. An email address, a phone number and a URL have fixed
+ * shapes, so code reads them -- asking Jev which line held the email let a
+ * flat distribution return nothing, and once returned a LinkedIn URL as a
+ * surname. Jev is asked the one thing that has no fixed shape: which line is
+ * the person's name. First and last names are then cut from it in code.
+ */
+const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
+const PHONE_RE = /(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}/;
+
+async function contactFields(apiKey, lines) {
+  if (globalThis.SP_DEBUG) console.log('CONTACT LINES', lines.slice(0, 4));
+  const fields = {};
+  for (const line of lines) {
+    const email = !fields.email && line.match(EMAIL_RE);
+    if (email) fields.email = email[0].replace(/[.,;]+$/, "");
+    for (const m of line.matchAll(new RegExp(PHONE_RE, "g"))) {
+      if (fields.phone) break;
+      const digits = m[0].replace(/\D/g, "");
+      if (digits.length >= 10 && digits.length <= 15 && !/^(?:19|20)\d{2}/.test(m[0].trim())) fields.phone = m[0].trim();
+    }
+  }
+  const candidates = lines.slice(0, 8).filter((l) => l.length <= 60 && !EMAIL_RE.test(l) && !/https?:|www\.|\d{3}/.test(l));
+  if (candidates.length) {
+    const criteria = { ...Object.fromEntries(candidates.map((l, i) => [`n${i}`, l])), [NONE]: "None of these is a name" };
+    const { name } = await callJev(apiKey, "Lines from the top of one resume.", {
+      name: choice({ ask: "Which line is the person's own full name?" }, criteria),
+    });
+    const pick = label(name, 0.4);
+    if (pick && pick !== NONE) {
+      const raw = candidates[Number(pick.slice(1))].replace(/\s*[|,].*$/, "").trim();
+      const parts = raw.split(/\s+/).filter((w) => !/^(?:Dr|Mr|Ms|Mrs|Prof)\.?$/i.test(w));
+      const cased = raw === raw.toUpperCase()
+        ? parts.map((w) => w.toLowerCase().replace(/(^|[^a-z])([a-z])/g, (_, a, c) => a + c.toUpperCase()))
+        : parts;
+      if (cased.length >= 2) {
+        fields.full_name = cased.join(" ");
+        fields.first_name = cased[0];
+        fields.last_name = cased[cased.length - 1].replace(/,$/, "");
+      }
+    }
+  }
+  return { ...fields, ...linksByDomain(lines) };
+}
+
+/**
+ * A URL's domain already says what it is. Asked which of two near-identical
+ * URL lines is the LinkedIn one, Jev's confidence swung between 0.29 and 0.77
+ * on wording alone; the domain answers it with certainty. So links are read by
+ * code, from every URL-shaped token -- including ones that exist only as text,
+ * as in a Word export without hyperlinks -- and Jev is not asked.
+ */
+const URL_TOKEN =
+  /(?<![@\w.])(?:https?:\/\/)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/[^\s|,;)]*)?/gi;
+
+export function linksByDomain(lines) {
+  const found = [];
+  for (const line of lines) {
+    for (const match of line.matchAll(URL_TOKEN)) {
+      // The part of an email before the "@" ("maya.chen") looks like a domain.
+      if (line[match.index + match[0].length] === "@") continue;
+      const url = match[0].replace(/[.)]+$/, "");
+      if (!/[/.]/.test(url) || /^\d/.test(url)) continue;
+      found.push(url);
+    }
+  }
+  const bare = (u) => u.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/+$/, "").toLowerCase();
+  // Prefer the full https:// form recovered from annotations over a bare
+  // "linkedin.com/in/x" in the text.
+  const best = (test) => {
+    const hits = found.filter((u) => test(bare(u)));
+    return hits.find((u) => /^https?:/i.test(u)) || hits[0];
+  };
+  const links = {};
+  const linkedin = best((u) => /(^|\.)linkedin\.com\/in\//.test(u));
+  const github = best((u) => /(^|\.)github\.com\/[^/]+/.test(u));
+  if (linkedin) links.linkedin = linkedin;
+  if (github) links.github = github;
+  const taken = new Set([linkedin, github].filter(Boolean).map(bare));
+  const personal = found.filter((u) => {
+    const b = bare(u);
+    // A personal site: not a profile we already have, not a bare mail host.
+    return !taken.has(b) && !/linkedin\.com|github\.com/.test(b) && (b.includes("/") || b.split(".").length >= 2) &&
+      !/^(gmail|yahoo|outlook|hotmail|icloud|example)\.(com|co\.uk)$/.test(b);
+  });
+  if (personal[0]) links.portfolio = personal[0];
+  if (personal[1] && bare(personal[1]) !== bare(personal[0])) links.other_link = personal[1];
+  return links;
+}
+
+const LABELS_BY_KEY = Object.fromEntries(FIELDS.map((f) => [f.key, f.label]));
+const context = (lines, i) => ({ previous_line: lines[i - 1] || "", next_line: lines[i + 1] || "" });
+
+async function profileBySegments(text) {
+  const { apiKey } = await loadOptions();
+  if (!apiKey) throw new Error("No API key — open smartpaste settings.");
+  const lines = unwrap(text).split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 4) throw new Error("Could not read enough text out of that PDF.");
+
+  // 1. Which short lines are section headings, and of what?
+  const candidates = headingCandidates(lines);
+  const headingQuestions = Object.fromEntries(candidates.map(({ text, index }) => [
+    `h${index}`,
+    choice({ line: text, ...context(lines, index),
+      ask: "Is this line a section heading of a resume? If so, which section does it open?" },
+    SECTION_KINDS),
+  ]));
+  const headingAnswers = await askBatched(apiKey, "Lines of one resume, in order.", headingQuestions);
+  const headings = new Map();
+  for (const { index } of candidates) {
+    const kind = label(headingAnswers[`h${index}`], 0.5);
+    if (kind && kind !== NONE) headings.set(index, kind);
+  }
+  const rows = sectionise(lines, headings);
+
+  // 2. Contact details from the header, plus any recovered link lines.
+  const header = rows.filter((r) => r.section === "header").map((r) => r.text);
+  const contactLines = [...(header.length >= 3 ? header : lines.slice(0, 12)),
+    ...lines.filter((l) => /^https?:\/\//.test(l))];
+  const fieldsPromise = contactFields(apiKey, contactLines);
+
+  // 3. Cut education and experience lines into single-field pieces; ask what each is.
+  const pieces = { education: [], experience: [] };
+  for (const row of rows) {
+    if (row.heading || !(row.section in pieces)) continue;
+    if (isBullet(row.text)) {
+      const text = splitPieces(row.text)[0];
+      // "• Cumulative GPA 3.6/4.0" is the GPA, bullet or not.
+      if (row.section === "education" && /\bC?GPA\b/i.test(text)) {
+        pieces.education.push({ text, label: "gpa", fixed: true });
+        continue;
+      }
+      pieces[row.section].push({ text, bullet: true });
+      continue;
+    }
+    for (const piece of splitPieces(row.text)) {
+      pieces[row.section].push({ text: piece, line: row.text, index: row.index });
+    }
+  }
+  const pieceQuestions = {};
+  for (const [section, list] of Object.entries(pieces)) {
+    const kinds = section === "education" ? EDUCATION_KINDS : EXPERIENCE_KINDS;
+    list.forEach((p, i) => {
+      if (p.bullet || p.fixed) return;
+      pieceQuestions[`${section}_${i}`] = choice(
+        { section, piece: p.text, whole_line: p.line, ...context(lines, p.index),
+          ask: "Within this section of a resume, what is this piece of text?" },
+        kinds);
+    });
+  }
+  const pieceAnswers = await askBatched(apiKey, "Pieces of one resume.", pieceQuestions);
+  for (const [section, list] of Object.entries(pieces)) {
+    list.forEach((p, i) => {
+      if (!p.bullet && !p.fixed) p.label = label(pieceAnswers[`${section}_${i}`]) || "other";
+    });
+  }
+
+  // 4. Assemble entries from the labels.
+  const experience = assemble(pieces.experience, "experience").map((e) => {
+    const { start, end } = e.dates ? parseDates(e.dates) : { start: "", end: "" };
+    return prune({ company: e.company, title: e.title, location: e.location,
+      start_date: start, end_date: end, description: e.description.join(" ") });
+  });
+  const education = assemble(pieces.education, "education").map((e) => {
+    let degree = e.degree || "";
+    let major = e.major || "";
+    if (e.degree_field) {
+      const split = splitDegreeField(e.degree_field);
+      degree = degree || split.degree;
+      major = major || split.field;
+    }
+    const { start, end } = e.dates ? parseDates(e.dates) : { start: "", end: "" };
+    return prune({ school: e.school, degree, major, gpa: e.gpa ? cleanGpa(e.gpa) : "",
+      start_date: start, end_date: end, location: e.location });
+  });
+
+  // 5. Degree names from a fixed list: "B.S." -> "Bachelor of Science".
+  const degreeQuestions = {};
+  education.forEach((e, i) => {
+    if (e.degree) {
+      degreeQuestions[`d${i}`] = choice(
+        { degree_as_written: e.degree, field_of_study: e.major || "",
+          ask: "Which degree is this? Choose the escape option if none of these is it." },
+        { ...Object.fromEntries(DEGREES.map((d, j) => [`g${j}`, d])), [NONE]: "None of these" });
+    }
+  });
+  const degreeAnswers = await askBatched(apiKey, "Degrees from one resume.", degreeQuestions);
+  education.forEach((e, i) => {
+    const pick = label(degreeAnswers[`d${i}`], 0.6);
+    if (pick && pick !== NONE) e.degree = DEGREES[Number(pick.slice(1))];
+  });
+
+  return {
+    fields: await fieldsPromise,
+    sections: { education, experience },
+    lines: lines.length,
+    // What Jev decided, line by line -- for the corpus scorer, not the UI.
+    debug: {
+      headings: [...headings].map(([i, kind]) => `${kind}: ${lines[i]}`),
+      pieces: Object.fromEntries(Object.entries(pieces).map(([k, list]) =>
+        [k, list.map((p) => `${p.bullet ? "bullet" : p.label}: ${p.text.slice(0, 50)}`)])),
+    },
+  };
+}
+
+function prune(entry) {
+  return Object.fromEntries(Object.entries(entry).filter(([, v]) => v && String(v).trim()));
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "profile-from-resume") {
-    profileFromResume(message.text)
+    (message.engine === "lines" ? profileFromResume : profileBySegments)(message.text)
       .then((draft) => sendResponse({ ok: true, ...draft }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;

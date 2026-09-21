@@ -37,8 +37,7 @@ export function unwrap(text) {
         joined < 3 &&
         i + 1 < lines.length &&
         !ENDS_SENTENCE.test(block) &&
-        !BULLET_START.test(lines[i + 1]) &&
-        !HEADING.test(lines[i + 1])
+        continues(block, lines[i + 1])
       ) {
         block += " " + lines[++i];
         joined++;
@@ -47,6 +46,23 @@ export function unwrap(text) {
     out.push(block);
   }
   return out.join("\n");
+}
+
+// A title, company, date or place is never the rest of a bullet, even when
+// the bullet has no full stop -- which most do not. Joining on "no full stop"
+// alone swallowed the next job's title, dates and company into a bullet.
+const DATEISH = /(?:19|20)\d{2}|\bPresent\b/;
+function titleLike(line) {
+  const words = line.split(/\s+/);
+  return words.length <= 6 && words.every((w) => /^[A-Z0-9&(]/.test(w) || /^(?:of|and|the|in|at|for|&|-|–|—)$/.test(w));
+}
+// The PDF extractor joins wrapped lines by position (lib/extract.js); text
+// alone is only trusted for a line that plainly starts mid-sentence. A "long
+// line running on" rule swallowed whole Word entry lines into the bullet
+// above them.
+function continues(block, next) {
+  if (BULLET_START.test(next) || HEADING.test(next)) return false;
+  return /^[a-z(,;%$]/.test(next);
 }
 
 /** Free-form lines (resume bullets, extra notes) as unlabeled options. */

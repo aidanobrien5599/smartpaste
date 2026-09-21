@@ -16,7 +16,8 @@ export const MENU = 0.4;
 
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 const URL = /(?:https?:\/\/|www\.)\S+|(?:[\w-]+\.)+(?:com|io|dev|org|net|ai)\/\S+/g;
-const PHONE = /\+?\d[\d\s().-]{5,}\d/g;
+// An opening bracket is part of "(404) 555-0182".
+const PHONE = /\+?\(?\d[\d\s().-]{5,}\d/g;
 const MIN_PHONE_DIGITS = 7;
 
 const MONTHS =

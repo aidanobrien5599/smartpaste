@@ -35,7 +35,10 @@ const pdfjs = await import(path.join(ROOT, "extension/vendor/pdf.mjs"));
 pdfjs.GlobalWorkerOptions.workerSrc = path.join(ROOT, "extension/vendor/pdf.worker.mjs");
 const { textFromPdfBytes } = await import(path.join(ROOT, "extension/lib/extract.js"));
 await import(path.join(ROOT, "extension/background.js"));
-const draft = (text) => new Promise((r) => listeners[0]({ type: "profile-from-resume", text }, {}, r));
+// ENGINE=lines (the original search drafter) or segments (classification).
+const ENGINE = process.env.ENGINE || "segments";
+const draft = (text) =>
+  new Promise((r) => listeners[0]({ type: "profile-from-resume", text, engine: ENGINE }, {}, r));
 
 // ------------------------------------------------------------ normalisation
 const MONTHS = { january: "jan", february: "feb", march: "mar", april: "apr", june: "jun", july: "jul",

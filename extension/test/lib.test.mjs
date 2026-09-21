@@ -116,3 +116,17 @@ test("resolve: a line that holds no such value is no answer", () => {
     { choice: "s1", probabilities: { s1: 0.95 }, confidence: 0.95 }, opts);
   assert.equal(r.status, "none");
 });
+
+test("unwrap: a bullet without a full stop does not swallow the next job", () => {
+  const out = unwrap([
+    "• Run weekly workshops for a 300-member student club and organise the annual hackathon",
+    "Software Engineering Intern", "May 2025 – Aug 2025", "Ford Motor Company",
+  ].join("\n")).split("\n");
+  assert.equal(out.length, 4);
+});
+
+test("unwrap: text alone joins only a line that starts mid-sentence", () => {
+  const out = unwrap(["\u2022 Designed a database served through a Hono/Bun +",
+    "and a Redis caching layer."].join("\n")).split("\n");
+  assert.equal(out.length, 1);
+});

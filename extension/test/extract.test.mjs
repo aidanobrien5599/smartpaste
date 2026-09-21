@@ -46,3 +46,61 @@ test("a dropped space is restored from the gap", () => {
   const lines = linesFromItems([item("Drove", 50, 600, 30), item("$15M", 83, 600, 25)]);
   assert.deepEqual(lines, ["Drove $15M"]);
 });
+
+test("LaTeX T1 control codes become the characters they encode", () => {
+  const lines = linesFromItems([
+    item("Aug 2022 \u0015 May 2026", 50, 600, 90),
+    item("\u0088", 50, 580, 5), item("Built a \u001daky-test bot o\u001fine", 60, 580, 150),
+  ]);
+  assert.deepEqual(lines, ["Aug 2022 – May 2026", "• Built a flaky-test bot offline"]);
+});
+
+test("a sidebar is read column by column, not woven together", () => {
+  const rows = [
+    ["+1 416 555 0199", 55, 700, "EXPERIENCE", 315], ["EDUCATION", 55, 680, "Wealthsimple", 315],
+    ["University of Toronto", 55, 665, "Jan 2025 – Apr 2025", 315], ["Sep 2021 – Apr 2026", 55, 650, "Rewrote the tax job in Rust", 315],
+    ["SKILLS", 55, 620, "Shopify", 315],
+    ["Ruby, Rust, React", 55, 605, "May 2024 \u2013 Dec 2024", 315],
+    ["GraphQL, MySQL", 55, 590, "Shipped bulk editing to merchants", 315],
+    ["Toronto, ON", 55, 575, "Fixed an N+1 query in the admin", 315],
+  ];
+  const items = rows.flatMap(([l, lx, y, r, rx]) => [item(l, lx, y, l.length * 5), item(r, rx, y, r.length * 5)]);
+  const lines = linesFromItems(items);
+  assert.deepEqual(lines.slice(0, 5), ["+1 416 555 0199", "EDUCATION", "University of Toronto", "Sep 2021 – Apr 2026", "SKILLS"]);
+  assert.equal(lines[5], "EXPERIENCE");
+});
+
+test("right-aligned dates are not mistaken for a column", () => {
+  const items = [0, 1, 2, 3, 4].flatMap((i) => {
+    const date = ["May 2026 – Aug 2026", "Dec 2025 – May 2026", "Jun 2025 – Aug 2025", "Sep 2023 – May 2027", "Jan 2024 – Jul 2024"][i];
+    const w = date.length * 5;
+    return [item(`Role ${i}`, 50, 700 - i * 20, 60), item(date, 560 - w, 700 - i * 20, w)];
+  });
+  const lines = linesFromItems(items);
+  assert.equal(lines[0], "Role 0");
+  assert.match(lines[1], /2026/); // the date stays beside its own role
+});
+
+test("a wrapped bullet joins by position; the next entry at the margin does not", () => {
+  const lines = linesFromItems([
+    item("\u2022 Related coursework: Software Project Management, Systems Analysis and Design,", 72, 600, 380),
+    item("Skills in Network Security, Advanced Operations Management", 84, 588, 300),
+    item("Bachelor of Science, Computer Information Systems (CIS), Towson University, Towson, MD", 54, 572, 420),
+  ]);
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /Design, Skills in Network Security/);
+  assert.match(lines[1], /^Bachelor of Science/);
+});
+
+test("a Kysely-style capitalised continuation under a bullet still joins", () => {
+  const lines = linesFromItems([
+    item("\u2022 Designed a PostgreSQL database through a Hono/Bun +", 50, 500, 400),
+    item("Kysely API, with typo-tolerant fuzzy search.", 60, 488, 300),
+  ]);
+  assert.equal(lines.length, 1);
+});
+
+test("an email under a phone number is its own line", () => {
+  const lines = linesFromItems([item("+1 416 555 0199", 40, 710, 80), item("d.okafor@example.com", 40, 697, 110)]);
+  assert.deepEqual(lines, ["+1 416 555 0199", "d.okafor@example.com"]);
+});

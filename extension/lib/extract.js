@@ -28,10 +28,23 @@ const MONTHS =
   "April|June|July|August|September|October|November|December";
 const GLUED_DATE = new RegExp(`(?<=[a-z])(?=(?:${MONTHS})\\b)`, "g");
 const GLUED_NAME = /(?<=[A-Z]{2})(?=[A-Z][’'][A-Z])/g;
-const PRIVATE_USE = /[-]+/g;
+const PRIVATE_USE = /[\ue000-\uf8ff]+/g;
+
+// LaTeX's T1 ("Cork") and TS1 encodings put dashes, quotes, ligatures and the
+// bullet in slots that are control characters in Unicode. A PDF made without
+// the vector cm-super fonts embeds bitmap fonts with no Unicode map, so pdf.js
+// hands back the raw slot: "Aug 2022 \u0015 May 2026", "\u001daky-test".
+// Control characters are never real text, so mapping them back is safe.
+const CORK = {
+  "\u000d": "‚", "\u0010": "“", "\u0011": "”", "\u0012": "„",
+  "\u0015": "–", "\u0016": "—", "\u001b": "ff", "\u001c": "fi", "\u001d": "fl",
+  "\u001e": "ffi", "\u001f": "ffl", "\u0088": "•",
+};
+const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g;
+const decodeCork = (text) => text.replace(CONTROL, (c) => CORK[c] ?? "");
 
 function repair(line) {
-  return line
+  return decodeCork(line)
     .normalize("NFKC")
     .replace(PRIVATE_USE, " ")
     .replace(/\(cid:\d+\)/g, "")
@@ -41,6 +54,84 @@ function repair(line) {
     .replace(/^\s*\|\s*/, "")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
+}
+
+const SECTION_WORD =
+  /^(?:education|experience|work experience|professional experience|employment|skills|technical skills|projects|summary|profile|contact|awards|certifications|leadership|activities|languages|interests)$/i;
+// Only a section word counts here: a name set in capitals ("FIRSTNAME
+// LASTNAME") is not a heading, and treating it as one let a centred header
+// pass for a sidebar.
+const headingish = (text) => SECTION_WORD.test(text.trim().replace(/:$/, ""));
+
+/**
+ * Segments in reading order: top to bottom, except that a real second column
+ * is read after the first instead of being woven into it line by line.
+ *
+ * A column is told apart from two things that look like one:
+ *  - right-aligned dates on the title line: they END at a common x, but start
+ *    wherever their width puts them -- so a gutter must be a common START x,
+ *    with ENDS that vary;
+ *  - a narrow date column in front of every entry (the content does start at
+ *    a common x) -- but only one side has section headings. A sidebar has
+ *    headings in both columns.
+ */
+export function readingOrder(segments) {
+  if (segments.length < 8) return segments;
+  // Where lines start. A second column is a large cluster of starts well to
+  // the right of the page margin. Columns rarely share baselines -- their line
+  // heights differ -- so this looks at every line, not at rows holding two.
+  const margin = Math.min(...segments.map((seg) => seg.x0));
+  // The gutter sits at the right column's leftmost start. Its biggest cluster
+  // is usually the indented bullets, and a gutter there files the column's own
+  // headings ("EXPERIENCE", 13pt further left) under the left column.
+  const beyond = segments.filter((seg) => seg.x0 >= margin + 60);
+  if (beyond.length < 8) return segments;
+  const gutter = Math.min(...beyond.map((seg) => seg.x0)) - 4;
+  // A column is left-aligned: most of its lines start at one x. Centred
+  // headers and right-aligned dates start all over the place.
+  const aligned = beyond.filter((seg) => seg.x0 - gutter <= 20).length;
+  if (aligned < 0.5 * beyond.length) return segments;
+  const ends = beyond.map((seg) => seg.x1);
+  if (Math.max(...ends) - Math.min(...ends) < 40) return segments; // right-aligned
+  const left = segments.filter((seg) => seg.x0 < gutter);
+  const right = segments.filter((seg) => seg.x0 >= gutter);
+  if (!left.some((seg) => headingish(seg.text)) || !right.some((seg) => headingish(seg.text))) {
+    return segments; // a date column, not a sidebar
+  }
+  return [...left, ...right];
+}
+
+const BULLET_MARK = /^\s*[\u2022\u00b7\u25aa\u25cf\u2023\u25e6\u2043*-]\s*/;
+
+/**
+ * Rejoin a line the page wrapped, using where it sits rather than what it says.
+ *
+ * A wrapped bullet continues on the very next line, indented under the
+ * bullet's text; the next entry starts back at the margin. Text alone cannot
+ * tell those apart -- most bullets have no full stop, and a Word entry line
+ * ("Teaching Assistant, Department of Computer and Information Science,
+ * Towson, MD") is as long as any sentence -- but position can.
+ */
+export function joinContinuations(segments) {
+  const out = [];
+  for (const seg of segments) {
+    const prev = out[out.length - 1];
+    const text = seg.text.trim();
+    const adjacent = prev && prev.y - seg.y > 0 && prev.y - seg.y <= 1.8 * Math.max(prev.h || 10, seg.h || 10);
+    const underBullet = prev && BULLET_MARK.test(decodeCork(prev.text)) && seg.x0 >= prev.x0 + 3;
+    // Lower case mid-sentence -- but an email, handle or URL also starts in
+    // lower case and is never the rest of a sentence.
+    const midSentence = /^[a-z(,;]/.test(text) && /\s/.test(text) && !/@|https?:|www\./.test(text) &&
+      prev && seg.x0 >= prev.x0 - 2;
+    if (adjacent && !BULLET_MARK.test(decodeCork(seg.text)) && (underBullet || midSentence)) {
+      prev.text = `${prev.text.trimEnd()} ${text}`;
+      prev.y = seg.y;
+      prev.x1 = Math.max(prev.x1, seg.x1);
+      continue;
+    }
+    out.push({ ...seg });
+  }
+  return out;
 }
 
 /**
@@ -62,19 +153,24 @@ export function linesFromItems(items, isIcon = () => false) {
     else rows.push({ y, items: [item] });
   }
 
-  const lines = [];
+  const segments = [];
   for (const row of rows) {
     const cells = row.items.sort((a, b) => a.transform[4] - b.transform[4]);
-    let segment = "";
+    let segment = null;
     let end = null; // right edge of the last visible fragment
     let height = 10;
+    const close = () => {
+      if (segment && segment.text.trim()) segments.push({ ...segment, y: row.y });
+      segment = null;
+      end = null;
+    };
     for (const item of cells) {
       const x = item.transform[4];
       // An icon is dropped from the text but still occupies its place on the
       // line. Removing it outright leaves a hole wide enough to read as a
       // column break, which split "908-216-0389" off its own contact row.
       if (isIcon(item)) {
-        if (segment && !segment.endsWith(" ")) segment += " ";
+        if (segment && !segment.text.endsWith(" ")) segment.text += " ";
         end = x + (item.width || 0);
         continue;
       }
@@ -82,30 +178,24 @@ export function linesFromItems(items, isIcon = () => false) {
       if (item.height) height = item.height;
       if (blank) {
         // A whitespace item as wide as a column gap is the gap itself.
-        if (item.width > COLUMN_GAP(height) && segment.trim()) {
-          lines.push(segment);
-          segment = "";
-          end = null;
-        } else if (segment && !segment.endsWith(" ")) {
-          segment += " ";
-        }
+        if (item.width > COLUMN_GAP(height) && segment && segment.text.trim()) close();
+        else if (segment && !segment.text.endsWith(" ")) segment.text += " ";
         continue;
       }
       if (end !== null) {
         const gap = x - end;
-        if (gap > COLUMN_GAP(height)) {
-          lines.push(segment);
-          segment = "";
-        } else if (gap > 0.15 * height && !segment.endsWith(" ")) {
-          // A visible gap with no space item: the PDF dropped the space.
-          segment += " ";
-        }
+        if (gap > COLUMN_GAP(height)) close();
+        else if (gap > 0.15 * height && segment && !segment.text.endsWith(" ")) segment.text += " ";
       }
-      segment += item.str;
+      if (!segment) segment = { text: "", x0: x, x1: x, h: height };
+      segment.h = Math.max(segment.h, item.height || 0);
+      segment.text += item.str;
       end = x + (item.width || 0);
+      segment.x1 = end;
     }
-    if (segment.trim()) lines.push(segment);
+    close();
   }
+  const lines = joinContinuations(readingOrder(segments)).map((seg) => seg.text);
   return lines.map(repair).filter(Boolean);
 }
 
