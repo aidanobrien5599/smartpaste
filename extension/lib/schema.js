@@ -12,6 +12,7 @@ export const GROUPS = [
   {
     title: "Identity",
     fields: [
+      ["full_name", "Full name", "Aidan O'Brien"],
       ["first_name", "First name", "Aidan"],
       ["last_name", "Last name", "O'Brien"],
       ["preferred_name", "Preferred name", "Aidan"],

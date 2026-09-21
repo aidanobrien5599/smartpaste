@@ -24,6 +24,23 @@ parsed resume 13–16 of 19 fields with several at 0.75–0.89; structured profi
 The resume box is still there as *Extra lines*, for essay answers that want a
 real bullet quoted back. It is optional.
 
+## Ashby
+
+A third shape again. No `<select>`, no combobox — yes/no questions are two
+`<button aria-pressed>` over a hidden checkbox, so neither the buttons (not
+form controls) nor the checkbox (invisible) were ever seen. A container holding
+one `<label>` and two-to-eight toggle buttons is now read as a choice field and
+answered by clicking.
+
+Ashby also puts an **unlabelled "Autofill from resume" dropzone** above the real
+Resume field. Handing it the PDF makes Ashby parse it and re-render the form,
+wiping everything already filled — so file matching ranks evidence: what the
+input says about itself (id, name, aria-label, `label[for]`) beats surrounding
+text, and anything that looks like an autofill dropzone is skipped outright.
+
+Live result: **8 of 8 fields**, resume on `_systemfield_resume`, all three
+toggles set, dropzone untouched.
+
 ## Repeated sections
 
 Education and Experience take as many entries as you like, newest first. Each

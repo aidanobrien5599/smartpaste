@@ -19,6 +19,11 @@
   const COMBO_SELECTOR = 'input[role="combobox"], input.select__input';
   const SELECT_SHELL = '[class*="select__control"], [class*="select-shell"]';
   const JUNK_LABELS = /^(?:select\.{0,3}|choose\.{0,3}|please select|search|--)$/i;
+  // Yes/No rendered as buttons over a hidden checkbox, as Ashby does it.
+  const TOGGLE_SELECTOR =
+    'button[aria-pressed], button[role="radio"], [role="radio"], [data-option]';
+  const FIELD_ENTRY =
+    '[class*="fieldEntry"], [class*="field-entry"], [class*="formField"], fieldset';
   const FIELD_SELECTOR =
     'input:not([type]), input[type="text"], input[type="email"], ' +
     'input[type="tel"], input[type="url"], input[type="search"], textarea, select';
@@ -94,6 +99,49 @@
       .slice(0, 60);
   }
 
+  function nodeVisible(node) {
+    const rect = node.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  /**
+   * Choice fields built from buttons rather than form controls.
+   *
+   * Ashby renders yes/no as two <button aria-pressed> over a hidden checkbox.
+   * The checkbox is invisible so it is skipped, and the buttons are not form
+   * controls, so without this the question is simply never seen.
+   */
+  function collectToggleGroups() {
+    const groups = new Map();
+    for (const button of document.querySelectorAll(TOGGLE_SELECTOR)) {
+      if (!nodeVisible(button)) continue;
+      const wrap = button.closest(FIELD_ENTRY);
+      if (!wrap) continue;
+      if (!groups.has(wrap)) groups.set(wrap, []);
+      groups.get(wrap).push(button);
+    }
+    const fields = [];
+    for (const [wrap, buttons] of groups) {
+      // One label and a handful of buttons means one question; more than that
+      // and we have walked up into a container holding several fields.
+      if (buttons.length < 2 || buttons.length > 8) continue;
+      if (wrap.querySelectorAll("label, legend").length !== 1) continue;
+      const label = clean(wrap.querySelector("label, legend").textContent);
+      const options = buttons.map((b) => b.textContent.trim()).filter(Boolean);
+      if (label.length < 2 || options.length !== buttons.length) continue;
+      fields.push({ element: wrap, label, options, buttons, combobox: false });
+    }
+    return fields;
+  }
+
+  function toggleAnswered(field) {
+    return field.buttons.some(
+      (b) =>
+        b.getAttribute("aria-pressed") === "true" ||
+        b.getAttribute("aria-checked") === "true"
+    );
+  }
+
   function collectFields() {
     return [...document.querySelectorAll(FIELD_SELECTOR)]
       .filter(visible)
@@ -103,7 +151,8 @@
         options: selectOptions(element),
         combobox: isCombobox(element),
       }))
-      .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label));
+      .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label))
+      .concat(collectToggleGroups());
   }
 
   /* ----------------------------------------------------------------- fetch */
@@ -133,7 +182,7 @@
         }
       });
       known = fields
-        .map((f, i) => ({ element: f.element, result: reply.results[i] }))
+        .map((f, i) => ({ ...f, result: reply.results[i] }))
         .filter((f) => f.result && f.result.status !== "none");
       showButton(known.length);
     } catch (error) {
@@ -150,6 +199,25 @@
    * the component's state stale and the field reverts on blur. Going through
    * the native setter and dispatching an input event is what React listens for.
    */
+  /** Click the button in a toggle group that expresses `want`. */
+  async function setToggle(entry, want) {
+    const texts = entry.options;
+    let index = texts.findIndex((t) => normalize(t) === normalize(want));
+    if (index < 0) {
+      const reply = await chrome.runtime.sendMessage({
+        type: "choose-option",
+        label: entry.label,
+        want,
+        options: texts,
+      });
+      if (reply && reply.ok && reply.index >= 0) index = reply.index;
+    }
+    if (index < 0 || !entry.buttons[index]) return false;
+    entry.buttons[index].click();
+    await sleep(150);
+    return toggleAnswered(entry);
+  }
+
   function setValue(field, value) {
     if (isCombobox(field)) return setCombobox(field, value); // async
     if (field.tagName === "SELECT") {
@@ -305,21 +373,52 @@
   ];
 
   /**
-   * Everything that might name a file input. Greenhouse labels its resume
-   * upload "Attach" and puts the only real clue in the element's id.
+   * What names a file input, strongest evidence first.
+   *
+   * The element's own label, id and name are reliable -- Greenhouse labels its
+   * resume upload "Attach" and hides the clue in the id. Surrounding text is a
+   * last resort and must stay that way: Ashby puts an unlabelled "Autofill
+   * from resume" dropzone above the real Resume field, and its container text
+   * says "resume" too. Ranking keeps the document on the right input.
    */
-  function fileHints(input) {
+  function fileHintTiers(input) {
+    const explicit = input.id
+      ? document.querySelector(`label[for="${CSS.escape(input.id)}"]`)?.textContent || ""
+      : "";
     return [
-      labelFor(input),
-      input.id || "",
-      input.name || "",
-      input.getAttribute("aria-label") || "",
-      input.closest("[class*='field'], fieldset, div")?.textContent?.slice(0, 120) || "",
-    ].join(" ");
+      // Only evidence the element states about itself. labelFor()'s sibling
+      // walk is deliberately excluded: an unlabelled dropzone sits next to the
+      // words "Autofill from resume", and letting that count outranks the real
+      // Resume field -- which hands the file to the site's own parser, which
+      // re-renders the form and wipes everything already filled.
+      [explicit, input.id || "", input.name || "",
+       input.getAttribute("aria-label") || ""].join(" "),
+      [labelFor(input),
+       (input.closest(FIELD_ENTRY) || input.closest("[class*='field'], fieldset"))
+         ?.textContent?.slice(0, 140) || ""].join(" "),
+    ];
   }
+
+  /** Assign each stored document to the one input that names it best. */
+  function planAttachments(inputs, documents) {
+    const plan = new Map();
+    for (const tier of [0, 1]) {
+      for (const input of inputs) {
+        if (plan.has(input)) continue;
+        const key = documentFor(fileHintTiers(input)[tier]);
+        if (!key || !documents[key]) continue;
+        if ([...plan.values()].includes(key)) continue; // already placed
+        plan.set(input, key);
+      }
+    }
+    return plan;
+  }
+
+  const AUTOFILL_DROPZONE = /autofill|auto-fill|parse (?:your )?resume/i;
 
   function documentFor(label) {
     const low = (label || "").toLowerCase();
+    if (AUTOFILL_DROPZONE.test(low)) return null;
     for (const [key, words] of DOC_KEYWORDS) {
       if (words.some((word) => low.includes(word))) return key;
     }
@@ -343,10 +442,10 @@
     );
     if (!inputs.length) return 0;
     const { documents = {} } = await chrome.storage.local.get("documents");
+    const plan = planAttachments(inputs, documents);
     let attached = 0;
-    for (const input of inputs) {
-      const key = documentFor(fileHints(input));
-      const stored = key && documents[key];
+    for (const [input, key] of plan) {
+      const stored = documents[key];
       if (!stored) continue;
       try {
         const file = new File([decode(stored.data)], stored.name, {
@@ -369,8 +468,15 @@
   async function fillPage() {
     let filled = 0;
     let skipped = 0;
-    for (const { element, result } of known) {
+    for (const entry of known) {
+      const { element, result } = entry;
       if (result.status !== "auto") { skipped++; continue; }
+      if (entry.buttons) {
+        if (toggleAnswered(entry)) { skipped++; continue; }
+        if (await setToggle(entry, result.value)) filled++;
+        else skipped++;
+        continue;
+      }
       const alreadySet = isCombobox(element)
         ? Boolean(currentValue(element))
         : Boolean(element.value && element.value.trim());
@@ -454,10 +560,7 @@
     );
     if (!inputs.length) return 0;
     const { documents = {} } = await chrome.storage.local.get("documents");
-    return inputs.filter((el) => {
-      const key = documentFor(fileHints(el));
-      return key && documents[key];
-    }).length;
+    return planAttachments(inputs, documents).size;
   }
 
   async function showButton(count) {
