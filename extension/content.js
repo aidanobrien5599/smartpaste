@@ -1337,9 +1337,20 @@
     const day = box("Day");
     const year = box("Year");
     if (month && !parts.month) return false; // "Present", or a year alone
-    if (month) { await typeLikeAPerson(month, String(parts.month).padStart(2, "0")); month.blur(); }
-    if (day) { await typeLikeAPerson(day, pad(parts.day || 1)); day.blur(); }
-    if (year) { await typeLikeAPerson(year, parts.year); year.blur(); }
+    // Each box gets its whole value at once, as a paste would, then change
+    // and blur -- what Simplify's Workday rules do too. Typing digit by digit
+    // lost dates: Workday's spinbuttons take digits on keydown themselves,
+    // so typed digits arrived twice ("05" as "0055", no month at all).
+    const put = (input, text) => {
+      if (!input) return;
+      input.focus();
+      nativeSet(input, text);
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.blur();
+    };
+    put(month, pad(parts.month || 1));
+    put(day, pad(parts.day || 1));
+    put(year, parts.year);
     return Boolean(year ? year.value : month?.value);
   }
 
