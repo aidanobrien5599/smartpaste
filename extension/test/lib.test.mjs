@@ -155,6 +155,14 @@ test("buildOptions defaults conflict-of-interest answers to No unless set", () =
   assert.equal(buildOptions({ non_compete: "Yes, a 6-month non-compete" }).non_compete.value, "Yes, a 6-month non-compete");
 });
 
+test("buildOptions: Say yes offers a Yes catch-all for willing / able questions, only when on", () => {
+  assert.equal(buildOptions({ first_name: "Aidan" }).willing_default, undefined);
+  const o = buildOptions({ first_name: "Aidan" }, "", { say_yes: true });
+  assert.match(o.willing_default.value, /^Yes\b/);
+  assert.match(o.willing_default.field, /willing/);
+  assert.equal(buildOptions({ willing_default: "No" }, "", { say_yes: true }).willing_default.value, "No");
+});
+
 test("yesNoFromEntry: a confident Yes/No profile entry selects the matching option", () => {
   const options = buildOptions({ first_name: "Aidan" });
   const sure = { choice: "history_default", confidence: 0.95, probabilities: { history_default: 0.95 } };

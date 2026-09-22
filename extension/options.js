@@ -428,6 +428,12 @@ $("save").addEventListener("click", save);
 
 // Saved on change, like documents: a behaviour, not part of the profile, so
 // it is never offered to Jev as an answer and "Clear all fields" keeps it.
+$("say-yes").addEventListener("change", async () => {
+  const { settings = {} } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({ settings: { ...settings, say_yes: $("say-yes").checked } });
+  say($("say-yes-status"), $("say-yes").checked ? "Willing and able: Yes." : "Willing and able: only what your profile says.");
+});
+
 $("acknowledge").addEventListener("change", async () => {
   const { settings = {} } = await chrome.storage.local.get("settings");
   await chrome.storage.local.set({ settings: { ...settings, acknowledge: $("acknowledge").checked } });
@@ -472,6 +478,7 @@ document.addEventListener("keydown", (event) => {
   const { apiKey = "", profile = {}, extraText = "", documents = {}, settings = {} } =
     await chrome.storage.local.get(["apiKey", "profile", "extraText", "documents", "settings"]);
   $("acknowledge").checked = Boolean(settings.acknowledge);
+  $("say-yes").checked = settings.say_yes === true;
   state = { profile, documents };
   $("key").value = apiKey;
   renderGroups(profile);

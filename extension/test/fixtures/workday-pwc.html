@@ -1,0 +1,134 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Technology Consulting - Intern - Summer 2027 | PwC | Workday</title>
+<style>body{font:14px system-ui;max-width:640px;margin:30px auto}
+[data-automation-id^="formField"]{margin:12px 0}
+label{display:block;font-size:12px;color:#444}
+input[type=text]{padding:6px;width:260px}
+.pop{position:absolute;background:#fff;border:1px solid #999;z-index:9;width:280px}
+.pop ul{list-style:none;margin:0;padding:0;max-height:200px;overflow-y:auto;position:relative}
+.pop li,.pop [data-automation-id=promptOption]{height:20px;padding:0 6px;cursor:pointer}
+.date input{width:40px}</style></head>
+<body>
+<!-- PwC's Application Questions step (Technology Consulting Intern, Summer
+     2027), as left on "Select One" after Autofill on 2026-09-21. Questions
+     verbatim; options are Workday's usual Yes / No, plus Not Applicable on
+     the internship one. -->
+<nav data-automation-id="progressBar"><span>My Information</span> · <span data-automation-id="progressBarActiveStep">current step 3 of 7 Application Questions</span></nav>
+<main data-automation-id="applyFlowPage">
+<h2>Application Questions</h2>
+<script>
+window.__model = {};
+const COUNTRIES = [];
+for (const a of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") for (let i=0;i<9;i++) COUNTRIES.push(a+"land "+i);
+COUNTRIES.push("United Kingdom","United States of America","Uruguay"); COUNTRIES.sort();
+const LISTS = { yn: ["Yes","No"], yna: ["Yes","No","Not Applicable"],
+  country: COUNTRIES,
+  phoneType: ["Home","Mobile","Work"],
+  degree: ["Associate's","Bachelor of Science","Bachelor of Arts","Master of Science","PhD"],
+  authorized: ["Yes","No"],
+  gender: ["Male","Female","I do not wish to answer"],
+};
+const PROMPTS = {
+  "Job Board": ["Indeed","LinkedIn Jobs","Glassdoor"],
+  "University": ["Career Fair","Handshake"],
+  "Referral": ["Employee Referral"],
+};
+const SCHOOLS = ["University of Wisconsin - Madison","University of Wisconsin - Milwaukee","Wisconsin Lutheran College"];
+// Like Workday: the open popup is marked data-automation-activepopup="true"
+// and its button aria-expanded="true". A closing popup stays on screen for
+// a moment as it animates out, still showing its options.
+function closePops(){
+  document.querySelectorAll("[aria-expanded=true]").forEach(b=>b.setAttribute("aria-expanded","false"));
+  document.querySelectorAll(".pop").forEach(p=>{ if(p.dataset.closing) return; p.dataset.closing="1"; p.dataset.automationActivepopup="false"; setTimeout(()=>p.remove(),250); });
+}
+function place(pop, el){const r=el.getBoundingClientRect();pop.style.left=(scrollX+r.left)+"px";pop.style.top=(scrollY+r.bottom+2)+"px";document.body.appendChild(pop)}
+// Listbox button, virtualized: only ~12 items rendered around scrollTop.
+// Options nest: li[role=option] > div[promptOption], as on Workday.
+function listbox(btn, key, toggling){
+  const open=()=>{
+    closePops();
+    const items = LISTS[key];
+    const pop=document.createElement("div");pop.className="pop";pop.dataset.automationId="activeListContainer";
+    pop.dataset.automationActivepopup="true";btn.setAttribute("aria-expanded","true");
+    const ul=document.createElement("ul");ul.setAttribute("role","listbox");pop.appendChild(ul);
+    const spacer=document.createElement("div");spacer.style.height=(items.length*20)+"px";ul.appendChild(spacer);
+    const render=()=>{
+      ul.querySelectorAll("li").forEach(l=>l.remove());
+      const start=Math.floor(ul.scrollTop/20);
+      items.slice(start,start+12).forEach((t,i)=>{
+        const li=document.createElement("li");li.setAttribute("role","option");li.dataset.automationLabel=t;
+        li.style.position="absolute";li.style.top=((start+i)*20)+"px";
+        li.innerHTML='<div data-automation-id="promptOption" data-automation-label="'+t+'">'+t+'</div>';
+        li.addEventListener("click",()=>{if(pop.dataset.closing)return;btn.textContent=t;btn.setAttribute("aria-label",btn.dataset.q+" "+t+" Required");window.__model[key]=t;closePops()});
+        ul.appendChild(li);
+      });
+    };
+    ul.addEventListener("scroll",render);place(pop,btn);render();
+  };
+  if (!toggling) { btn.addEventListener("click", open); return; }
+  // Phone Device Type, as it behaves live: opens on mousedown, and a click
+  // toggles it -- so mousedown-then-click opens and shuts it at once.
+  btn.addEventListener("mousedown", open);
+  btn.addEventListener("click", () => { if (btn.getAttribute("aria-expanded") === "true") closePops(); else open(); });
+}
+// Search prompt: Enter searches leaves; click with empty text shows categories.
+// Like the real one, its list reads "0 items selected" while empty, and a
+// result is a promptLeafNode row that marks itself data-automation-checked.
+// A "broken" prompt never takes a click, to prove a fill cannot hang on one.
+function prompt(input, key, source){
+  const box=input.closest('[data-automation-id="multiSelectContainer"]');
+  const broken = source==="broken";
+  let search = false;
+  const show=(opts,onpick)=>{
+    closePops();
+    const pop=document.createElement("div");pop.className="pop";pop.dataset.automationId="activeListContainer";
+    const lb=document.createElement("div");lb.setAttribute("role","listbox");pop.appendChild(lb);
+    if(!opts.length){lb.innerHTML="<div>No Items.</div>"} else if (search) lb.innerHTML="<div>Search Results ("+opts.length+")</div>";
+    for(const o of opts){
+      // Real shape: a leaf row holding a radio circle and a label. Only the
+      // row takes the click; the label swallows its own.
+      const leaf=document.createElement("div");leaf.dataset.automationId="promptLeafNode";leaf.setAttribute("role","option");
+      leaf.innerHTML='<input type="radio" tabindex="-1">';
+      const d=document.createElement("div");d.dataset.automationId="promptOption";d.dataset.automationLabel=o;d.textContent=o;
+      d.addEventListener("click",e=>e.stopPropagation());
+      leaf.appendChild(d);
+      leaf.addEventListener("click",()=>{ if(broken) return; leaf.dataset.automationChecked="Checked"; onpick(o); });
+      lb.appendChild(leaf);
+    }
+    place(pop,input);
+  };
+  const pick=(o)=>{box.querySelector('[data-automation-id="selectedItemList"]').innerHTML='<p>1 item selected</p><div data-automation-id="selectedItem">'+o+'</div>';window.__model[key]=o;input.value="";closePops()};
+  const leaves = source==="source" ? Object.values(PROMPTS).flat() : source==="broken" ? ["Career Fair","Career Site","Other"] : SCHOOLS;
+  input.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); const q=input.value.toLowerCase(); search=true; show(leaves.filter(l=>l.toLowerCase().includes(q)),pick); search=false;} });
+  input.addEventListener("click",()=>{ if(input.value) return;
+    if(source==="source") show(Object.keys(PROMPTS),(cat)=>show(PROMPTS[cat],pick)); else show(leaves,pick); });
+}
+// Text inputs commit to the model on blur only, like Workday.
+function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__model[key]=input.value})}
+</script>
+<div data-automation-id="formField-cpa"><label for="cpa">Do you intend to sit for the CPA exam and pursue a CPA license?<abbr>*</abbr></label>
+ <button type="button" aria-haspopup="listbox" id="cpa" data-q="Do you intend to sit for the CPA exam and pursue a CPA license?" aria-label="Do you intend to sit for the CPA exam and pursue a CPA license? Select One Required">Select One</button></div>
+<div data-automation-id="formField-edu"><label for="edu">Have you completed all educational requirements to be eligible for full-time employment, including completing your final degree and any coursework needed to sit for certifications (like the CPA exam)?<abbr>*</abbr></label>
+ <button type="button" aria-haspopup="listbox" id="edu" data-q="Have you completed all educational requirements to be eligible for full-time employment, including completing your final degree and any coursework needed to sit for certifications (like the CPA exam)?" aria-label="Have you completed all educational requirements to be eligible for full-time employment, including completing your final degree and any coursework needed to sit for certifications (like the CPA exam)? Select One Required">Select One</button></div>
+<div data-automation-id="formField-intern"><label for="intern">Are you able to commit to a full-time internship lasting at least 8 weeks? If this is not an internship position, please choose &quot;Not Applicable.&quot;Note: PwC internships require a full-time commitment of at least 40 hours per week during normal business hours. Winter internships run from January to March/April, while summer internships span June to mid-August. While you may earn credit for the internship, interns are encouraged to focus fully on the PwC experience and, therefore, are asked not to enroll in traditional academic courses during this period.<abbr>*</abbr></label>
+ <button type="button" aria-haspopup="listbox" id="intern" data-q="Are you able to commit to a full-time internship lasting at least 8 weeks? If this is not an internship position, please choose &quot;Not Applicable.&quot;Note: PwC internships require a full-time commitment of at least 40 hours per week during normal business hours. Winter internships run from January to March/April, while summer internships span June to mid-August. While you may earn credit for the internship, interns are encouraged to focus fully on the PwC experience and, therefore, are asked not to enroll in traditional academic courses during this period." aria-label="Are you able to commit to a full-time internship lasting at least 8 weeks? If this is not an internship position, please choose &quot;Not Applicable.&quot;Note: PwC internships require a full-time commitment of at least 40 hours per week during normal business hours. Winter internships run from January to March/April, while summer internships span June to mid-August. While you may earn credit for the internship, interns are encouraged to focus fully on the PwC experience and, therefore, are asked not to enroll in traditional academic courses during this period. Select One Required">Select One</button></div>
+<div data-automation-id="formField-contractor"><label for="contractor">Are you currently working, or have you worked, as third party labor or an independent contractor to PwC?<abbr>*</abbr></label>
+ <button type="button" aria-haspopup="listbox" id="contractor" data-q="Are you currently working, or have you worked, as third party labor or an independent contractor to PwC?" aria-label="Are you currently working, or have you worked, as third party labor or an independent contractor to PwC? Select One Required">Select One</button></div>
+<div data-automation-id="formField-client"><label for="client">Have you worked with a PwC engagement team as a client?<abbr>*</abbr></label>
+ <button type="button" aria-haspopup="listbox" id="client" data-q="Have you worked with a PwC engagement team as a client?" aria-label="Have you worked with a PwC engagement team as a client? Select One Required">Select One</button></div>
+<div data-automation-id="formField-auth"><label for="auth">Are you legally authorized to work in the United States?<abbr>*</abbr></label>
+ <button type="button" aria-haspopup="listbox" id="auth" data-q="Are you legally authorized to work in the United States?" aria-label="Are you legally authorized to work in the United States? Select One Required">Select One</button></div>
+<div data-automation-id="formField-sponsor"><label for="sponsor">Will you now or in the future require any type of immigration/visa sponsorship or support? Sponsorship or support for an immigration-related employment benefit includes but is not limited to the following: H-1B, H-1B1, J-1, TN, E-3, O-1, job portability benefit (I-485 Supplement Js), F-1 CPT, F-1 STEM OPT, or any employment authorization application that may require immigration support from PwC.<abbr>*</abbr></label>
+ <button type="button" aria-haspopup="listbox" id="sponsor" data-q="Will you now or in the future require any type of immigration/visa sponsorship or support? Sponsorship or support for an immigration-related employment benefit includes but is not limited to the following: H-1B, H-1B1, J-1, TN, E-3, O-1, job portability benefit (I-485 Supplement Js), F-1 CPT, F-1 STEM OPT, or any employment authorization application that may require immigration support from PwC." aria-label="Will you now or in the future require any type of immigration/visa sponsorship or support? Sponsorship or support for an immigration-related employment benefit includes but is not limited to the following: H-1B, H-1B1, J-1, TN, E-3, O-1, job portability benefit (I-485 Supplement Js), F-1 CPT, F-1 STEM OPT, or any employment authorization application that may require immigration support from PwC. Select One Required">Select One</button></div>
+</main>
+<script>
+listbox(document.getElementById("cpa"),"yn");
+listbox(document.getElementById("edu"),"yn");
+listbox(document.getElementById("intern"),"yna");
+listbox(document.getElementById("contractor"),"yn");
+listbox(document.getElementById("client"),"yn");
+listbox(document.getElementById("auth"),"yn");
+listbox(document.getElementById("sponsor"),"yn");
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closePops()});
+</script>
+</body></html>

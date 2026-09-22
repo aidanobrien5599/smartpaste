@@ -116,7 +116,7 @@ function repeatedOptions(profile) {
  * full-name box would be wrong. Joining the two is code's job, so the composed
  * answer is offered as an option of its own. Anything typed explicitly wins.
  */
-function derived(profile) {
+function derived(profile, settings = {}) {
   const has = (key) => Boolean(String(profile[key] || "").trim());
   const get = (key) => String(profile[key] || "").trim();
   const out = {};
@@ -141,6 +141,13 @@ function derived(profile) {
   for (const key of ["related_employee", "non_compete", "history_default"]) {
     if (!has(key)) out[key] = "No";
   }
+  // Settings -> "Say yes": for a search where any interview beats none.
+  // Scoped like the other catch-alls, to what you would be willing, able or
+  // intending to do -- never what you have done or are, so it cannot answer
+  // sponsorship, authorization, "have you graduated?" or ties to the company.
+  if (settings.say_yes === true) {
+    out.willing_default = "Yes — I am willing and able to do whatever the role requires";
+  }
   if (!has("location") && has("city")) {
     out.location = [get("city"), get("state")].filter(Boolean).join(", ");
   }
@@ -162,9 +169,9 @@ function websiteOptions(profile) {
 }
 
 /** The full option set: labelled profile fields first, then free-form lines. */
-export function buildOptions(profile = {}, extraText = "") {
+export function buildOptions(profile = {}, extraText = "", settings = {}) {
   const options = {};
-  const complete = { ...derived(profile), ...profile };
+  const complete = { ...derived(profile, settings), ...profile };
   for (const [key, value] of Object.entries(complete)) {
     if (Array.isArray(value) || value === null || typeof value === "object") continue;
     if (!String(value).trim()) continue;

@@ -33,12 +33,13 @@ const ASK_SELECT =
   "profile does not say.";
 
 async function loadOptions() {
-  const { apiKey, profile = {}, extraText = "" } = await chrome.storage.local.get([
+  const { apiKey, profile = {}, extraText = "", settings = {} } = await chrome.storage.local.get([
     "apiKey",
     "profile",
     "extraText",
+    "settings",
   ]);
-  const options = buildOptions(profile, extraText);
+  const options = buildOptions(profile, extraText, settings);
   // A "Date" beside a signature wants today's date, which no profile holds.
   // Worded for that field: plain "Today's date" lost "Date signed" to the
   // escape option, while start and graduation dates keep their own answers.

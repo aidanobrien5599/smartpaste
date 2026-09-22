@@ -247,3 +247,9 @@ export const FIELDS = GROUPS.flatMap((g) =>
 );
 
 export const LABELS = Object.fromEntries(FIELDS.map((f) => [f.key, f.label]));
+
+// Offered only with Settings -> "Say yes" on (lib/profile.js); not a form field.
+LABELS.willing_default = "Default answer on any yes/no question about whether " +
+  "I am willing, able or intend to do something the job asks: commit to its " +
+  "hours, dates or length, pursue a certification or license it expects, " +
+  "relocate, travel, or complete its checks and assessments";
