@@ -188,7 +188,13 @@ Asked to pick Yes or No straight off a dropdown, Jev rarely leans on a
 catch-all (0.35–0.46 on the PwC questions). Asked which profile entry answers
 the question, it picks this one at 0.9+. So a Yes/No dropdown asks both in
 the same batch, and a confident entry that starts with Yes or No selects the
-matching option (`yesNoFromEntry`).
+matching option (`yesNoFromEntry`). Entries that say the same Yes or No pool
+their probability, since only the answer matters, and a place preference
+reads as Yes when you are open to any location ("relocate to the NYC area?"
+picks your top city). Two answers are composed from facts you gave: a citizen
+or permanent resident is on no visa ("in a period of OPT?" → No), and an
+education list whose degrees are all undergraduate has no graduate degree
+("Graduate GPA" → Not Applicable).
 
 ## Forms in the wild
 

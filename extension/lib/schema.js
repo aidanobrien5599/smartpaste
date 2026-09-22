@@ -63,7 +63,8 @@ export const GROUPS = [
       // it covers so it never answers work authorization, sponsorship or age.
       ["history_default", "Default answer on any other yes/no question about " +
         "my past or present ties to the company (worked, contracted or consulted " +
-        "for it, been its client, a relationship with someone there), my prior " +
+        "for it, applied or interviewed there before, been its client, a " +
+        "relationship with someone there), my prior " +
         "work, certifications or licenses held, or conflicts and restrictions", "No"],
     ],
   },
@@ -249,9 +250,14 @@ export const FIELDS = GROUPS.flatMap((g) =>
 export const LABELS = Object.fromEntries(FIELDS.map((f) => [f.key, f.label]));
 
 LABELS.phone_country_code = "Phone number country code";
+// Derived in lib/profile.js from visa status and the education list.
+LABELS.on_visa = "Currently on a student or temporary work visa or permit " +
+  "(F-1, OPT, CPT, STEM OPT, H-1B, TN, etc.)";
+LABELS.graduate_degree = "Graduate degree (master's or doctorate), for its GPA or graduation date";
 
 // Offered only with Settings -> "Say yes" on (lib/profile.js); not a form field.
 LABELS.willing_default = "Default answer on any yes/no question about whether " +
   "I am willing, able or intend to do something the job asks: commit to its " +
   "hours, dates or length, pursue a certification or license it expects, " +
-  "relocate, travel, or complete its checks and assessments";
+  "relocate, travel, accept the pay it states, or complete its checks and " +
+  "assessments";

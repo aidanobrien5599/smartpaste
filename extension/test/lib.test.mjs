@@ -1,7 +1,8 @@
 // Unit tests for extension/lib. Run: node --test extension/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isYesNo, maxTicks, refine, resolve, yesNoFromEntry } from "../lib/resolve.js";
+import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../lib/resolve.js";
+import { placeSaysYes } from "../lib/places.js";
 import { buildOptions, unwrap, extraSnippets, NONE } from "../lib/profile.js";
 
 test("refine: names from an all-caps header", () => {
@@ -181,4 +182,53 @@ test("yesNoFromEntry: a confident Yes/No profile entry selects the matching opti
   assert.equal(yesNoFromEntry(["Yes", "No"], { choice: NONE, confidence: 1, probabilities: { [NONE]: 1 } }, options), -1);
   assert.ok(isYesNo(["Select One", "Yes", "No"]));
   assert.ok(!isYesNo(["Midwest", "West"]));
+});
+
+test("yesNoFromEntry: entries that say the same Yes pool their probability", () => {
+  // Hudl's "on-site in Lincoln, NE for the full program?" (live Jev, 2026-09-22).
+  const options = buildOptions({ flexibility_default: "Yes I am flexible", work_locations: { ranked: [], anywhere: true } });
+  const split = { choice: "flexibility_default", confidence: 0.53,
+    probabilities: { flexibility_default: 0.55, open_to_any_location: 0.15, [NONE]: 0.3 } };
+  assert.equal(yesNoFromEntry(["Yes", "No"], split, options), 0);
+  assert.ok(Math.abs(yesNoCertainty(split, options).certainty - 0.7 * 0.53 / 0.55) < 1e-9);
+  // Disagreeing entries do not add up, and a low confidence still discounts.
+  const torn = { ...split, probabilities: { flexibility_default: 0.55, history_default: 0.15, [NONE]: 0.3 } };
+  assert.equal(yesNoFromEntry(["Yes", "No"], torn, buildOptions({ flexibility_default: "Yes" })), -1);
+  assert.equal(yesNoFromEntry(["Yes", "No"], { ...split, confidence: 0.3 }, options), -1);
+});
+
+test("yesNoFromEntry: a place preference reads Yes only when anywhere is fine", () => {
+  // Garner Health: "based in or planning to relocate to the NYC area?" picks the top city.
+  const nyc = { choice: "top_work_location", confidence: 0.44,
+    probabilities: { top_work_location: 0.46, work_locations: 0.22, [NONE]: 0.13 } };
+  const anywhere = buildOptions({ work_locations: { ranked: ["New York City", "Chicago"], anywhere: true } });
+  assert.equal(yesNoFromEntry(["Yes", "No"], nyc, anywhere), 0);
+  assert.ok(placeSaysYes("top_work_location", anywhere));
+  const listed = buildOptions({ work_locations: { ranked: ["New York City", "Chicago"], anywhere: false } });
+  assert.equal(yesNoFromEntry(["Yes", "No"], nyc, listed), -1);
+  assert.ok(!placeSaysYes("top_work_location", listed));
+  assert.ok(!placeSaysYes("location", anywhere));
+});
+
+test("buildOptions: a citizen is on no visa; a bachelor's-only list has no graduate degree", () => {
+  const o = buildOptions({ visa_status: "US Citizen", education: [{ degree: "Bachelor of Science" }, { school: "Shore Regional" }] });
+  assert.equal(o.on_visa.value, "No");
+  assert.match(o.on_visa.field, /OPT/);
+  assert.match(o.graduate_degree.value, /^None\b/);
+  assert.match(buildOptions({ visa_status: "Permanent resident (green card)" }).on_visa.value, /^No\b/);
+  // Nothing to go on, or a visa or a graduate degree listed: no such entry.
+  assert.equal(buildOptions({ visa_status: "F-1 (OPT)" }).on_visa, undefined);
+  assert.equal(buildOptions({ first_name: "Aidan" }).on_visa, undefined);
+  assert.equal(buildOptions({ education: [{ school: "UW" }] }).graduate_degree, undefined);
+  for (const degree of ["Master of Science", "M.S.", "MS", "MEng", "PhD", "Ph.D.", "MBA", "Doctor of Philosophy"]) {
+    assert.equal(buildOptions({ education: [{ degree: "B.S." }, { degree }] }).graduate_degree, undefined, degree);
+  }
+  for (const degree of ["B.S.", "Bachelor of Arts", "BSc", "Associate of Science"]) {
+    assert.ok(buildOptions({ education: [{ degree }] }).graduate_degree, degree);
+  }
+});
+
+test("catch-alls name the history and willingness questions they now cover", () => {
+  assert.match(buildOptions({}).history_default.field, /interviewed there before/);
+  assert.match(buildOptions({}, "", { say_yes: true }).willing_default.field, /pay it states/);
 });

@@ -8,6 +8,7 @@
  */
 
 import { NONE, isStructured, valueOf } from "./profile.js";
+import { placeSaysYes } from "./places.js";
 
 // Above AUTO, Cmd-V pastes silently. Below MENU we offer nothing at all and
 // let the keystroke fall through to an ordinary paste.
@@ -237,16 +238,41 @@ export function maxTicks(label) {
  * Asked which profile entry answers it, it picks that catch-all at 0.9+. So
  * a Yes/No dropdown asks both, and a confident entry that starts with Yes
  * or No selects the matching option. Returns that option's index, or -1.
+ *
+ * Only the Yes or No matters, not which entry says it, so entries that agree
+ * pool their probability. Hudl's "on-site in Lincoln, NE for the full
+ * program?" split 0.55 / 0.11 between the flexibility catch-all and "open to
+ * any location" -- both Yes, neither alone over the bar. Jev's confidence
+ * discounts the pooled share as it discounts its own pick.
  */
 export function yesNoFromEntry(fieldOptions, answer, options) {
-  if (!answer || answer.choice === NONE) return -1;
-  const option = options[answer.choice];
-  if (!isStructured(option)) return -1;
-  const confidence = Math.min(Number(answer.probabilities?.[answer.choice] ?? 0), Number(answer.confidence ?? 0));
-  if (confidence < AUTO) return -1;
+  const { said, certainty } = yesNoCertainty(answer, options);
+  if (!said || certainty < AUTO) return -1;
+  return fieldOptions.findIndex((text) => String(text).trim().toLowerCase() === said);
+}
+
+/** The Yes or No the profile entries lean to, and how surely. */
+export function yesNoCertainty(answer, options) {
+  if (!answer || answer.choice === NONE) return { said: null, certainty: 0 };
+  const probabilities = answer.probabilities || {};
+  const pooled = { yes: 0, no: 0 };
+  for (const [key, p] of Object.entries(probabilities)) {
+    const said = key === NONE ? null : yesNoOf(key, options);
+    if (said) pooled[said] += Number(p) || 0;
+  }
+  const top = Number(probabilities[answer.choice] ?? 0);
+  const discount = top > 0 ? Math.min(1, Number(answer.confidence ?? 0) / top) : 0;
+  const said = pooled.yes >= pooled.no ? "yes" : "no";
+  return pooled[said] ? { said, certainty: pooled[said] * discount } : { said: null, certainty: 0 };
+}
+
+/** Which of Yes / No a profile entry says, if either. */
+function yesNoOf(key, options) {
+  const option = options[key];
+  if (!isStructured(option)) return null;
   const said = String(valueOf(option)).trim().match(/^(yes|no)\b/i);
-  if (!said) return -1;
-  return fieldOptions.findIndex((text) => String(text).trim().toLowerCase() === said[1].toLowerCase());
+  if (said) return said[1].toLowerCase();
+  return placeSaysYes(key, options) ? "yes" : null;
 }
 
 /** Whether a dropdown's choices include both a plain "Yes" and a plain "No". */

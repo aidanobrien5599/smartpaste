@@ -164,8 +164,27 @@ function derived(profile, settings = {}) {
   if (!has("location") && has("city")) {
     out.location = [get("city"), get("state")].filter(Boolean).join(", ");
   }
+  // "Are you currently in a period of OPT?" (Relay) came back 0.48: "Visa
+  // status: US Citizen" implies No, but it is not a No, and a Yes/No dropdown
+  // needs one. A citizen or green-card holder is on no student or work visa.
+  // A bare "No": saying "No — US Citizen" drew 0.44 on "Are you a U.S.
+  // citizen?", a No one pooled neighbour away from answering it.
+  if (!has("on_visa") && CITIZEN_OR_RESIDENT.test(get("visa_status"))) {
+    out.on_visa = "No";
+  }
+  // Rocket Lab asks for a Graduate GPA and a master's graduation date, with
+  // "Not Applicable" for the rest of us. Only an education list that names
+  // its degrees can say none of them is a graduate one.
+  const degrees = (Array.isArray(profile.education) ? profile.education : [])
+    .map((e) => String(e?.degree || "").trim()).filter(Boolean);
+  if (!has("graduate_degree") && degrees.length && !degrees.some((d) => GRADUATE.test(d))) {
+    out.graduate_degree = "None — no master's or doctoral degree, completed or in progress";
+  }
   return out;
 }
+
+const CITIZEN_OR_RESIDENT = /\bcitizen\b|\bnational\b|permanent resident|green card/i;
+const GRADUATE = /\bmaster|\bdoctor|\bph\.?\s?d\b|\bm\.?(?:s|a|eng|sc|phil)\b|\bmba\b|\bj\.?d\b|\bm\.?d\b|\bgraduate\b/i;
 
 /**
  * Workday's Websites section is a list of bare "URL" boxes, one per Add.

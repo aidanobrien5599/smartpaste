@@ -19,6 +19,13 @@ export function normalizePlaces(value) {
   return { ranked, anywhere: Boolean(value?.anywhere) };
 }
 
+// "Open to any location" named no city, so asked "Are you based in or
+// planning to relocate to the NYC area?" (Garner Health) Jev reached for the
+// top-ranked city -- a place, not a Yes -- and the dropdown stayed blank.
+// Worded as the question forms actually ask, it names the city they name.
+const ANYWHERE = "Willing to work in, or relocate to, a particular city, " +
+  "region or office the job names -- open to any location";
+
 /** Profile options for these preferences, in buildOptions' shape. */
 export function placesOptions(value) {
   const { ranked, anywhere } = normalizePlaces(value);
@@ -36,11 +43,24 @@ export function placesOptions(value) {
   }
   if (anywhere || ranked.length) {
     options.open_to_any_location = {
-      field: "Open to working in any location or office",
+      field: anywhere ? ANYWHERE : "Open to working in any location or office",
       value: anywhere
         ? "Yes, open to any location"
         : `No, only these: ${ranked.join("; ")}`,
     };
   }
   return options;
+}
+
+/**
+ * A Yes/No question answered by a place preference says Yes when anywhere is
+ * fine. Asked whether it would relocate to the NYC area, Jev picks the top
+ * city ("New York City") -- the right entry, but a place, not a Yes. Jev
+ * chose that the question is about where you would work; being open to any
+ * location is what makes the answer Yes. Without "anywhere" a place is no
+ * answer: matching "NYC area" against a list is a guess.
+ */
+export function placeSaysYes(key, options) {
+  if (!["work_locations", "top_work_location", "open_to_any_location"].includes(key)) return false;
+  return /^yes\b/i.test(String(options.open_to_any_location?.value || "").trim());
 }

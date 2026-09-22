@@ -13,7 +13,7 @@ import {
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
-import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoFromEntry } from "./lib/resolve.js";
+import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.js";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
 import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.js";
 
@@ -297,12 +297,11 @@ async function answerFields(fields, page = {}) {
       if (answer.choice === NONE || picked === undefined || confidence < AUTO) {
         const entry = yesNoFromEntry(field.options, answers[`f${i}_entry`], options);
         if (entry >= 0) {
-          const a = answers[`f${i}_entry`];
           return {
             label: field.label,
             status: "auto",
             value: field.options[entry],
-            confidence: Math.min(Number(a.probabilities?.[a.choice] ?? 0), Number(a.confidence ?? 0)),
+            confidence: yesNoCertainty(answers[`f${i}_entry`], options).certainty,
             isSelect: true,
             alternatives: [],
           };
