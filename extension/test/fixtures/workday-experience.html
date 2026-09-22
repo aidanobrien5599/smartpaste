@@ -131,16 +131,18 @@ function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__mod
 const hidden = 'style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"';
 const monthYear = (id, label, stem) => `<div data-automation-id="formField-${id}"><label>${label}<span ${hidden}> current value is MM/YYYY</span></label>
   <div class="date" data-automation-id="dateInputWrapper">
-  ${stem ? `<label for="${stem}-dateSectionMonth-input" ${hidden}>Month</label>` : ""}<input type="text" role="spinbutton" aria-label="Month" placeholder="MM" data-k="${id}-m" ${stem ? `id="${stem}-dateSectionMonth-input"` : ""}>
-  ${stem ? `<label for="${stem}-dateSectionYear-input" ${hidden}>Year</label>` : ""}<input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y" ${stem ? `id="${stem}-dateSectionYear-input"` : ""}></div></div>`;
+  ${stem ? `<label for="${stem}-dateSectionMonth-input" ${hidden}>Month</label>` : ""}<input type="text" role="spinbutton" aria-label="Month" value="MM" data-k="${id}-m" ${stem ? `id="${stem}-dateSectionMonth-input"` : ""}>
+  ${stem ? `<label for="${stem}-dateSectionYear-input" ${hidden}>Year</label>` : ""}<input type="text" role="spinbutton" aria-label="Year" value="YYYY" data-k="${id}-y" ${stem ? `id="${stem}-dateSectionYear-input"` : ""}></div></div>`;
 const year = (id, label) => `<div data-automation-id="formField-${id}"><label>${label}</label>
-  <div class="date"><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y"></div></div>`;
+  <div class="date"><input type="text" role="spinbutton" aria-label="Year" value="YYYY" data-k="${id}-y"></div></div>`;
 const text = (id, label, tag, key) => `<div data-automation-id="formField-${id}"><label for="${id}">${label}</label><${tag||"input"} type="text" id="${id}" ${key ? `data-k="${key}"` : ""}></${tag||"input"}></div>`;
 const BUILD = {
-  "Work-Experience": (n) => text(`workExperience-${n}--jobTitle`, "Job Title", null, `we${n}-title`) + text(`workExperience-${n}--companyName`, "Company", null, `we${n}-company`) + text(`workExperience-${n}--location`, "Location", null, `we${n}-location`) +
-    `<div data-automation-id="formField-currentlyWorkHere"><label><input type="checkbox" data-automation-id="currentlyWorkHere" id="we${n}-current"> I currently work here</label></div>` +
-    monthYear(`we${n}-from`, "From", `workExperience-${n}--startDate`) + monthYear(`we${n}-to`, "To", `workExperience-${n}--endDate`) +
-    text(`workExperience-${n}--roleDescription`, "Role Description", "textarea", `we${n}-desc`),
+  // Live ids number entries from 19 (workExperience-20--...), not from 1.
+  "Work-Experience": (n) => ((w) => text(`${w}--jobTitle`, "Job Title", null, `we${n}-title`) + text(`${w}--companyName`, "Company", null, `we${n}-company`) + text(`${w}--location`, "Location", null, `we${n}-location`) +
+    // Live: every job's box is name="currentlyWorkHere", labelled by for=.
+    `<div data-automation-id="formField-currentlyWorkHere" data-fkit-id="${w}--currentlyWorkHere"><label for="${w}--currentlyWorkHere">I currently work here</label><div><input id="${w}--currentlyWorkHere" type="checkbox" name="currentlyWorkHere" data-k="we${n}-current"></div></div>` +
+    monthYear(`we${n}-from`, "From", `${w}--startDate`) + monthYear(`we${n}-to`, "To", `${w}--endDate`) +
+    text(`${w}--roleDescription`, "Role Description", "textarea", `we${n}-desc`))(`workExperience-${18 + n}`),
   "Education": (n) => `<div data-automation-id="formField-school"><label for="ed${n}-school">School or University</label>
       <div data-automation-id="multiSelectContainer"><div data-automation-id="selectedItemList"><p>0 items selected</p></div>
       <div data-automation-id="multiselectInputContainer"><input type="text" id="ed${n}-school" data-uxi-widget-type="selectinput" data-automation-id="searchBox" placeholder="Search"></div></div></div>
@@ -155,7 +157,7 @@ const BUILD = {
 // "0055" is no month at all, and the box empties.
 function spin(input) {
   const width = input.getAttribute("aria-label") === "Year" ? 4 : 2;
-  let buf = "";
+  let buf = /\d/.test(input.value) ? input.value : "";
   const valid = (v) => v === "" || (width === 2 ? /^(0?[1-9]|1[0-2])$/.test(v) || v === "0" : /^\d{1,4}$/.test(v));
   input.addEventListener("keydown", (e) => {
     if (!/^\d$/.test(e.key)) return;
@@ -198,7 +200,7 @@ document.querySelectorAll('[role="group"][aria-labelledby$="-section"], [data-au
           }
         }, 0));
       });
-      panel.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => { window.__model[c.id] = c.checked; }));
+      panel.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => { window.__model[c.dataset.k || c.id] = c.checked; }));
     }, 150);
   });
 });

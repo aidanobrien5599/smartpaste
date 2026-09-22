@@ -12,7 +12,7 @@ window.__model = window.__model || {};
 const ANSWERS = [
   // My Experience (workday-experience.html); specific ones first.
   [/Work Experience 1: Location/, "Los Gatos, CA"], [/Work Experience 2: Location/, "Remote"],
-  [/Work Experience \d: I currently work here/, "No"],
+  [/Work Experience 2: I currently work here/, "Yes"], [/Work Experience \d: I currently work here/, "No"],
   [/Work Experience 1: To/, "August 2026"], [/Work Experience 2: From/, "Dec 2025"], [/Work Experience 2: To/, "May 2026"],
   [/Work Experience 1: Role Description/, "Drove $15M+ in projected savings."], [/Work Experience 2: Role Description/, "Built data ingestion pipelines."],
   [/Education 1: Overall Result/, "3.9"], [/Education 1: From/, "2023"],

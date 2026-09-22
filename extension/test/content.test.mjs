@@ -350,8 +350,10 @@ test("fill: Workday My Experience -- entries added, then filled", { skip }, () =
     for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model[key])}`);
     // Skills one at a time; one with no plain match (Next.js) is skipped.
     assert.deepEqual(model.skills, ["Python", "TypeScript", "Java", "React.js"]);
-    // "I currently work here" is No for both: left unticked.
-    assert.equal(await page.eval("document.querySelectorAll('[data-automation-id=currentlyWorkHere]:checked').length"), 0);
+    // "I currently work here" (every job's box is name="currentlyWorkHere"):
+    // ticked for the current job only.
+    assert.equal(model["we2-current"], true);
+    assert.equal(model["we1-current"], undefined);
     assert.match(summary, /^filled \d+ in/);
   }));
 

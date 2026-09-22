@@ -235,7 +235,27 @@
     const [, stem, n] = byId || byBox || [];
     if (!stem) return "";
     const name = ENTRY_NAMES[stem] || stem.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
-    return `${name} ${n}: `;
+    // Workday's ids number entries its own way (the first job is
+    // workExperience-20); a form's "Work Experience 1" is the first on the page.
+    const order = entryNumbers(stem);
+    return `${name} ${order.indexOf(n) + 1 || n}: `;
+  }
+
+  /** An entry stem's numbers ("20", "21"...) in page order. */
+  function entryNumbers(stem) {
+    // Field ids first ("workExperience-20--jobTitle"); a container's own
+    // marker ("workExperience-1") may number the same entry differently.
+    const collect = (selector, pattern, read) => {
+      const seen = [];
+      for (const el of document.querySelectorAll(selector)) {
+        const m = read(el).match(pattern);
+        if (m && !seen.includes(m[1])) seen.push(m[1]);
+      }
+      return seen;
+    };
+    const byId = collect(`[id^="${stem}-"]`, /^[a-zA-Z]+-(\d+)--/, (el) => el.id);
+    return byId.length ? byId
+      : collect(`[data-automation-id^="${stem}-"]`, /^[a-zA-Z]+-(\d+)$/, (el) => el.getAttribute("data-automation-id") || "");
   }
 
   const ENTRY_NAMES = { workExperience: "Work Experience", education: "Education", websitePanelSet: "Websites",
@@ -303,13 +323,32 @@
    * question (Lever's language and office questions). Several may be right,
    * so the answer is a list of options, not one.
    */
-  function collectCheckboxGroups() {
-    const groups = new Map();
+  /**
+   * Which checkboxes form one question: same name AND same form field.
+   * Workday names every job's "I currently work here" box currentlyWorkHere,
+   * so by name alone two jobs' boxes looked like one check-all-that-apply
+   * question with no text, and neither was ever answered.
+   */
+  function checkboxKey(box) {
+    const field = box.closest('[data-automation-id^="formField"], ' + QUESTION_BOX);
+    return field ? [box.name || box.id, field] : [box.name || box.id, null];
+  }
+
+  function groupCheckboxes() {
+    const groups = [];
     for (const box of document.querySelectorAll('input[type="checkbox"]')) {
-      if (!box.name || box.disabled) continue;
-      if (!groups.has(box.name)) groups.set(box.name, []);
-      groups.get(box.name).push(box);
+      if (box.disabled) continue;
+      const [name, field] = checkboxKey(box);
+      if (!name) { groups.push([box]); continue; }
+      const group = groups.find((g) => g.name === name && g.field === field);
+      if (group) group.push(box);
+      else groups.push(Object.assign([box], { name, field }));
     }
+    return groups;
+  }
+
+  function collectCheckboxGroups() {
+    const groups = new Map(groupCheckboxes().filter((g) => g.length > 1 && g[0].name).map((g, i) => [i, g]));
     const fields = [];
     for (const boxes of groups.values()) {
       if (boxes.length < 2 || boxes.length > 60) continue;
@@ -338,14 +377,9 @@
   const CONSENT = /agree|consent|terms|privacy|acknowledg|certif|attest|marketing|newsletter|subscribe|remember me|sms|text messages?|contact me/i;
 
   function collectSingleCheckboxes() {
-    const byName = new Map();
-    for (const box of document.querySelectorAll('input[type="checkbox"]')) {
-      const key = box.name || box.id || box;
-      byName.set(key, (byName.get(key) || 0) + 1);
-    }
     const fields = [];
-    for (const box of document.querySelectorAll('input[type="checkbox"]')) {
-      if (box.disabled || byName.get(box.name || box.id || box) !== 1) continue;
+    for (const [box, ...rest] of groupCheckboxes()) {
+      if (rest.length) continue;
       const label = labelFor(box) ||
         clean(box.closest('[data-automation-id^="formField"]')?.querySelector("label, legend")?.textContent || "");
       if (label.length < 3 || CONSENT.test(label)) continue;
@@ -1434,7 +1468,9 @@
     const { element } = entry;
     if (entry.buttons) return toggleAnswered(entry);
     if (element.matches(LISTBOX_BUTTON)) return !EMPTY_BUTTON.test(element.textContent.trim());
-    if (dateWrappers.has(element)) return [...element.querySelectorAll(DATE_PART)].some((p) => p.value);
+    // Live, an empty date box holds its mask -- "MM", "YYYY" ("current value
+    // is MM/YYYY") -- and counting that as filled skipped every From / To.
+    if (dateWrappers.has(element)) return [...element.querySelectorAll(DATE_PART)].some((p) => /\d/.test(p.value));
     if (element.matches(PROMPT_INPUT)) return Boolean(promptChosen(element));
     if (isCombobox(element)) return Boolean(currentValue(element));
     return Boolean(element.value && element.value.trim());
@@ -1568,22 +1604,10 @@
 
   /** Entries already on the page for a section: panels, marked boxes, or ids. */
   function countEntries(kind, prefix) {
-    const numbers = new Set();
-    if (prefix) {
-      document.querySelectorAll(`[role="group"][aria-labelledby^="${CSS.escape(prefix)}"][aria-labelledby$="-panel"]`)
-        .forEach((g) => numbers.add(g.getAttribute("aria-labelledby")));
-    }
-    for (const stem of kind.stems) {
-      document.querySelectorAll(`[data-automation-id^="${stem}-"]`).forEach((el) => {
-        const m = el.getAttribute("data-automation-id").match(/-(\d+)$/);
-        if (m) numbers.add(`box${m[1]}`);
-      });
-      document.querySelectorAll(`[id^="${stem}-"]`).forEach((el) => {
-        const m = el.id.match(/^[a-zA-Z]+-(\d+)--/);
-        if (m) numbers.add(`box${m[1]}`);
-      });
-    }
-    return numbers.size;
+    // One entry can carry both a panel label and ids; count one or the other.
+    const panels = prefix ? document.querySelectorAll(
+      `[role="group"][aria-labelledby^="${CSS.escape(prefix)}"][aria-labelledby$="-panel"]`).length : 0;
+    return panels || Math.max(0, ...kind.stems.map((stem) => entryNumbers(stem).length));
   }
 
   const addButtonIn = (root) => [...root.querySelectorAll("button")].find((b) =>
@@ -1877,7 +1901,7 @@
     const handled = [...known.map((k) => k.element), ...collectFields().map((f) => f.element)];
     const gaps = [];
     for (const box of document.querySelectorAll('[data-automation-id^="formField"], .application-question, fieldset')) {
-      if (!nodeVisible(box) || box.querySelector('[data-automation-id^="formField"]')) continue;
+      if (!nodeVisible(box) || box.querySelector('[data-automation-id^="formField"], input[type="file"]')) continue;
       if (handled.some((el) => box.contains(el) || el.contains(box))) continue;
       const label = clean(box.querySelector("label, legend")?.textContent || "");
       if (!label) continue;
