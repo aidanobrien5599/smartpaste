@@ -111,7 +111,10 @@ test("localMatch: exact, or the one option that starts with the answer", { skip 
 
 /* ------------------------------------------------------ application gate */
 
-for (const fixture of ["form.html", "application-no-upload.html", "workday.html", "ashby.html", "lever.html"]) {
+// workday-questions.html: a step of only questions (age, salary,
+// sponsorship) -- too few kinds of field on its own, but inside Workday's
+// application flow, which settles it.
+for (const fixture of ["form.html", "application-no-upload.html", "workday.html", "ashby.html", "lever.html", "workday-questions.html"]) {
   test(`gate: ${fixture} is an application, so the button appears`, { skip }, () =>
     withPage(fixture, async (page) => {
       assert.match(await page.waitFor(BUTTON), /^Autofill \d+ field/);

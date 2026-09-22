@@ -438,10 +438,24 @@
   const IDENTITY = new Set(["name", "email", "phone"]);
   const APPLY_PAGE = /\b(?:apply|application|careers?|jobs?|position|opening|recruit\w*|talent)\b/i;
 
+  // An applicant tracking system's own application flow says what it is.
+  // A Workday step of nothing but questions -- "Are you at least 18?",
+  // "Salary expectations?", sponsorship -- names too few kinds of field to
+  // pass the check below, and got no button at all.
+  const ATS_HOST = /(?:^|\.)(?:myworkdayjobs\.com|myworkdaysite\.com|greenhouse\.io|lever\.co|ashbyhq\.com|smartrecruiters\.com|icims\.com|jobvite\.com|workable\.com|bamboohr\.com)$/i;
+  const ATS_FLOW = '[data-automation-id="applyFlowPage"], [data-automation-id="progressBar"], ' +
+    '#application-form, #application_form, .application-form, form[action*="apply" i]';
+
+  function inApplicationFlow() {
+    return document.querySelector(ATS_FLOW) !== null ||
+      (ATS_HOST.test(location.hostname) && /\/appl(?:y|ication)\b/i.test(location.pathname));
+  }
+
   function looksLikeApplication(fields) {
-    // A resume upload settles it.
+    // A resume upload settles it; so does the ATS's own application flow.
     const uploads = [...document.querySelectorAll(FILE_SELECTOR)].filter(nodeVisible);
     if (uploads.some((input) => documentFor(fileHintTiers(input).join(" ")) === "resume")) return true;
+    if (fields.length && inApplicationFlow()) return true;
     const kinds = new Set();
     for (const { label } of fields) {
       for (const [kind, pattern] of APPLICATION_TERMS) if (pattern.test(label)) kinds.add(kind);

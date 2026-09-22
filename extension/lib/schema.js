@@ -55,6 +55,9 @@ export const GROUPS = [
       ["sponsorship", "Requires visa sponsorship", "No"],
       ["visa_status", "Visa status", "US citizen"],
       ["clearance", "Security clearance", "None"],
+      ["over_18", "At least 18 years of age", "Yes"],
+      ["related_employee", "Related to anyone who works at the company I'm applying to", "No"],
+      ["non_compete", "Bound by a non-compete or other agreement that could limit this job", "No"],
     ],
   },
   {

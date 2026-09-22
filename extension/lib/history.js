@@ -10,6 +10,8 @@
 const PRIOR_EMPLOYMENT = new RegExp(
   [
     String.raw`\b(?:currently|previously|ever|formerly|before|past|prior)\b.{0,40}\b(?:work(?:ed|ing)?|employed|intern(?:ed)?|contract(?:ed)?)\s+(?:for|at|by|with)\b`,
+    // "Are you currently employed as an Associate at Broadridge?"
+    String.raw`\b(?:currently|previously|ever|formerly)\b.{0,20}\b(?:work(?:ed|ing)?|employed)\s+as\s+an?\s+.{1,40}?\s+(?:at|by|with|for)\b`,
     String.raw`\b(?:work(?:ed)?|employed|intern(?:ed)?)\s+(?:for|at|by|with)\b.{0,60}\b(?:before|previously|in the past|ever)\b`,
     String.raw`\b(?:current|former|previous|past)\s+(?:or\s+(?:current|former|previous|past)\s+)?(?:employee|intern|contractor|worker)\b`,
   ].join("|"),

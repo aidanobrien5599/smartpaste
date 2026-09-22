@@ -14,6 +14,7 @@ test("prior-employment questions are recognised in their usual wordings", () => 
     "Have you ever interned at Google?",
     "Are you currently working for a Wells Fargo contractor?",
     "Have you previously been employed with the company?",
+    "Are you currently employed as an Associate at Broadridge?",
   ]) assert.ok(isPriorEmploymentQuestion(label), label);
 });
 
