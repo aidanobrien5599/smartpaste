@@ -1783,6 +1783,10 @@
     const day = finder("Day");
     const year = finder("Year");
     if (month && !parts.month) return false; // "Present", or a year alone
+    // Disabled boxes are not the applicant's to fill: Ambrook disables End
+    // Date once "Still Student?" is ticked, and still rejects a value there.
+    const boxes = [month, day, year].filter(Boolean).map((find) => find());
+    if (boxes.length && boxes.every((b) => b?.disabled)) return false;
     // Each box gets its whole value at once, as a paste would, then change
     // and blur -- what Simplify's Workday rules do too. Typing digit by digit
     // lost dates: Workday's spinbuttons take digits on keydown themselves,
@@ -2155,9 +2159,12 @@
   // or Expected)", "Graduation date".
   const END_DATE = /^(?:end(?:ing)?\b|to\b|until\b|graduation date)/i;
   function dropEndDatesOfOngoing(todo) {
-    const ongoing = todo.filter((e) => e.single && /^y/i.test(e.result.value) && ONGOING.test(e.label));
+    // From every known box, not just those still to tick: a second pass
+    // (after a resume upload rebuilds the form) finds the box already ticked.
+    const ongoing = known.filter((e) => e.single && ONGOING.test(e.label) &&
+      (e.element.checked || (e.result.status === "auto" && /^y/i.test(e.result.value))));
     for (const box of ongoing) {
-      const ends = todo.filter((e) => e !== box && END_DATE.test(e.label.split(": ").pop()));
+      const ends = todo.filter((e) => END_DATE.test(e.label.split(": ").pop()));
       // The same entry: the nearest ancestor holding the box and an end date.
       for (let node = box.element.parentElement; node; node = node.parentElement) {
         const mine = ends.filter((e) => node.contains(e.element));

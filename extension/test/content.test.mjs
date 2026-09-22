@@ -372,6 +372,13 @@ test("fill: Ashby radios with no legend, orphan labels, and Month/Year selects",
     // "Still Student?" ticked means no End Date: Ashby rejects both at once.
     assert.equal(await page.eval("document.getElementById('still').checked"), true);
     assert.deepEqual(await page.eval("['sm','sy','em','ey'].map(id => document.getElementById(id).value)"), ["9", "2023", "", ""]);
+    // A second pass (after a resume upload rebuilds the form) finds the box
+    // already ticked, so not due; the entry is still ongoing. Re-enabled
+    // here so only that, not the disabled selects, keeps End Date empty.
+    await new Promise((r) => setTimeout(r, 1500)); // the first fill's follow-up rounds
+    await page.eval("document.querySelectorAll('#em, #ey').forEach(s => { s.disabled = false; }); document.querySelector('.smartpaste-note')?.remove()");
+    await autofill(page);
+    assert.deepEqual(await page.eval("['em','ey'].map(id => document.getElementById(id).value)"), ["", ""]);
   }));
 
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>

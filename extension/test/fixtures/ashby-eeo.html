@@ -44,6 +44,10 @@
 <script>
 // remove the stray template marker used above
 document.querySelectorAll("fieldset").forEach((f) => f.childNodes.forEach((n) => { if (n.nodeType === 3 && n.textContent.includes("${")) n.remove(); }));
+// As on Ambrook: ticking "Still Student?" disables the End Date selects.
+document.getElementById("still").addEventListener("change", (e) => {
+  for (const id of ["em", "ey"]) document.getElementById(id).disabled = e.target.checked;
+});
 // the school box has no id: its label's for= points at nothing
 document.getElementById("edu-school").removeAttribute("id");
 </script>
