@@ -438,6 +438,24 @@ test("fill: Oracle Recruiting Cloud -- pills, a two-id aria-labelledby, hidden r
     assert.equal(await page.eval(value("#country-codes-dropdownphoneNumber")), "+1");
   }));
 
+test("fill: Ashby choice questions -- titles whose for= names nothing, one multi per fieldset", { skip }, () =>
+  withPage("ashby-checkboxes.html", async (page) => {
+    const fields = await page.eval(() => window.__smartpasteTest.collectFields()
+      .filter((f) => f.buttons).map((f) => ({ label: f.label, options: f.options, multi: Boolean(f.multi) })));
+    assert.deepEqual(fields, [
+      { label: "Do you have prior internship experience?", options: ["Yes", "No"], multi: false },
+      { label: "Have you ever been convicted of a felony?", options: ["Yes", "No"], multi: false },
+      { label: "Please indicate any engineering, technical, or project-based student organizations, clubs, or competition teams you have been involved with",
+        options: ["Formula SAE / Electric Vehicle Racing", "Robotics Team", "None of the Above"], multi: true },
+      { label: "Which of the following communities do you belong to? Please select all that apply.",
+        options: ["Person with disability", "Veteran", "None of the above", "I prefer not to answer"], multi: true },
+    ]);
+    await autofill(page);
+    assert.deepEqual(await page.eval("[...document.querySelectorAll('#communities input:checked')].map(b => b.name)"), ["None of the above"]);
+    // "I agree" to be contacted for two years is a consent: never ours to tick.
+    assert.equal(await page.eval("document.querySelector('#consent input').checked"), false);
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);

@@ -102,7 +102,8 @@ window.chrome = {
             const pick = /races you identify/i.test(f.label) ? ["White"]
               : /check one of the boxes/i.test(f.label) ? ["No, I do not have a disability and have not had one in the past"]
               : /language/i.test(f.label) ? ["English (ENG)"]
-              : /office/i.test(f.label) ? ["New York, NY", "Washington, DC", "Seattle, WA"] : [];
+              : /office/i.test(f.label) ? ["New York, NY", "Washington, DC", "Seattle, WA"]
+              : /communities do you belong to/i.test(f.label) ? ["None of the above"] : []; // ashby-checkboxes.html
             const value = f.options.filter((o) => pick.includes(o));
             return value.length
               ? { status: "auto", value, confidence: 0.98, multi: true, alternatives: [] }

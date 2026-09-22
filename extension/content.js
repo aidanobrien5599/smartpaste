@@ -299,12 +299,19 @@
   // control is that control's; the text block just before the options is ours.
   function questionFor(inputs) {
     const own = (node) => inputs.some((i) => node.contains(i) || (i.id && node.htmlFor === i.id));
-    const foreign = (node) =>
-      [...node.querySelectorAll(ANY_CONTROL)].some((c) => !inputs.includes(c)) ||
-      // A label for= the group's own container is the group's question:
-      // Eightfold's <label for="…_94552_1"> names the div[role=radiogroup].
-      (node.htmlFor && !inputs.some((i) => i.id === node.htmlFor) &&
-        !document.getElementById(node.htmlFor)?.contains(inputs[0]));
+    // A label for= the group's own container is the group's question:
+    // Eightfold's <label for="…_94552_1"> names the div[role=radiogroup].
+    // One whose for= names nothing on the page is no other control's either:
+    // Ashby's question title points at the question's id, which no element
+    // has. Taken for foreign, every Ashby choice question lost its title and
+    // the walk went on up to "This job has application limits…" above the
+    // form, or found nothing and dropped the question.
+    const foreign = (node) => {
+      if ([...node.querySelectorAll(ANY_CONTROL)].some((c) => !inputs.includes(c))) return true;
+      if (!node.htmlFor || inputs.some((i) => i.id === node.htmlFor)) return false;
+      const target = document.getElementById(node.htmlFor);
+      return Boolean(target) && !target.contains(inputs[0]);
+    };
     let node = inputs[0].parentElement;
     for (let depth = 0; node && depth < 6; depth++, node = node.parentElement) {
       const direct = questionText(inputs[0]);
