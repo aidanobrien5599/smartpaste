@@ -369,7 +369,9 @@ test("fill: Ashby radios with no legend, orphan labels, and Month/Year selects",
     // Nothing in the profile says: left alone, never guessed.
     assert.equal(await checked("trans"), null);
     assert.equal(await page.eval(value("input[placeholder='Search schools...']")), "University of Wisconsin - Madison");
-    assert.deepEqual(await page.eval("['sm','sy','em','ey'].map(id => document.getElementById(id).value)"), ["9", "2023", "5", "2027"]);
+    // "Still Student?" ticked means no End Date: Ashby rejects both at once.
+    assert.equal(await page.eval("document.getElementById('still').checked"), true);
+    assert.deepEqual(await page.eval("['sm','sy','em','ey'].map(id => document.getElementById(id).value)"), ["9", "2023", "", ""]);
   }));
 
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>

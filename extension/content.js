@@ -2147,6 +2147,27 @@
     }
   }
 
+  // "Still Student?" / "I currently work here" ticked means the entry has no
+  // end. Ashby rejects an End Date beside a ticked "Still Student?", so the
+  // end date of the same entry is left empty instead of filled.
+  const ONGOING = /\b(?:still (?:a )?student|currently (?:work|study|attend|enrolled)|(?:i )?(?:still )?work here|present|ongoing|current(?:ly)? (?:role|position|job))\b/i;
+  // The field's own label, after any section prefix: "End Date", "To (Actual
+  // or Expected)", "Graduation date".
+  const END_DATE = /^(?:end(?:ing)?\b|to\b|until\b|graduation date)/i;
+  function dropEndDatesOfOngoing(todo) {
+    const ongoing = todo.filter((e) => e.single && /^y/i.test(e.result.value) && ONGOING.test(e.label));
+    for (const box of ongoing) {
+      const ends = todo.filter((e) => e !== box && END_DATE.test(e.label.split(": ").pop()));
+      // The same entry: the nearest ancestor holding the box and an end date.
+      for (let node = box.element.parentElement; node; node = node.parentElement) {
+        const mine = ends.filter((e) => node.contains(e.element));
+        if (!mine.length) continue;
+        for (const e of mine) todo.splice(todo.indexOf(e), 1);
+        break;
+      }
+    }
+  }
+
   async function fillFields(started, attached, prefix = "", only = null) {
     rebind();
     let filled = 0;
@@ -2158,6 +2179,7 @@
       if (!due) skipped++;
       return due;
     });
+    dropEndDatesOfOngoing(todo);
 
     // Nothing waits on anything slower than itself. Instant fields go in
     // one pass, as on Ashby; a Workday search picker waits on its server,

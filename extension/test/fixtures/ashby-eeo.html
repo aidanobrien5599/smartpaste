@@ -3,7 +3,8 @@
 <!-- As inspected on a live Ashby form (Superhuman): radio questions are a
      <fieldset> with no <legend>, the question a <label> above it; the
      education entry's School search box has no id for its label to point
-     at; Start / End Date are Month... / Year... <select> pairs. -->
+     at; Start / End Date are Month... / Year... <select> pairs, showing
+     their placeholder until chosen. -->
 <div class="_fieldEntry_1" id="degree"><label class="_heading_1">Which degree are you currently pursuing?</label>
   <fieldset>
     <div><span><input type="radio" id="deg-0" name="q_deg"></span><label for="deg-0">Bachelors</label></div>
@@ -33,11 +34,12 @@
   <div><div><label for="_systemfield_education_history-school">School</label><div><input id="edu-school" placeholder="Search schools..." type="text"></div></div>
   <div><label for="_systemfield_education_history-degree">Degree</label><input id="_systemfield_education_history-degree" placeholder="e.g. Bachelor of Science" type="text"></div>
   <div><label for="_systemfield_education_history-startDate">Start Date</label><div id="_systemfield_education_history-startDate"><div>
-    <select id="sm"><option disabled hidden value="">Month...</option><option value="1">January</option><option value="5">May</option><option value="9">September</option></select>
-    <select id="sy"><option disabled hidden value="">Year...</option><option value="2027">2027</option><option value="2023">2023</option></select></div></div></div>
+    <select id="sm"><option disabled hidden selected value="">Month...</option><option value="1">January</option><option value="5">May</option><option value="9">September</option></select>
+    <select id="sy"><option disabled hidden selected value="">Year...</option><option value="2027">2027</option><option value="2023">2023</option></select></div></div></div>
   <div><label for="_systemfield_education_history-endDate">End Date</label><div id="_systemfield_education_history-endDate"><div>
-    <select id="em"><option disabled hidden value="">Month...</option><option value="1">January</option><option value="5">May</option><option value="9">September</option></select>
-    <select id="ey"><option disabled hidden value="">Year...</option><option value="2027">2027</option><option value="2023">2023</option></select></div></div></div>
+    <select id="em"><option disabled hidden selected value="">Month...</option><option value="1">January</option><option value="5">May</option><option value="9">September</option></select>
+    <select id="ey"><option disabled hidden selected value="">Year...</option><option value="2027">2027</option><option value="2023">2023</option></select></div></div></div>
+  <div><label><input type="checkbox" id="still" name="stillStudent">Still Student?</label></div>
   </div></div>
 <script>
 // remove the stray template marker used above

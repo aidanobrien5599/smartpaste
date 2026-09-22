@@ -13,6 +13,8 @@ const ANSWERS = [
   // ashby-eeo.html
   [/^Education History: School$/, "University of Wisconsin - Madison"], [/^Education History: Degree$/, "Bachelor of Science"],
   [/^Education History: Start Date$/, "Sep 2023"], [/^Education History: End Date$/, "May 2027"],
+  // Ashby rejects an End Date next to a ticked "Still Student?".
+  [/^Education History: Still Student\?$/, "Yes"],
   // bytedance.html: cards named by section, number and the entry they are for.
   [/^Work Experience 1 \(Intelligible AI\): Company name$/, "Intelligible AI"],
   [/^Work Experience 1 \(Intelligible AI\): Title$/, "Founding Engineer"],
