@@ -10,6 +10,11 @@ window.__inFlight = 0;
 window.__maxInFlight = 0;
 window.__model = window.__model || {};
 const ANSWERS = [
+  // ashby-eeo.html
+  [/^Education History: School$/, "University of Wisconsin - Madison"], [/^Education History: Degree$/, "Bachelor of Science"],
+  [/^Education History: Start Date$/, "Sep 2023"], [/^Education History: End Date$/, "May 2027"],
+  [/degree are you currently pursuing/, "Bachelors"], [/expected graduation date\?$/, "January - June 2027"],
+  [/Armed Forces/, "No, I am not a veteran or active member"],
   // My Experience (workday-experience.html); specific ones first.
   [/Work Experience 1: Location/, "Los Gatos, CA"], [/Work Experience 2: Location/, "Remote"],
   [/Work Experience 2: I currently work here/, "Yes"], [/Work Experience \d: I currently work here/, "No"],
@@ -39,7 +44,7 @@ const ANSWERS = [
   [/authori[sz]ed/i, "Yes"],
   [/sponsorship/i, "No"],
   [/relocat/i, "Yes"],
-  [/gender/i, "Prefer not to say"],
+  [/\bgender\b/i, "Prefer not to say"], // not "transgender"
   [/hispanic/i, "No"], [/identify your race/i, "White"],
   [/linkedin/i, "https://www.linkedin.com/in/aidanobrien5599"],
   [/graduat/i, "May 2027"],

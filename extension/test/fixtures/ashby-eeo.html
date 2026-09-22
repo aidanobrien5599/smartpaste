@@ -1,0 +1,48 @@
+<!doctype html><meta charset="utf-8"><title>Apply - Ashby</title>
+<body style="font:14px system-ui;max-width:640px;margin:30px auto">
+<!-- As inspected on a live Ashby form (Superhuman): radio questions are a
+     <fieldset> with no <legend>, the question a <label> above it; the
+     education entry's School search box has no id for its label to point
+     at; Start / End Date are Month... / Year... <select> pairs. -->
+<div class="_fieldEntry_1" id="degree"><label class="_heading_1">Which degree are you currently pursuing?</label>
+  <fieldset>
+    <div><span><input type="radio" id="deg-0" name="q_deg"></span><label for="deg-0">Bachelors</label></div>
+    <div><span><input type="radio" id="deg-1" name="q_deg"></span><label for="deg-1">Masters</label></div>
+    <div><span><input type="radio" id="deg-2" name="q_deg"></span><label for="deg-2">PhD</label></div>
+  </fieldset></div>
+<div class="_fieldEntry_1" id="grad"><label class="_heading_1">When is your expected graduation date?</label>
+  <fieldset>
+    ${""}
+    <div><span><input type="radio" id="grad-0" name="q_grad"></span><label for="grad-0">2026</label></div>
+    <div><span><input type="radio" id="grad-1" name="q_grad"></span><label for="grad-1">January - June 2027</label></div>
+    <div><span><input type="radio" id="grad-2" name="q_grad"></span><label for="grad-2">December 2027</label></div>
+  </fieldset></div>
+<div class="_fieldEntry_1" id="vet"><label class="_heading_1">Are you a veteran or active member of the United States Armed Forces?</label>
+  <fieldset>
+    <div><span><input type="radio" id="vet-0" name="q_vet"></span><label for="vet-0">Yes, I am a veteran or active member</label></div>
+    <div><span><input type="radio" id="vet-1" name="q_vet"></span><label for="vet-1">No, I am not a veteran or active member</label></div>
+    <div><span><input type="radio" id="vet-2" name="q_vet"></span><label for="vet-2">I don't wish to answer</label></div>
+  </fieldset></div>
+<div class="_fieldEntry_1" id="trans"><label class="_heading_1">Do you identify as transgender?</label>
+  <fieldset>
+    <div><span><input type="radio" id="tr-0" name="q_tr"></span><label for="tr-0">Yes</label></div>
+    <div><span><input type="radio" id="tr-1" name="q_tr"></span><label for="tr-1">No</label></div>
+    <div><span><input type="radio" id="tr-2" name="q_tr"></span><label for="tr-2">I don't wish to answer</label></div>
+  </fieldset></div>
+<div class="_fieldEntry_1" data-field-path="_systemfield_education_history"><label for="_systemfield_education_history">Education History</label>
+  <div><div><label for="_systemfield_education_history-school">School</label><div><input id="edu-school" placeholder="Search schools..." type="text"></div></div>
+  <div><label for="_systemfield_education_history-degree">Degree</label><input id="_systemfield_education_history-degree" placeholder="e.g. Bachelor of Science" type="text"></div>
+  <div><label for="_systemfield_education_history-startDate">Start Date</label><div id="_systemfield_education_history-startDate"><div>
+    <select id="sm"><option disabled hidden value="">Month...</option><option value="1">January</option><option value="5">May</option><option value="9">September</option></select>
+    <select id="sy"><option disabled hidden value="">Year...</option><option value="2027">2027</option><option value="2023">2023</option></select></div></div></div>
+  <div><label for="_systemfield_education_history-endDate">End Date</label><div id="_systemfield_education_history-endDate"><div>
+    <select id="em"><option disabled hidden value="">Month...</option><option value="1">January</option><option value="5">May</option><option value="9">September</option></select>
+    <select id="ey"><option disabled hidden value="">Year...</option><option value="2027">2027</option><option value="2023">2023</option></select></div></div></div>
+  </div></div>
+<script>
+// remove the stray template marker used above
+document.querySelectorAll("fieldset").forEach((f) => f.childNodes.forEach((n) => { if (n.nodeType === 3 && n.textContent.includes("${")) n.remove(); }));
+// the school box has no id: its label's for= points at nothing
+document.getElementById("edu-school").removeAttribute("id");
+</script>
+</body>

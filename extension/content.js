@@ -87,6 +87,15 @@
       );
       if (text) return text;
     }
+    // A label whose for= names nothing on the page, just above the field's
+    // wrapper: Ashby's "School" (its search box has no id to point at).
+    for (let node = field.parentElement, depth = 0; node && depth < 2; node = node.parentElement, depth++) {
+      const label = node.previousElementSibling;
+      if (label && label.matches("label[for]") && !document.getElementById(label.htmlFor)) {
+        const text = clean(label.textContent);
+        if (text) return text;
+      }
+    }
     // Greenhouse and friends often put the label in a preceding sibling. Stop
     // at the first form control: anything before it is that control's label,
     // not ours, and walking past it silently steals the neighbour's name.
@@ -185,6 +194,25 @@
    * this way, and a radio is neither a text field nor a toggle button, so the
    * question was simply never collected.
    */
+  /**
+   * The question a group of options answers: the nearest label or legend,
+   * walking up from the options, that is not one of the options' own labels.
+   * Ashby wraps its radios in a <fieldset> with no <legend> and puts the
+   * question in a <label> just above; looking only for a legend dropped the
+   * degree, graduation, veteran, disability and transgender questions.
+   */
+  function questionFor(inputs) {
+    const own = (node) => inputs.some((i) => node.contains(i) || (i.id && node.htmlFor === i.id));
+    let node = inputs[0].parentElement;
+    for (let depth = 0; node && depth < 6; depth++, node = node.parentElement) {
+      const direct = questionText(inputs[0]);
+      if (direct && !own(direct) && clean(direct.textContent)) return clean(direct.textContent);
+      const found = [...node.querySelectorAll("label, legend, .application-label")].find((l) => !own(l) && clean(l.textContent));
+      if (found) return clean(found.textContent);
+    }
+    return "";
+  }
+
   function collectRadioGroups() {
     const groups = new Map();
     for (const radio of document.querySelectorAll('input[type="radio"]')) {
@@ -196,11 +224,7 @@
     for (const radios of groups.values()) {
       if (radios.length < 2 || radios.length > 12) continue;
       const first = radios[0];
-      const label = clean(
-        questionText(first)?.textContent ||
-          first.closest("fieldset")?.querySelector("legend")?.textContent ||
-          ""
-      );
+      const label = questionFor(radios);
       const options = radios.map((r) =>
         clean(
           r.closest("label")?.textContent ||
@@ -210,7 +234,7 @@
       );
       if (label.length < 2 || options.some((o) => !o)) continue;
       const element = first.closest(QUESTION_BOX) || first.parentElement;
-      if (!nodeVisible(element)) continue;
+      if (!nodeVisible(element) && !radios.some(nodeVisible)) continue;
       fields.push({ element, label, options, buttons: radios, combobox: false });
     }
     return fields;
@@ -233,7 +257,14 @@
     const box = element.closest('[data-automation-id]:is([data-automation-id^="workExperience-"], [data-automation-id^="education-"], [data-automation-id^="websitePanelSet-"], [data-automation-id^="certification-"], [data-automation-id^="language-"])');
     const byBox = box?.getAttribute("data-automation-id").match(/^([a-zA-Z]+)-(\d+)$/);
     const [, stem, n] = byId || byBox || [];
-    if (!stem) return "";
+    if (!stem) {
+      // Ashby: data-field-path="_systemfield_education_history" around the
+      // entry, whose own fields are just "Start Date", "Degree"...
+      const path = element.closest("[data-field-path]")?.getAttribute("data-field-path") || "";
+      const section = path.replace(/^_systemfield_/, "").replace(/_/g, " ").trim();
+      return /\b(education|experience|employment|work) history\b/i.test(section)
+        ? `${section.replace(/\b\w/g, (c) => c.toUpperCase())}: ` : "";
+    }
     const name = ENTRY_NAMES[stem] || stem.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
     // Workday's ids number entries its own way (the first job is
     // workExperience-20); a form's "Work Experience 1" is the first on the page.
@@ -289,6 +320,7 @@
   function dateLabel(wrapper) {
     const entry = wrapper.closest(FIELD_ENTRY);
     const candidates = [
+      wrapper.id && document.querySelector(`label[for="${CSS.escape(wrapper.id)}"]`),
       ...(entry ? entry.querySelectorAll("label, legend") : []),
       wrapper.getAttribute("aria-labelledby") && document.getElementById(wrapper.getAttribute("aria-labelledby")),
       ...[...wrapper.querySelectorAll(DATE_PART)].map((p) => p.id && document.querySelector(`label[for="${CSS.escape(p.id)}"]`)),
@@ -307,6 +339,15 @@
       fields.push({ element: button, label: listboxLabel(button), options: null, combobox: false, widget: "listbox" });
     }
     const wrappers = new Set();
+    // A Month... / Year... pair of <select>s under one label (Ashby's
+    // education Start Date / End Date) is a split date too.
+    for (const select of document.querySelectorAll("select")) {
+      if (!/^month/i.test(select.options[0]?.textContent.trim() || "")) continue;
+      const wrapper = select.parentElement?.closest("[id]") || select.parentElement;
+      if (wrapper && [...wrapper.querySelectorAll("select")].some((s) => /^year/i.test(s.options[0]?.textContent.trim() || "")) && nodeVisible(wrapper)) {
+        wrappers.add(wrapper);
+      }
+    }
     for (const part of document.querySelectorAll(DATE_PART)) {
       const wrapper = part.closest(DATE_WRAPPER) || part.closest('[data-automation-id^="formField"]') || part.parentElement;
       if (wrapper && nodeVisible(wrapper)) wrappers.add(wrapper);
@@ -355,13 +396,7 @@
 
   /** A group's question: its form field's own label, or Lever's / a legend. */
   function groupLabel(group) {
-    const first = group[0];
-    const own = group.field && [...group.field.querySelectorAll("label, legend")]
-      .find((node) => !group.some((box) => node.contains(box) || node.htmlFor === box.id));
-    return clean(
-      questionText(first)?.textContent || own?.textContent ||
-        first.closest("fieldset")?.querySelector("legend")?.textContent || ""
-    );
+    return questionFor([...group]);
   }
 
   function collectCheckboxGroups() {
@@ -824,9 +859,9 @@
   }
 
   function currentValue(field) {
-    const shown = field
-      .closest(SELECT_SHELL)
-      ?.querySelector('[class*="single-value"], [class*="multi-value__label"]');
+    const shell = field.closest(SELECT_SHELL);
+    if (!shell) return field.value.trim(); // not a React Select (Ashby's search boxes): its text is its value
+    const shown = shell.querySelector('[class*="single-value"], [class*="multi-value__label"]');
     return shown ? shown.textContent.trim() : "";
   }
 
@@ -1451,7 +1486,9 @@
   async function setDate(wrapper, value) {
     const parts = dateParts(value);
     if (!parts) return false;
-    const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"], input[aria-label="${name}"]`);
+    const selectFor = (name) => [...wrapper.querySelectorAll("select")]
+      .find((s) => new RegExp(`^${name}`, "i").test(s.options[0]?.textContent.trim() || ""));
+    const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"], input[aria-label="${name}"]`) || selectFor(name);
     // Workday's date widget re-renders on every change: a box held from
     // before is no longer on the page, and a value set on it goes nowhere.
     // Its ids are stable ("workExperience-1--startDate-dateSectionYear-input"),
@@ -1475,6 +1512,16 @@
       for (let attempt = 0; attempt < 2; attempt++) {
         const input = find();
         if (!input) return false;
+        if (input.tagName === "SELECT") {
+          // Options valued 1-12 / 2027, or worded "May": take the one that matches.
+          const option = [...input.options].find((o) => Number(o.value) === Number(text) || Number(o.textContent) === Number(text) ||
+            (input === month?.() && MONTH_NAMES[Number(text) - 1] === o.textContent.trim().slice(0, 3).toLowerCase()));
+          if (!option) return false;
+          input.value = option.value;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        }
         input.focus();
         nativeSet(input, text);
         input.dispatchEvent(new Event("change", { bubbles: true }));

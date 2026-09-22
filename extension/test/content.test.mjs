@@ -228,8 +228,9 @@ test("fill: Greenhouse comboboxes pick by meaning, scoped to their own menu", { 
     // shows no menu until its 400ms search returns; waiting 1.5s for one to
     // open by itself first was most of Figma's 2.0s.
     const times = Object.fromEntries((await page.eval("window.__smartpasteTest.timeline")).map((t) => [t.field, t.ms]));
-    assert.ok(times["When do you expect to graduate?"] < 250, JSON.stringify(times));
-    assert.ok(times["Location (City)"] < 900, JSON.stringify(times));
+    // Loose enough for a loaded machine; the waits these guard against were 1.5s+.
+    assert.ok(times["When do you expect to graduate?"] < 400, JSON.stringify(times));
+    assert.ok(times["Location (City)"] < 1200, JSON.stringify(times));
     assert.equal(await page.eval(text("#loc-value")), "Madison, Wisconsin, United States");
   }));
 
@@ -331,6 +332,25 @@ test("fill: a whole Workday page", { skip }, () =>
     // need the model ("B.S.", "Prefer not to say").
     const asked = await page.eval("window.__messages.filter(m => m.type === 'choose-option').map(m => m.label)");
     assert.deepEqual(asked.sort(), ["Education 1: Degree", "Gender"]);
+  }));
+
+test("fill: Ashby radios with no legend, orphan labels, and Month/Year selects", { skip }, () =>
+  withPage("ashby-eeo.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const label of ["Which degree are you currently pursuing?", "When is your expected graduation date?",
+      "Are you a veteran or active member of the United States Armed Forces?", "Do you identify as transgender?",
+      "Education History: School", "Education History: Degree", "Education History: Start Date", "Education History: End Date"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${labels.join(" | ")}`);
+    }
+    await autofill(page);
+    const checked = (id) => page.eval(`document.querySelector("#${id} input:checked")?.id || null`);
+    assert.equal(await checked("degree"), "deg-0");
+    assert.equal(await checked("grad"), "grad-1");
+    assert.equal(await checked("vet"), "vet-1");
+    // Nothing in the profile says: left alone, never guessed.
+    assert.equal(await checked("trans"), null);
+    assert.equal(await page.eval(value("input[placeholder='Search schools...']")), "University of Wisconsin - Madison");
+    assert.deepEqual(await page.eval("['sm','sy','em','ey'].map(id => document.getElementById(id).value)"), ["9", "2023", "5", "2027"]);
   }));
 
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>

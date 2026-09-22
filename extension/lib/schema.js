@@ -92,6 +92,8 @@ export const GROUPS = [
       ["race", "Race / ethnicity", "Prefer not to say"],
       ["hispanic_latino", "Hispanic or Latino?", "No"],
       ["lgbtq", "Identify as part of the LGBTQ+ community?", "Prefer not to say"],
+      ["transgender", "Identify as transgender?", "Prefer not to say"],
+      ["orientation", "Sexual orientation", "Prefer not to say"],
       ["veteran", "Veteran status", "I am not a protected veteran"],
       ["disability", "Disability status", "Prefer not to answer"],
     ],
