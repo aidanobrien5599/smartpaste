@@ -1,0 +1,125 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Submit application for 2027 Technology Summer Internship Program - Analyst Intern</title>
+<style>body{font:14px system-ui;max-width:720px;margin:20px auto}fieldset{margin:12px 0}
+label,legend{display:block;font-weight:600;margin-top:8px}input[type=text]{padding:4px;width:300px}
+[role=listbox]{border:1px solid #999;list-style:none;margin:0;padding:0;width:300px;background:#fff}
+[role=option]{padding:3px 6px;cursor:pointer}</style></head>
+<body>
+<!-- An Eightfold application (careers.newyorklife.com/careers/apply?pid=...),
+     rebuilt from its live markup on 2026-09-21. What broke smartpaste:
+       - "Position Specific Questions" is ONE <fieldset> around every
+         question in the section, radios included. Every text box in it was
+         taken for the "Other: ___" write-in of a choice question and
+         dropped; the rest were labelled with the section's legend.
+       - Each field names its own label by aria-labelledby, which has to
+         outrank the fieldset's legend.
+       - "Phone" is a fieldset of a country-code picker and a number box.
+       - Follow-ups ("If yes, please provide ...") explain a Yes; one got "No".
+       - An "Applicant Electronic Signature" box: my full name (my call),
+         which Jev left blank until the question said so.
+       - "Save my answers for future applications", ticked by the site on load. -->
+<h1>Application Form</h1>
+<form>
+<fieldset><legend>Application questions</legend>
+  <label for="Application_questions_email">Email</label>
+  <div class="input-module_input-wrapper"><input type="text" id="Application_questions_email" data-key="Email"></div>
+  <label for="Application_questions_firstname">Legal First Name</label>
+  <div class="input-module_input-wrapper"><input type="text" id="Application_questions_firstname" data-key="Legal First Name"></div>
+  <fieldset><legend id="Application_questions_phone_legend"><span>Phone</span></legend>
+    <div class="select-module_select-wrapper" id="Application_questions_phone-country-code">
+      <input role="combobox" aria-label="Country code" placeholder="Select country code" type="text" id="input-4" data-key="Country code" aria-controls="list-2" aria-expanded="false">
+      <!-- 254 rows live, sorted by ISO code, and typing does not filter them:
+           the US is past row 150, beyond what one Choice was shown. -->
+      <ul role="listbox" id="list-2" hidden></ul>
+    </div>
+    <div class="input-module_input-wrapper"><input type="text" id="Application_questions_phone" placeholder="Phone Number" data-key="Phone Number"></div>
+  </fieldset>
+</fieldset>
+
+<fieldset><legend id="Position_Specific_Questions_legend">Position Specific Questions</legend>
+  <div class="grid-module_row">
+    <label id="Position_Specific_Questions_94552_1_label" for="Position_Specific_Questions_94552_1"><span>Have you previously held an internship at New York Life?</span></label>
+    <div role="radiogroup" id="Position_Specific_Questions_94552_1" aria-labelledby="Position_Specific_Questions_94552_1_legend">
+      <input type="radio" name="Position_Specific_Questions_94552_1" id="p1-yes" aria-label="Yes, Have you previously held an internship at New York Life?" value="Yes"><label for="p1-yes">Yes</label>
+      <input type="radio" name="Position_Specific_Questions_94552_1" id="p1-no" aria-label="No, Have you previously held an internship at New York Life?" value="No"><label for="p1-no">No</label>
+    </div>
+  </div>
+  <div class="grid-module_row">
+    <label id="q_school_label" for="q_school">What is the name of your university/college? *Please ONLY use the official name listed on the drop-down</label>
+    <div class="input-module_input-wrapper"><input type="text" id="q_school" aria-labelledby="q_school_label" data-key="University"></div>
+  </div>
+  <div class="grid-module_row">
+    <label id="q_employer_label">Current Employer:</label>
+    <div class="input-module_input-wrapper"><input type="text" id="q_employer" aria-labelledby="q_employer_label" data-key="Current Employer"></div>
+  </div>
+  <div class="grid-module_row">
+    <label id="Position_Specific_Questions_q_cust_legalAuthUS_label">Are you currently authorized to work in the U.S.?</label>
+    <div class="select-module_select-wrapper" id="Position_Specific_Questions_q_cust_legalAuthUS">
+      <input role="combobox" aria-labelledby="Position_Specific_Questions_q_cust_legalAuthUS_label" aria-controls="list-17" aria-expanded="false" placeholder="Select" type="text" id="input-19" data-key="Authorized">
+      <ul role="listbox" id="list-17" hidden><li role="option">Yes</li><li role="option">No</li></ul>
+    </div>
+  </div>
+  <div class="grid-module_row">
+    <label id="q_related_label">Are you related to an employee of New York Life, its subsidiaries or affiliates?</label>
+    <div role="radiogroup" id="q_related" aria-labelledby="q_related_label">
+      <input type="radio" name="q_related" id="rel-yes" aria-label="Yes, Are you related to an employee of New York Life?" value="Yes"><label for="rel-yes">Yes</label>
+      <input type="radio" name="q_related" id="rel-no" aria-label="No, Are you related to an employee of New York Life?" value="No"><label for="rel-no">No</label>
+    </div>
+  </div>
+  <div class="grid-module_row">
+    <label id="q_relative_label">If yes, please provide the name of relative and relationship:</label>
+    <div class="input-module_input-wrapper"><input type="text" id="q_relative" aria-labelledby="q_relative_label" data-key="Relative"></div>
+  </div>
+  <div class="grid-module_row">
+    <label id="q_signature_label">Applicant Electronic Signature:</label>
+    <div class="input-module_input-wrapper"><input type="text" id="q_signature" aria-labelledby="q_signature_label" data-key="Signature"></div>
+  </div>
+  <label class="checkbox-module_label"><input type="checkbox" id="save-answers" checked data-key="Save my answers"> Save my answers for future applications</label>
+</fieldset>
+<!-- A long list with no answer in it: a failed pick must not leave the
+     word it searched for typed in the box. -->
+<fieldset><legend>Citizenship</legend>
+  <label id="q_citizen_label">Country of citizenship</label>
+  <div class="select-module_select-wrapper"><input role="combobox" aria-labelledby="q_citizen_label" aria-controls="list-30" aria-expanded="false" placeholder="Select" type="text" id="input-31" data-key="Citizenship">
+  <ul role="listbox" id="list-30" hidden></ul></div>
+</fieldset>
+<!-- A section with a single question: its legend is the section's title,
+     and only aria-labelledby says what the box is for. -->
+<fieldset><legend id="Additional_Information_legend">Additional Information</legend>
+  <label id="q_linkedin_label">LinkedIn Profile URL</label>
+  <div class="input-module_input-wrapper"><input type="text" id="q_linkedin" aria-labelledby="q_linkedin_label" data-key="LinkedIn"></div>
+</fieldset>
+</form>
+<script>
+window.__model = {};
+const record = (el) => {
+  if (!el.dataset.key) return;
+  window.__model[el.dataset.key] = el.type === "checkbox" ? el.checked : el.value;
+};
+document.addEventListener("input", (e) => record(e.target), true);
+document.addEventListener("change", (e) => {
+  if (e.target.type === "radio") window.__model[e.target.name] = e.target.value;
+  else record(e.target);
+}, true);
+// Country lists: 250 filler rows, the real ones sorted where the live
+// list has them.
+const fill = (id, rows) => { document.getElementById(id).innerHTML = rows.map((r) => `<li role="option">${r}</li>`).join(""); };
+const filler = Array.from({ length: 250 }, (_, i) => `(+${100 + i}) Country ${String.fromCharCode(65 + (i % 26))}${i}`);
+fill("list-2", ["🇦🇪 (+971) United Arab Emirates", ...filler.slice(0, 200), "🇬🇧 (+44) United Kingdom", "🇺🇸 (+1) United States of America", ...filler.slice(200)]);
+fill("list-30", filler);
+// The comboboxes: aria-controls names a listbox shown on click; an option
+// click sets the input's text.
+for (const input of document.querySelectorAll("[role=combobox]")) {
+  const list = document.getElementById(input.getAttribute("aria-controls"));
+  input.addEventListener("click", () => { list.hidden = false; input.setAttribute("aria-expanded", "true"); });
+  for (const option of list.querySelectorAll("[role=option]")) {
+    option.addEventListener("click", () => {
+      input.value = option.textContent;
+      window.__model[input.dataset.key] = option.textContent;
+      list.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+    });
+  }
+}
+</script>
+</body></html>

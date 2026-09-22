@@ -777,3 +777,44 @@ test("fill: Vercel -- a box after a shown linkedin.com/in/ prefix takes the hand
     assert.equal(await page.eval(value('[name="question_19385420004"]')), "aidanobrien5599");
     assert.equal(await page.eval(value('[name="question_19385421004"]')), "aidanobrien.dev");
   }));
+
+// eightfold.html: New York Life's Eightfold application, where one fieldset
+// holds a whole section and every text box in it was dropped.
+test("labels: Eightfold -- a section-wide fieldset, aria-labelledby over its legend", { skip }, () =>
+  withPage("eightfold.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const label of ["Email", "Legal First Name", "Country code", "Phone Number",
+      "What is the name of your university/college? *Please ONLY use the official name listed on the drop-down",
+      "Current Employer", "Are you currently authorized to work in the U.S.?", "LinkedIn Profile URL",
+      // A signature is my full legal name, and the question says so.
+      "Applicant Electronic Signature (type your full legal name)"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${JSON.stringify(labels)}`);
+    }
+    // The section's title is nobody's label; "Phone" was the country picker's.
+    assert.ok(!labels.includes("Position Specific Questions"), JSON.stringify(labels));
+    assert.ok(!labels.includes("Additional Information"), JSON.stringify(labels));
+    assert.ok(!labels.includes("Phone"), JSON.stringify(labels));
+    // Never ours: a Yes's explanation, a site preference.
+    for (const bad of [/^If yes/i, /save my answers/i]) {
+      assert.ok(!labels.some((l) => bad.test(l)), `${bad} was asked: ${JSON.stringify(labels)}`);
+    }
+  }));
+
+test("fill: Eightfold -- the section fills and signs; follow-up and site preference left alone", { skip }, () =>
+  withPage("eightfold.html", async (page) => {
+    await autofill(page, 60000);
+    const model = await page.eval("window.__model");
+    const want = {
+      Email: "aidanobrien5599@gmail.com", "Legal First Name": "Aidan", "Phone Number": "9082160389",
+      University: "University of Wisconsin - Madison", "Current Employer": "Netflix", Authorized: "Yes",
+      Position_Specific_Questions_94552_1: "No", q_related: "No",
+    };
+    for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model)}`);
+    assert.equal(model.Relative, undefined, "explained a Yes that was never given");
+    assert.equal(model.Signature, "Aidan O'Brien");
+    // Past row 150 of a list that never filters: shortlisted by shared words.
+    assert.equal(model["Country code"], "🇺🇸 (+1) United States of America");
+    // No answer in the list: the search word is not left behind as one.
+    assert.equal(await page.eval("document.getElementById('input-31').value"), "");
+    assert.equal(await page.eval("document.getElementById('save-answers').checked"), true, "changed the site's own preference");
+  }));

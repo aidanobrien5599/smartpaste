@@ -30,6 +30,13 @@ const ANSWERS = [
   [/^Education 1 \(University of Wisconsin - Madison\): Start & end date \(start\)$/, "Sep 2023"],
   [/^Education 1 \(University of Wisconsin - Madison\): Start & end date \(end\)$/, "May 2027"],
   [/^Preferred work location$/, "San Jose"], [/^Preferred interview language$/, "English"],
+  // eightfold.html. The follow-up has an answer here on purpose: smartpaste
+  // must not ask about it at all.
+  [/^Legal First Name$/, "Aidan"], [/^What is the name of your university/, "University of Wisconsin - Madison"],
+  [/^Current Employer$/, "Netflix"], [/previously held an internship/, "No"], [/^Country code$/, "+1 (United States)"], [/^Country of citizenship$/, "Atlantis"],
+  [/related to an employee/, "No"], [/relative and relationship/, "No"],
+  // Only the question as smartpaste words it: bare, Jev left it blank live.
+  [/Electronic Signature: \(type your full legal name\)$|Electronic Signature \(type your full legal name\)$/, "Aidan O'Brien"],
   // C3's Greenhouse-API form: an "Education" section of bare labels.
   [/^Education: School$/, "University of Wisconsin - Madison"], [/^Education: Degree$/, "Bachelor's Degree"],
   [/^Education: Field of study$/, "Computer Science"], [/^Education: Start$/, "Sep 2023"], [/^Education: End/, "May 2027"],

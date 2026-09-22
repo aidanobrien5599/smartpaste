@@ -12,7 +12,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(here, "fixtures");
-const CONTENT = join(here, "..", "content.js");
+// bench/mutation-check.mjs points this at a mutated copy, so the real
+// content.js is never rewritten under anyone else editing it.
+const CONTENT = process.env.SMARTPASTE_CONTENT || join(here, "..", "content.js");
 
 const CANDIDATES = [
   process.env.CHROME,

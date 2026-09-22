@@ -74,7 +74,18 @@
 
   function questionText(field) {
     const box = field.closest(QUESTION_BOX);
-    return box ? box.querySelector(QUESTION_TEXT) : null;
+    if (!box) return null;
+    // A fieldset around several fields is a section, and its legend the
+    // section's title ("Position Specific Questions"), not this question.
+    // (A fieldset of radios alone, as Lever draws a question, holds none.)
+    if ([...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length > 1) return null;
+    return box.querySelector(QUESTION_TEXT);
+  }
+
+  /** aria-labelledby may name several ids; their texts, in order. */
+  function labelledBy(field) {
+    const ids = (field.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
+    return ids.map((id) => document.getElementById(id)?.textContent || "").join(" ").trim();
   }
 
   // A label's text without what it hides from screen readers: Vercel's
@@ -102,12 +113,11 @@
       field.id && document.querySelector(`label[for="${CSS.escape(field.id)}"]`);
     const candidates = [
       byFor,
+      // What the field names as its label outranks the box it sits in.
+      labelledBy(field),
       questionText(field),
       field.closest("label"),
       field.getAttribute("aria-label"),
-      // It may name several ids ("labelText-undefined inputFieldLabel-…").
-      (field.getAttribute("aria-labelledby") || "").split(/\s+/)
-        .map((id) => id && document.getElementById(id)?.textContent.trim()).filter(Boolean).join(" "),
       field.labels && field.labels[0],
     ];
     for (const candidate of candidates) {
@@ -284,7 +294,10 @@
     const own = (node) => inputs.some((i) => node.contains(i) || (i.id && node.htmlFor === i.id));
     const foreign = (node) =>
       [...node.querySelectorAll(ANY_CONTROL)].some((c) => !inputs.includes(c)) ||
-      (node.htmlFor && !inputs.some((i) => i.id === node.htmlFor));
+      // A label for= the group's own container is the group's question:
+      // Eightfold's <label for="…_94552_1"> names the div[role=radiogroup].
+      (node.htmlFor && !inputs.some((i) => i.id === node.htmlFor) &&
+        !document.getElementById(node.htmlFor)?.contains(inputs[0]));
     let node = inputs[0].parentElement;
     for (let depth = 0; node && depth < 6; depth++, node = node.parentElement) {
       const direct = questionText(inputs[0]);
@@ -551,7 +564,7 @@
 
   // A lone checkbox is a yes/no question -- "I currently work here" -- unless
   // it is a consent. Those are the applicant's to tick, never ours.
-  const CONSENT = /agree|accept|consent|terms|privacy|acknowledg|certif|attest|marketing|newsletter|subscribe|remember me|sms|text messages?|contact me|do not sell/i;
+  const CONSENT = /agree|accept|consent|terms|privacy|acknowledg|certif|attest|marketing|newsletter|subscribe|remember me|save my (?:answers|information|details|profile)|sms|text messages?|contact me|do not sell/i;
 
   function collectSingleCheckboxes() {
     const fields = [];
@@ -621,10 +634,27 @@
   const bareMobile = (element, label) =>
     element.tagName === "INPUT" && /^(?:mobile|cell)$/i.test(label) ? `${label} phone number` : label;
 
+  // An electronic signature is my full legal name, typed: my choice, made
+  // once (2026-09-21), so it is filled like any name. But Jev read New York
+  // Life's bare "Applicant Electronic Signature" as nothing in my profile and
+  // left it blank, so the question says what a signature is.
+  const SIGNATURE = /\b(?:e-?signature|electronic signature|signature|sign your name|type your (?:full )?name to sign)\b/i;
+  const signatureLabel = (element, label) =>
+    element.tagName === "INPUT" && SIGNATURE.test(label) ? `${label} (type your full legal name)` : label;
+
+  // "If yes, please provide the name of the relative" explains a Yes. The
+  // profile never holds that explanation, and Jev filled one with "No".
+  const FOLLOW_UP = /^(?:if (?:yes|so)\b|if you answered yes\b|please (?:provide|give) (?:an? )?(?:explanation|details?) if you answered yes\b)/i;
+
   /** A write-in ("Other: ___") inside a choice question is not that question. */
   function insideChoiceQuestion(element) {
     const box = element.closest(QUESTION_BOX);
-    return Boolean(box) && box.querySelectorAll('input[type="checkbox"], input[type="radio"]').length >= 2;
+    if (!box || box.querySelectorAll('input[type="checkbox"], input[type="radio"]').length < 2) return false;
+    // A write-in is the one box in its question. A fieldset holding several
+    // is a section: New York Life's (Eightfold) "Position Specific Questions"
+    // is one <fieldset> around every question, and each was taken for the
+    // "Other: ___" of some checkbox in it and dropped.
+    return [...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length <= 1;
   }
 
   function collectFields() {
@@ -632,13 +662,13 @@
       .filter((element) => visible(element) && !element.matches(DATE_PART) && !insideChoiceQuestion(element) && !pageChrome(element) && !monthYearWrapper(element))
       .map((element) => ({
         element,
-        label: bareMobile(element, labelFor(element)),
+        label: signatureLabel(element, bareMobile(element, labelFor(element))),
         options: selectOptions(element),
         combobox: isCombobox(element),
         widget: element.matches(PROMPT_INPUT) ? "prompt" : null,
       }))
       .concat(collectWidgets())
-      .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label))
+      .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label) && !FOLLOW_UP.test(f.label))
       .concat(collectToggleGroups())
       .concat(collectRadioGroups())
       .concat(collectCheckboxGroups())
@@ -1219,8 +1249,14 @@
     // opened is just what it shows (a menu half-read showed a lone "No" to a
     // "Yes", and it was clicked).
     if (index < 0 && texts.length === 1 && searched) index = 0;
-    if (index < 0) index = await askChoice(labelFor(field), want, texts.slice(0, MAX_MENU));
+    // chooseAmong, not askChoice on the first 150: past Jev's list size it
+    // keeps the rows sharing a word with the answer. Eightfold's 254 country
+    // codes never filter as you type, and "(+1) United States" is past 150.
+    if (index < 0) index = await chooseAmong(labelFor(field), want, texts);
     if (index < 0 || !nodes[index]) {
+      // What we typed to search is not an answer: "United" was left in the
+      // country-code box.
+      if (searched) nativeSet(field, "");
       field.blur();
       return false;
     }

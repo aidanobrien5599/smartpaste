@@ -43,6 +43,10 @@ if (!url || !existsSync(binary)) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 rmSync(join(profile, "DevToolsActivePort"), { force: true });
+// The extension's service worker is cached in the profile, and a change to a
+// module it imports (lib/profile.js) did not reach a run while background.js
+// itself was unchanged: the run tested yesterday's code. Start clean.
+rmSync(join(profile, "Default", "Service Worker"), { recursive: true, force: true });
 const chrome = spawn(binary, [
   "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run",
   "--no-default-browser-check", "--window-size=1280,1400",
@@ -79,8 +83,16 @@ socket.onmessage = ({ data }) => {
     const text = m.params.args.map((a) => a.value ?? a.preview?.properties?.map((p) => `${p.name}=${p.value}`).join(" ") ?? a.description ?? "").join(" ");
     if (/smartpaste|jev|SPTRACE/i.test(text)) logs.push(`[${m.params.type}] ${text}`);
   }
+  if (m.method === "Debugger.paused" && onPaused) onPaused(m.params);
+  // A dialog blocks the page's JavaScript and every evaluate with it: say
+  // what it asked, then dismiss it (Cancel: never agree to anything unread).
+  if (m.method === "Page.javascriptDialogOpening") {
+    console.log(`DIALOG (${m.params.type}): ${String(m.params.message).slice(0, 300)}`);
+    socket.send(JSON.stringify({ id: ++nextId, method: "Page.handleJavaScriptDialog", params: { accept: false } }));
+  }
   if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result || m); pending.delete(m.id); }
 };
+let onPaused = null;
 const send = (method, params = {}) => new Promise((r) => { const id = ++nextId; pending.set(id, r); socket.send(JSON.stringify({ id, method, params })); });
 // A page that is busy (or showing a dialog) can hold an evaluate forever.
 const evaluate = async (expression) => {
@@ -88,8 +100,27 @@ const evaluate = async (expression) => {
     send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }),
     sleep(15000).then(() => ({ exceptionDetails: { exception: { description: "evaluate timed out" } } })),
   ]);
+  if (r.exceptionDetails?.exception?.description === "evaluate timed out") await frozen();
   return r.exceptionDetails ? { error: r.exceptionDetails.exception?.description } : r.result?.value;
 };
+
+// The page stopped answering: pause its JavaScript, print where it is
+// stuck, and stop -- waiting out every timeout took 20+ minutes.
+async function frozen() {
+  console.log("PAGE FROZE -- pausing its JavaScript:");
+  const paused = new Promise((resolve) => { onPaused = resolve; });
+  send("Debugger.enable");
+  send("Debugger.pause");
+  const where = await Promise.race([paused, sleep(10000).then(() => null)]);
+  if (!where) console.log("  (it would not pause)");
+  for (const f of where?.callFrames?.slice(0, 15) || []) {
+    console.log(`  at ${f.functionName || "(anonymous)"} ${f.url.split("/").pop()}:${f.location.lineNumber + 1}`);
+  }
+  console.log("SMARTPASTE LOG:");
+  for (const line of logs) console.log(`  ${line.slice(0, 3000)}`);
+  chrome.kill();
+  process.exit(2);
+}
 
 await send("Page.enable");
 await send("Runtime.enable");
@@ -106,6 +137,8 @@ if (/log-?in|sign-?in/i.test(await evaluate("location.href + document.title"))) 
 let pill = null;
 for (let i = 0; i < 60 && !pill; i++) {
   pill = await evaluate("document.querySelector('.smartpaste-button')?.textContent || null");
+  // An exception from the page ({error}) is not a pill: say so and keep looking.
+  if (pill && typeof pill === "object") { console.log(`page error: ${String(pill.error).slice(0, 200)}`); pill = null; }
   if (!pill) await sleep(500);
 }
 console.log(`PILL: ${pill}`);
@@ -147,6 +180,38 @@ const fields = await evaluate(`(() => {
 })()`);
 console.log("FIELDS:");
 for (const line of fields || []) console.log(line);
+
+// Every field's value as the page shows it, labelled the way a screen
+// reader would: aria-labelledby, label[for], a wrapping label, aria-label.
+// Radios are one line per group, showing the ticked option.
+const controls = await evaluate(`(() => {
+  const clean = (t) => (t || "").replace(/\\s+/g, " ").trim();
+  const labelOf = (el) => clean(
+    (el.getAttribute("aria-labelledby") || "").split(/\\s+/).map((id) => document.getElementById(id)?.textContent || "").join(" ") ||
+    (el.id && document.querySelector('label[for="' + CSS.escape(el.id) + '"]')?.textContent) ||
+    el.closest("label")?.textContent || el.getAttribute("aria-label") || el.placeholder || el.name || "");
+  const out = [];
+  const radios = new Map();
+  for (const el of document.querySelectorAll("input, textarea, select")) {
+    if (el.type === "hidden" || el.type === "file" || (!el.getBoundingClientRect().width && el.type !== "radio" && el.type !== "checkbox")) continue;
+    if (el.type === "radio") {
+      const group = radios.get(el.name) || { el, picked: null };
+      if (el.checked) group.picked = labelOf(el);
+      radios.set(el.name, group);
+      continue;
+    }
+    const value = el.type === "checkbox" ? (el.checked ? "[ticked]" : "")
+      : el.tagName === "SELECT" ? (el.value ? el.selectedOptions[0]?.textContent : "") : el.value;
+    out.push((value ? "  = " : "  ✗ ") + labelOf(el).slice(0, 80) + (value ? " => " + clean(value).slice(0, 80) : ""));
+  }
+  for (const { el, picked } of radios.values()) {
+    const q = clean(el.closest("fieldset, [role=radiogroup]")?.querySelector("legend, [id$=_label]")?.textContent || el.name);
+    out.push((picked ? "  = " : "  ✗ ") + q.slice(0, 80) + (picked ? " => " + picked.slice(0, 40) : ""));
+  }
+  return out;
+})()`);
+console.log("CONTROLS:");
+for (const line of controls || []) console.log(line);
 
 chrome.kill();
 process.exit(0);

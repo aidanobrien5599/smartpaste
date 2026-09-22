@@ -5,20 +5,23 @@
 // For each entry below: undo one fix in extension/content.js, run the
 // content tests that should guard it, and report CAUGHT (some test failed
 // or hung) or MISSED (everything still passed -- the fix is unguarded).
-// content.js is restored afterwards, whatever happens.
+// Each mutant is a temp copy the tests load via SMARTPASTE_CONTENT; the real
+// content.js is only read. (Rewriting it in place once erased another
+// session's commit that landed mid-run.)
 //
 // Add an entry whenever a live bug gets a fix and a test: the entry is the
 // proof the test can see the bug. A MISSED entry means the fixture is kinder
 // than the site (bytedance.html's menus once closed each other, which the
 // real page never does, and hid the stale-menu bug).
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(root, "extension", "content.js");
-const TESTS = "C3|ByteDance|year|consent box";
+const TESTS = "C3|ByteDance|Eightfold|year|consent box";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -43,10 +46,21 @@ const MUTATIONS = [
   ["bare Add found by section title", "if (section && !found.some((f) => f.root === section.root)) found.push({ ...section, prefix: \"\", button });", ""],
   ["roles split intern / work", "(p.experience || []).filter((role) => !split || !isIntern(role))", "(p.experience || [])"],
   ["card label names its entry", 'return `${titled.name} ${n}${subject ? ` (${subject})` : ""}: `;', "return `${titled.name} ${n}: `;"],
+  ["a section-wide fieldset is not a write-in", "return [...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length <= 1;", "return true;"],
+  ["a section's legend is no field's label", "if ([...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length > 1) return null;", ""],
+  ["aria-labelledby outranks the legend", "      labelledBy(field),\n      questionText(field),", "      questionText(field),\n      labelledBy(field),"],
+  ["label for= a group's container", "&&\n        !document.getElementById(node.htmlFor)?.contains(inputs[0]));", ");"],
+  ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
+  ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
+  ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],
+  ["long menus shortlisted by shared words", "if (index < 0) index = await chooseAmong(labelFor(field), want, texts);", "if (index < 0) index = await askChoice(labelFor(field), want, texts.slice(0, MAX_MENU));"],
+  ["a failed pick clears its search text", "      if (searched) nativeSet(field, \"\");\n", ""],
 ];
 
 const filter = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
 const original = readFileSync(SRC, "utf8");
+const scratch = mkdtempSync(join(tmpdir(), "smartpaste-mutant-"));
+const MUTANT = join(scratch, "content.js");
 let missed = 0;
 try {
   for (const [name, fixed, before] of MUTATIONS) {
@@ -56,9 +70,9 @@ try {
       missed++;
       continue;
     }
-    writeFileSync(SRC, original.replace(fixed, before));
+    writeFileSync(MUTANT, original.replace(fixed, before));
     const run = spawnSync("node", ["--test", `--test-name-pattern=${TESTS}`, "extension/test/content.test.mjs"],
-      { cwd: root, encoding: "utf8", timeout: 240_000 });
+      { cwd: root, encoding: "utf8", timeout: 240_000, env: { ...process.env, SMARTPASTE_CONTENT: MUTANT } });
     const failed = [...new Set([...(run.stdout || "").matchAll(/^✖ (.+?) \(\d/gm)].map((m) => m[1]))];
     const hung = run.error?.code === "ETIMEDOUT";
     if (hung) spawnSync("pkill", ["-f", "smartpaste-chrome-"]);
@@ -67,6 +81,6 @@ try {
     console.log(`${caught ? "CAUGHT" : "MISSED"}  ${name}${hung ? " -> (hung)" : failed.length ? ` -> ${failed.map((f) => f.slice(0, 50)).join("; ")}` : ""}`);
   }
 } finally {
-  writeFileSync(SRC, original);
+  rmSync(scratch, { recursive: true, force: true });
 }
 process.exit(missed ? 1 : 0);
