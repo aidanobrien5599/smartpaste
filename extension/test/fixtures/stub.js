@@ -48,7 +48,7 @@ const ANSWERS = [
   [/Websites 1: URL/, "https://www.linkedin.com/in/aidanobrien5599"], [/Websites 2: URL/, "https://github.com/aidanobrien5599"],
   [/Add Skills/, "Languages: Python, TypeScript, Java\nFrameworks: React, Next.js"],
   // oracle.html
-  [/come into the office/i, "Yes"],
+  [/come into the office/i, "Yes"], [/^Degree$/, "Bachelor of Science"],
   [/hear about/i, "LinkedIn"],
   [/first see this job/i, "Career Site"],
   [/^date$/i, "09/21/2026"], [/available start/i, "May 15, 2027"],

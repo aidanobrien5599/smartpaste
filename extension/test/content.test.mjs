@@ -411,6 +411,7 @@ test("fill: Oracle Recruiting Cloud -- pills, a two-id aria-labelledby, hidden r
     const pill = (id) => page.eval(`document.querySelector('#${id} [aria-checked="true"]')?.textContent.trim() || null`);
     assert.equal(await pill("q-office"), "Yes");
     assert.equal(await pill("q-sponsor"), "No");
+    assert.equal(await pill("q-degree"), "Bachelor's Degree");
     assert.deepEqual(await page.eval("[...document.querySelectorAll('.input-row--radiogroup input:checked')].map(b => b.id)"), ["dq-option-3"]);
     assert.equal(await page.eval(value("#country-codes-dropdownphoneNumber")), "+1");
   }));

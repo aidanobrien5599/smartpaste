@@ -241,8 +241,10 @@
     for (const [wrap, buttons] of groups) {
       // One label and a handful of buttons means one question; more than that
       // and we have walked up into a container holding several fields.
-      if (buttons.length < 2 || buttons.length > 8) continue;
       const named = wrap.matches('[role="radiogroup"][aria-label]') ? wrap.getAttribute("aria-label") : null;
+      // A group the page itself names as one question can be long: Oracle's
+      // Degree is ten pills. Unnamed, more than eight is several fields.
+      if (buttons.length < 2 || buttons.length > (named ? 20 : 8)) continue;
       if (!named && wrap.querySelectorAll("label, legend").length !== 1) continue;
       const label = clean(named ?? wrap.querySelector("label, legend").textContent);
       const options = buttons.map((b) => b.textContent.trim()).filter(Boolean);
