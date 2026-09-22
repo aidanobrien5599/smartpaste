@@ -54,6 +54,15 @@
     'input[type="tel"], input[type="url"], input[type="search"], ' +
     'input[type="date"], textarea, select';
   const MIN_FIELDS = 2;
+
+  // SmartRecruiters draws every control as a web component with an open
+  // shadow root, and document.querySelectorAll never looks inside one: its
+  // one-click form read as a page with no fields at all.
+  function deepAll(selector, root = document) {
+    const out = [...root.querySelectorAll(selector)];
+    for (const el of root.querySelectorAll("*")) if (el.shadowRoot) out.push(...deepAll(selector, el.shadowRoot));
+    return out;
+  }
   const answers = new WeakMap(); // field element -> resolved answer
   const asked = new WeakSet(); // fields sent to Jev, answered or not
   const cycle = new WeakMap(); // field element -> index into alternatives
@@ -78,6 +87,17 @@
   }
 
   function labelFor(field) {
+    // Inside a component, the label is the component's own attribute
+    // (<spl-input label="First name">), or a <label> in the same shadow root.
+    const root = field.getRootNode();
+    if (root instanceof ShadowRoot) {
+      const host = root.host;
+      const inner = field.id && root.querySelector(`label[for="${CSS.escape(field.id)}"]`);
+      for (const text of [inner && shownText(inner), host.getAttribute("label"), field.getAttribute("aria-label"),
+        host.getAttribute("splarialabel"), host.getAttribute("aria-label")]) {
+        if (clean(text)) return clean(text);
+      }
+    }
     const byFor =
       field.id && document.querySelector(`label[for="${CSS.escape(field.id)}"]`);
     const candidates = [
@@ -601,7 +621,7 @@
   }
 
   function collectFields() {
-    return [...document.querySelectorAll(FIELD_SELECTOR)]
+    return deepAll(FIELD_SELECTOR)
       .filter((element) => visible(element) && !element.matches(DATE_PART) && !insideChoiceQuestion(element) && !pageChrome(element) && !monthYearWrapper(element))
       .map((element) => ({
         element,
@@ -657,7 +677,7 @@
 
   function looksLikeApplication(fields) {
     // A resume upload settles it; so does the ATS's own application flow.
-    const uploads = [...document.querySelectorAll(FILE_SELECTOR)].filter(nodeVisible);
+    const uploads = deepAll(FILE_SELECTOR).filter(nodeVisible);
     if (uploads.some((input) => documentFor(fileHintTiers(input).join(" ")) === "resume")) return true;
     if (fields.length && inApplicationFlow()) return true;
     const kinds = new Set();
@@ -1856,13 +1876,19 @@
     const explicit = input.id
       ? document.querySelector(`label[for="${CSS.escape(input.id)}"]`)?.textContent || ""
       : "";
+    // Inside a component (SmartRecruiters' <spl-dropzone>) the component's
+    // data-test names it: "resume-upload". Not "apply-with-resume-container":
+    // that one is the site's own resume parser, for the reason below.
+    const host = input.getRootNode().host;
+    const named = host?.getAttribute("data-test") || "";
+    const hostName = /apply-with|autofill|parse/i.test(named) ? "" : named;
     return [
       // Only evidence the element states about itself. labelFor()'s sibling
       // walk is deliberately excluded: an unlabelled dropzone sits next to the
       // words "Autofill from resume", and letting that count outranks the real
       // Resume field -- which hands the file to the site's own parser, which
       // re-renders the form and wipes everything already filled.
-      [explicit, input.id || "", input.name || "",
+      [explicit, hostName, input.id || "", input.name || "",
        input.getAttribute("aria-label") || "",
        // Workday: <div data-automation-id="resumeUpload"> around a bare input
        input.closest('[data-automation-id*="resume" i], [aria-labelledby*="resume" i], [data-fkit-id*="resume" i]')
@@ -1915,7 +1941,7 @@
    * a DataTransfer -- which is how a drag-and-drop would have delivered it.
    */
   async function attachDocuments() {
-    const inputs = [...document.querySelectorAll(FILE_SELECTOR)].filter(
+    const inputs = deepAll(FILE_SELECTOR).filter(
       (el) => !el.disabled && !el.files.length
     );
     if (!inputs.length) return 0;
@@ -2424,7 +2450,7 @@
   /* ---------------------------------------------------------------- button */
 
   async function countAttachable() {
-    const inputs = [...document.querySelectorAll(FILE_SELECTOR)].filter(
+    const inputs = deepAll(FILE_SELECTOR).filter(
       (el) => !el.disabled && !el.files.length
     );
     if (!inputs.length) return 0;

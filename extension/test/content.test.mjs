@@ -381,6 +381,22 @@ test("fill: Ashby radios with no legend, orphan labels, and Month/Year selects",
     assert.deepEqual(await page.eval("['em','ey'].map(id => document.getElementById(id).value)"), ["", ""]);
   }));
 
+test("fill: SmartRecruiters -- inputs inside web components, labelled on the host", { skip }, () =>
+  withPage("smartrecruiters.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const label of ["First name", "Last name", "Email", "Confirm your email", "Phone number", "LinkedIn"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${labels.join(" | ")}`);
+    }
+    await autofill(page);
+    const model = await page.eval("window.__model");
+    assert.equal(model["first-name-input"], "Aidan");
+    assert.equal(model["last-name-input"], "O'Brien");
+    assert.equal(model["confirm-email-input"], "aidanobrien5599@gmail.com");
+    assert.equal(model["linkedin-input"], "https://www.linkedin.com/in/aidanobrien5599");
+    assert.equal(model["resume-upload"], "resume.pdf");
+    assert.equal(model["apply-with-resume-container"], undefined, "never hand the file to the site's parser");
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);

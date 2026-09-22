@@ -1,0 +1,58 @@
+<!doctype html><meta charset="utf-8"><title>Summer 2027 Intern - Software Engineering | Easy Apply</title>
+<body style="font:14px system-ui;max-width:640px;margin:30px auto">
+<!-- As inspected on SmartRecruiters' one-click apply (Western Digital,
+     2026-09-21): every control is a Lit web component with an open shadow
+     root. The <input> lives inside it, and its label is only an attribute on
+     the component (label="First name"), or splarialabel on the phone box. -->
+<script>
+window.__model = {};
+class SplInput extends HTMLElement {
+  connectedCallback() {
+    if (this.shadowRoot) return;
+    const root = this.attachShadow({ mode: "open" });
+    const multi = this.tagName === "SPL-TEXTAREA";
+    const label = this.getAttribute("label");
+    root.innerHTML = (label ? `<label for="${this.id}">${label}</label>` : "") +
+      (multi ? `<textarea id="${this.id}"></textarea>` : `<input id="${this.id}" type="${this.getAttribute("type") || "text"}" placeholder="">`);
+    const input = root.querySelector("input, textarea");
+    const aria = this.getAttribute("splarialabel");
+    if (aria) input.setAttribute("aria-label", aria);
+    // Like Lit + Angular: the component re-emits its value from the host.
+    input.addEventListener("input", () => {
+      this.value = input.value;
+      window.__model[this.id] = input.value;
+      this.dispatchEvent(new CustomEvent("splInput", { detail: input.value, bubbles: true, composed: true }));
+    });
+  }
+}
+customElements.define("spl-input", SplInput);
+customElements.define("spl-textarea", class extends SplInput {});
+customElements.define("spl-dropzone", class extends HTMLElement {
+  connectedCallback() {
+    if (this.shadowRoot) return;
+    this.attachShadow({ mode: "open" }).innerHTML = `<div>Drop a file here or <button>browse</button><input type="file" id="file-input"></div>`;
+    this.shadowRoot.querySelector("input").addEventListener("change", (e) => { window.__model[this.dataset.test] = e.target.files[0]?.name; });
+  }
+});
+</script>
+<h1>Summer 2027 Intern - Software Engineering</h1>
+<!-- The site's own resume parser: a file dropped here re-renders the form. -->
+<div class="spl-flex"><p>Autofill from resume</p><spl-form-field><spl-dropzone data-test="apply-with-resume-container"></spl-dropzone></spl-form-field></div>
+<div data-test="personal-info" class="form-section">
+  <h2>Personal information</h2>
+  <oc-input formcontrolname="firstName"><spl-input id="first-name-input" type="text" label="First name" required></spl-input></oc-input>
+  <oc-input formcontrolname="lastName"><spl-input id="last-name-input" type="text" label="Last name" required></spl-input></oc-input>
+  <oc-input formcontrolname="email"><spl-input id="email-input" type="email" label="Email" required></spl-input></oc-input>
+  <oc-input formcontrolname="emailConfirmation"><spl-input id="confirm-email-input" type="email" label="Confirm your email" required></spl-input></oc-input>
+  <div class="c-spl-phone-field" role="group"><spl-input id="spl-form-element_5" type="tel" splarialabel="Phone number"></spl-input></div>
+</div>
+<div data-test="web" class="form-section">
+  <h2>Your Profiles</h2>
+  <oc-input formcontrolname="linkedIn"><spl-input id="linkedin-input" type="text" label="LinkedIn"></spl-input></oc-input>
+  <oc-input formcontrolname="website"><spl-input id="website-input" type="text" label="Website"></spl-input></oc-input>
+</div>
+<div data-test="resume-upload-container" class="form-section">
+  <h2>Resume</h2>
+  <spl-form-field><spl-dropzone data-test="resume-upload"></spl-dropzone></spl-form-field>
+</div>
+</body>
