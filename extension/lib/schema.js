@@ -58,6 +58,13 @@ export const GROUPS = [
       ["over_18", "At least 18 years of age", "Yes"],
       ["related_employee", "Related to anyone who works at the company I'm applying to", "No"],
       ["non_compete", "Bound by a non-compete or other agreement that could limit this job", "No"],
+      // Scoped like the flexibility catch-all below, and for the same reason:
+      // PwC alone asks four of these, each worded its own way. It names what
+      // it covers so it never answers work authorization, sponsorship or age.
+      ["history_default", "Default answer on any other yes/no question about " +
+        "my past or present ties to the company (worked, contracted or consulted " +
+        "for it, been its client, a relationship with someone there), my prior " +
+        "work, certifications or licenses held, or conflicts and restrictions", "No"],
     ],
   },
   {

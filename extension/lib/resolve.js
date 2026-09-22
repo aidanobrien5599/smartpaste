@@ -227,3 +227,30 @@ export function maxTicks(label) {
     String(label).match(/\bup to (\d+)\b/i);
   return m ? Number(m[1]) : Infinity;
 }
+
+/**
+ * A Yes/No dropdown answered through the profile's own labels.
+ *
+ * Asked to pick "Yes" or "No" directly, Jev rarely leans on a catch-all
+ * ("Default answer on any other question about my ties to the company"):
+ * PwC's "worked with an engagement team as a client?" came back 0.35-0.46.
+ * Asked which profile entry answers it, it picks that catch-all at 0.9+. So
+ * a Yes/No dropdown asks both, and a confident entry that starts with Yes
+ * or No selects the matching option. Returns that option's index, or -1.
+ */
+export function yesNoFromEntry(fieldOptions, answer, options) {
+  if (!answer || answer.choice === NONE) return -1;
+  const option = options[answer.choice];
+  if (!isStructured(option)) return -1;
+  const confidence = Math.min(Number(answer.probabilities?.[answer.choice] ?? 0), Number(answer.confidence ?? 0));
+  if (confidence < AUTO) return -1;
+  const said = String(valueOf(option)).trim().match(/^(yes|no)\b/i);
+  if (!said) return -1;
+  return fieldOptions.findIndex((text) => String(text).trim().toLowerCase() === said[1].toLowerCase());
+}
+
+/** Whether a dropdown's choices include both a plain "Yes" and a plain "No". */
+export function isYesNo(fieldOptions) {
+  const set = new Set((fieldOptions || []).map((t) => String(t).trim().toLowerCase()));
+  return set.has("yes") && set.has("no");
+}

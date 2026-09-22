@@ -13,7 +13,7 @@ import {
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
-import { AUTO, MENU, maxTicks, resolve } from "./lib/resolve.js";
+import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoFromEntry } from "./lib/resolve.js";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
 import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.js";
 
@@ -228,6 +228,14 @@ async function answerFields(fields, page = {}) {
         instructions: { field: field.label, ask: ASK_SELECT },
         criteria: choices,
       };
+      // See yesNoFromEntry: the same question, answered by profile entry.
+      if (isYesNo(field.options)) {
+        questions[`f${i}_entry`] = {
+          type: "choice",
+          instructions: { field: field.label, ask: ASK_TEXT },
+          criteria,
+        };
+      }
     } else {
       questions[`f${i}`] = {
         type: "choice",
@@ -285,6 +293,20 @@ async function answerFields(fields, page = {}) {
         Number(answer.confidence ?? 0)
       );
       const picked = field.options[index];
+      if (answer.choice === NONE || picked === undefined || confidence < AUTO) {
+        const entry = yesNoFromEntry(field.options, answers[`f${i}_entry`], options);
+        if (entry >= 0) {
+          const a = answers[`f${i}_entry`];
+          return {
+            label: field.label,
+            status: "auto",
+            value: field.options[entry],
+            confidence: Math.min(Number(a.probabilities?.[a.choice] ?? 0), Number(a.confidence ?? 0)),
+            isSelect: true,
+            alternatives: [],
+          };
+        }
+      }
       if (answer.choice === NONE || picked === undefined || confidence < 0.4) {
         return { label: field.label, status: "none", value: null, confidence, alternatives: [] };
       }

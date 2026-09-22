@@ -1,9 +1,7 @@
 // Unit tests for extension/lib. Run: node --test extension/test/
-// The JS refine() is a port of smartpaste/answer.py and has drifted from it
-// once already (it lost "end" from its end-of-range words); these pin it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { maxTicks, refine, resolve } from "../lib/resolve.js";
+import { isYesNo, maxTicks, refine, resolve, yesNoFromEntry } from "../lib/resolve.js";
 import { buildOptions, unwrap, extraSnippets, NONE } from "../lib/profile.js";
 
 test("refine: names from an all-caps header", () => {
@@ -146,4 +144,24 @@ test("maxTicks: how many boxes a question allows", () => {
   assert.equal(maxTicks("Select only one"), 1);
   assert.equal(maxTicks("Language Skill(s) (Check all that apply)"), Infinity);
   assert.equal(maxTicks("Which offices? (select all)"), Infinity);
+});
+
+test("buildOptions defaults conflict-of-interest answers to No unless set", () => {
+  const o = buildOptions({ first_name: "Aidan" });
+  assert.equal(o.related_employee.value, "No");
+  assert.equal(o.non_compete.value, "No");
+  assert.equal(o.history_default.value, "No");
+  assert.match(o.history_default.field, /ties to the company/);
+  assert.equal(buildOptions({ non_compete: "Yes, a 6-month non-compete" }).non_compete.value, "Yes, a 6-month non-compete");
+});
+
+test("yesNoFromEntry: a confident Yes/No profile entry selects the matching option", () => {
+  const options = buildOptions({ first_name: "Aidan" });
+  const sure = { choice: "history_default", confidence: 0.95, probabilities: { history_default: 0.95 } };
+  assert.equal(yesNoFromEntry(["Select One", "Yes", "No"], sure, options), 2);
+  assert.equal(yesNoFromEntry(["Select One", "Yes", "No"], { ...sure, confidence: 0.5 }, options), -1);
+  assert.equal(yesNoFromEntry(["Yes", "No"], { choice: "first_name", confidence: 1, probabilities: { first_name: 1 } }, options), -1);
+  assert.equal(yesNoFromEntry(["Yes", "No"], { choice: NONE, confidence: 1, probabilities: { [NONE]: 1 } }, options), -1);
+  assert.ok(isYesNo(["Select One", "Yes", "No"]));
+  assert.ok(!isYesNo(["Midwest", "West"]));
 });
