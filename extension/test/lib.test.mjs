@@ -163,6 +163,15 @@ test("buildOptions: Say yes offers a Yes catch-all for willing / able questions,
   assert.equal(buildOptions({ willing_default: "No" }, "", { say_yes: true }).willing_default.value, "No");
 });
 
+test("buildOptions: names get a straight apostrophe; a US phone gets a +1 country code", () => {
+  const o = buildOptions({ first_name: "Aidan", last_name: "O’Brien", full_name: "Aidan O’Brien", phone: "908-216-0389" });
+  assert.equal(o.last_name.value, "O'Brien");
+  assert.equal(o.full_name.value, "Aidan O'Brien");
+  assert.equal(o.phone_country_code.value, "+1 (United States)");
+  assert.equal(buildOptions({ first_name: "Aidan", last_name: "O’Brien" }).full_name.value, "Aidan O'Brien");
+  assert.equal(buildOptions({ phone: "+44 20 7946 0000", country: "United Kingdom" }).phone_country_code, undefined);
+});
+
 test("yesNoFromEntry: a confident Yes/No profile entry selects the matching option", () => {
   const options = buildOptions({ first_name: "Aidan" });
   const sure = { choice: "history_default", confidence: 0.95, probabilities: { history_default: 0.95 } };

@@ -248,6 +248,8 @@ export const FIELDS = GROUPS.flatMap((g) =>
 
 export const LABELS = Object.fromEntries(FIELDS.map((f) => [f.key, f.label]));
 
+LABELS.phone_country_code = "Phone number country code";
+
 // Offered only with Settings -> "Say yes" on (lib/profile.js); not a form field.
 LABELS.willing_default = "Default answer on any yes/no question about whether " +
   "I am willing, able or intend to do something the job asks: commit to its " +

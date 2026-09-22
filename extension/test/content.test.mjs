@@ -397,6 +397,24 @@ test("fill: SmartRecruiters -- inputs inside web components, labelled on the hos
     assert.equal(model["apply-with-resume-container"], undefined, "never hand the file to the site's parser");
   }));
 
+test("fill: Oracle Recruiting Cloud -- pills, a two-id aria-labelledby, hidden race boxes", { skip }, () =>
+  withPage("oracle.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const label of ["Are you willing and able to come into the office as required for this position?",
+      "Will you now or in the future require employer sponsorship in order to obtain or maintain work authorization?",
+      "Select the races you identify with.", "Country code", "Full Name"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${labels.join(" | ")}`);
+    }
+    // The country code was once read as "Phone Number" and got the number.
+    assert.ok(!labels.filter((l) => l === "Phone Number").length || labels.filter((l) => l === "Phone Number").length === 1);
+    await autofill(page);
+    const pill = (id) => page.eval(`document.querySelector('#${id} [aria-checked="true"]')?.textContent.trim() || null`);
+    assert.equal(await pill("q-office"), "Yes");
+    assert.equal(await pill("q-sponsor"), "No");
+    assert.deepEqual(await page.eval("[...document.querySelectorAll('.input-row--radiogroup input:checked')].map(b => b.id)"), ["dq-option-3"]);
+    assert.equal(await page.eval(value("#country-codes-dropdownphoneNumber")), "+1");
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);

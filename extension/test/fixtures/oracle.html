@@ -1,0 +1,67 @@
+<!doctype html><meta charset="utf-8"><title>2027 Software Engineer Summer Internship application | Lazard Careers</title>
+<style>body{font:14px system-ui;max-width:640px;margin:30px auto}
+.input-row__hidden-control{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.cx-select-pill-section[aria-checked=true]{background:#cde}</style>
+<!-- Oracle Recruiting Cloud (Lazard, 2026-09-21), trimmed from the live page:
+     Yes/No questions are "pills" (buttons in a ul[role=radiogroup] whose
+     aria-label is the question, in a plain .input-row); the phone's country
+     code is labelled by aria-labelledby naming two ids; race is a group of
+     unnamed, visually hidden checkboxes; the e-signature must match the
+     name on the form exactly. -->
+<main><form>
+<h2>Contact Information</h2>
+<div class="input-row"><label class="input-row__label" for="lastName-1"><span class="input-row__linebreak" id="labelText-lastName-1">Last Name</span></label>
+  <div class="input-row__control-container"><input class="input-row__control" id="lastName-1" name="lastName"></div></div>
+<div class="input-row"><label class="input-row__label" for="firstName-2"><span class="input-row__linebreak" id="labelText-firstName-2">First Name</span></label>
+  <div class="input-row__control-container"><input class="input-row__control" id="firstName-2" name="firstName"></div></div>
+<div class="input-row">
+  <label class="input-row__label"><span class="input-row__linebreak" id="phoneNumberGroupLabel">Phone Number</span></label>
+  <div class="input-row__control-container">
+    <div class="input-row-composite__inputs phone-row" role="group" aria-labelledby="phoneNumberGroupLabel">
+      <div class="phone-row__prefix"><div class="cx-select-container"><span id="inputFieldLabel-country-codes-dropdownphoneNumber" class="input-field__label">Country code</span>
+        <input autocomplete="none" name="phoneNumber" id="country-codes-dropdownphoneNumber" type="text" role="combobox" aria-autocomplete="list" aria-haspopup="grid" aria-expanded="false" aria-labelledby="labelText-undefined inputFieldLabel-country-codes-dropdownphoneNumber" class="cx-select-input" value="+1"></div></div>
+      <div class="phone-row__number"><input type="tel" class="input-row__control phone-row__input" autocomplete="tel-national" aria-label="Phone Number"></div>
+    </div>
+  </div>
+</div>
+
+<h2>Application Questions</h2>
+<div class="input-row input-row--has-picker">
+  <label class="input-row__label input-row__label--required" for="300000003447223-13"><span class="input-row__linebreak" id="labelText-300000003447223-13">Are you willing and able to come into the office as required for this position?</span></label>
+  <div class="input-row__control-container" data-qa="300000003447223"><div><ul role="radiogroup" id="q-office" aria-label="Are you willing and able to come into the office as required for this position?" class="cx-select-pills-container">
+    <li role="presentation"><button type="button" role="radio" aria-checked="false" class="cx-select-pill-section"><span class="cx-select-pill-name"> Yes</span></button></li>
+    <li role="presentation"><button type="button" role="radio" aria-checked="false" class="cx-select-pill-section"><span class="cx-select-pill-name"> No</span></button></li></ul></div></div>
+</div>
+<div class="input-row input-row--has-picker">
+  <label class="input-row__label input-row__label--required" for="300000003447221-15"><span class="input-row__linebreak" id="labelText-300000003447221-15">Will you now or in the future require employer sponsorship in order to obtain or maintain work authorization?</span></label>
+  <div class="input-row__control-container"><div><ul role="radiogroup" id="q-sponsor" aria-label="Will you now or in the future require employer sponsorship in order to obtain or maintain work authorization?" class="cx-select-pills-container">
+    <li role="presentation"><button type="button" role="radio" aria-checked="false" class="cx-select-pill-section"><span class="cx-select-pill-name"> Yes</span></button></li>
+    <li role="presentation"><button type="button" role="radio" aria-checked="false" class="cx-select-pill-section"><span class="cx-select-pill-name"> No</span></button></li></ul></div></div>
+</div>
+
+<h2>Voluntary Self-Identification</h2>
+<div class="input-row input-row--radiogroup" role="group" aria-labelledby="race-label">
+  <label class="input-row__label" id="race-label"><span class="input-row__linebreak">Select the races you identify with.</span></label>
+  <div class="input-row__control-container">
+    <div class="input-row__control-item"><input type="checkbox" class="input-row__hidden-control" value="7" id="dq-option-7"><label class="apply-flow-input-checkbox" for="dq-option-7"><span class="apply-flow-input-checkbox__label">American Indian or Alaska Native</span></label></div>
+    <div class="input-row__control-item"><input type="checkbox" class="input-row__hidden-control" value="5" id="dq-option-5"><label class="apply-flow-input-checkbox" for="dq-option-5"><span class="apply-flow-input-checkbox__label">Asian</span></label></div>
+    <div class="input-row__control-item"><input type="checkbox" class="input-row__hidden-control" value="3" id="dq-option-3"><label class="apply-flow-input-checkbox" for="dq-option-3"><span class="apply-flow-input-checkbox__label">White</span></label></div>
+  </div>
+</div>
+
+<h2>Supporting Documents and URLs</h2>
+<div class="input-row"><label for="attachment-upload-resume">Upload Resume</label><input type="file" id="attachment-upload-resume" name="resume"></div>
+
+<h2>E-Signature</h2>
+<div class="esign-form"><div class="input-row input-row--text">
+  <label class="input-row__label input-row__label--required" for="fullName-5"><span class="input-row__linebreak" id="labelText-fullName-5">Full Name</span></label>
+  <div class="input-row__control-container"><input class="input-row__control" id="fullName-5" name="fullName" autocomplete="off"></div>
+</div></div>
+</form></main>
+<script>
+// Pills: a click checks one and unchecks the rest, as Knockout does.
+document.querySelectorAll('[role="radiogroup"]').forEach((group) => group.addEventListener("click", (e) => {
+  const pill = e.target.closest('[role="radio"]'); if (!pill) return;
+  group.querySelectorAll('[role="radio"]').forEach((b) => b.setAttribute("aria-checked", String(b === pill)));
+}));
+</script>

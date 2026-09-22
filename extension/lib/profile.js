@@ -148,6 +148,19 @@ function derived(profile, settings = {}) {
   if (settings.say_yes === true) {
     out.willing_default = "Yes — I am willing and able to do whatever the role requires";
   }
+  // Official forms want the straight apostrophe a keyboard types. macOS
+  // smart quotes store "O’Brien", and Oracle rejected that e-signature
+  // because the name fields above it said "O'Brien".
+  for (const key of ["full_name", "first_name", "last_name", "preferred_name"]) {
+    if (/[‘’]/.test(get(key)) || /[‘’]/.test(String(out[key] || ""))) {
+      out[key] = String(out[key] || get(key)).replace(/[‘’]/g, "'");
+    }
+  }
+  // A phone's country-code box (Oracle, Workday) is otherwise answered with
+  // the phone number itself: the nearest thing in the profile.
+  if (has("phone") && /^(?:us|usa|united states(?: of america)?)$/i.test(get("country") || "United States")) {
+    out.phone_country_code = "+1 (United States)";
+  }
   if (!has("location") && has("city")) {
     out.location = [get("city"), get("state")].filter(Boolean).join(", ");
   }
@@ -171,7 +184,12 @@ function websiteOptions(profile) {
 /** The full option set: labelled profile fields first, then free-form lines. */
 export function buildOptions(profile = {}, extraText = "", settings = {}) {
   const options = {};
-  const complete = { ...derived(profile, settings), ...profile };
+  // Derived values win only for the keys they correct (names' apostrophes).
+  const fixed = derived(profile, settings);
+  const complete = { ...fixed, ...profile };
+  for (const key of ["full_name", "first_name", "last_name", "preferred_name"]) {
+    if (fixed[key] && String(profile[key] || "").trim()) complete[key] = fixed[key];
+  }
   for (const [key, value] of Object.entries(complete)) {
     if (Array.isArray(value) || value === null || typeof value === "object") continue;
     if (!String(value).trim()) continue;

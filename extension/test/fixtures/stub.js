@@ -47,6 +47,8 @@ const ANSWERS = [
   [/Education 1: Overall Result/, "3.9"], [/Education 1: From/, "2023"],
   [/Websites 1: URL/, "https://www.linkedin.com/in/aidanobrien5599"], [/Websites 2: URL/, "https://github.com/aidanobrien5599"],
   [/Add Skills/, "Languages: Python, TypeScript, Java\nFrameworks: React, Next.js"],
+  // oracle.html
+  [/come into the office/i, "Yes"],
   [/hear about/i, "LinkedIn"],
   [/first see this job/i, "Career Site"],
   [/^date$/i, "09/21/2026"], [/available start/i, "May 15, 2027"],
@@ -88,7 +90,8 @@ window.chrome = {
         return { ok: true, results: m.fields.map((f) => {
           if (f.multi) {
             // What real Jev ticks for these two Lever questions.
-            const pick = /check one of the boxes/i.test(f.label) ? ["No, I do not have a disability and have not had one in the past"]
+            const pick = /races you identify/i.test(f.label) ? ["White"]
+              : /check one of the boxes/i.test(f.label) ? ["No, I do not have a disability and have not had one in the past"]
               : /language/i.test(f.label) ? ["English (ENG)"]
               : /office/i.test(f.label) ? ["New York, NY", "Washington, DC", "Seattle, WA"] : [];
             const value = f.options.filter((o) => pick.includes(o));

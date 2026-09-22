@@ -105,8 +105,9 @@
       questionText(field),
       field.closest("label"),
       field.getAttribute("aria-label"),
-      field.getAttribute("aria-labelledby") &&
-        document.getElementById(field.getAttribute("aria-labelledby")),
+      // It may name several ids ("labelText-undefined inputFieldLabel-…").
+      (field.getAttribute("aria-labelledby") || "").split(/\s+/)
+        .map((id) => id && document.getElementById(id)?.textContent.trim()).filter(Boolean).join(" "),
       field.labels && field.labels[0],
     ];
     for (const candidate of candidates) {
@@ -229,7 +230,9 @@
     const groups = new Map();
     for (const button of document.querySelectorAll(TOGGLE_SELECTOR)) {
       if (!nodeVisible(button)) continue;
-      const wrap = button.closest(FIELD_ENTRY);
+      // Oracle's Yes/No "pills" sit in a plain .input-row; their
+      // ul[role=radiogroup] carries the question as its aria-label.
+      const wrap = button.closest(FIELD_ENTRY) || button.closest('[role="radiogroup"][aria-label]');
       if (!wrap) continue;
       if (!groups.has(wrap)) groups.set(wrap, []);
       groups.get(wrap).push(button);
@@ -239,8 +242,9 @@
       // One label and a handful of buttons means one question; more than that
       // and we have walked up into a container holding several fields.
       if (buttons.length < 2 || buttons.length > 8) continue;
-      if (wrap.querySelectorAll("label, legend").length !== 1) continue;
-      const label = clean(wrap.querySelector("label, legend").textContent);
+      const named = wrap.matches('[role="radiogroup"][aria-label]') ? wrap.getAttribute("aria-label") : null;
+      if (!named && wrap.querySelectorAll("label, legend").length !== 1) continue;
+      const label = clean(named ?? wrap.querySelector("label, legend").textContent);
       const options = buttons.map((b) => b.textContent.trim()).filter(Boolean);
       if (label.length < 2 || options.length !== buttons.length) continue;
       fields.push({ element: wrap, label, options, buttons, combobox: false });
@@ -492,7 +496,8 @@
    * question with no text, and neither was ever answered.
    */
   // One question's box: Workday's form field, or Lever's / a fieldset.
-  const CHOICE_FIELD = '[data-automation-id^="formField"], ' + QUESTION_BOX;
+  // Oracle: unnamed race boxes in one .input-row--radiogroup.
+  const CHOICE_FIELD = '[data-automation-id^="formField"], .input-row--radiogroup, ' + QUESTION_BOX;
 
   /**
    * Checkboxes in one form field are one question, whatever their names:
