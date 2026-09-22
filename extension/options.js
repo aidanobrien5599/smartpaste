@@ -426,6 +426,14 @@ $("save-key").addEventListener("click", async () => {
 
 $("save").addEventListener("click", save);
 
+// Saved on change, like documents: a behaviour, not part of the profile, so
+// it is never offered to Jev as an answer and "Clear all fields" keeps it.
+$("acknowledge").addEventListener("change", async () => {
+  const { settings = {} } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({ settings: { ...settings, acknowledge: $("acknowledge").checked } });
+  say($("acknowledge-status"), $("acknowledge").checked ? "Acknowledgements will be ticked." : "Acknowledgements are left for you.");
+});
+
 /**
  * Empty the profile: every labelled field, both repeated sections, and the
  * extra lines. The API key and stored documents are separate things with
@@ -461,8 +469,9 @@ document.addEventListener("keydown", (event) => {
 });
 
 (async function load() {
-  const { apiKey = "", profile = {}, extraText = "", documents = {} } =
-    await chrome.storage.local.get(["apiKey", "profile", "extraText", "documents"]);
+  const { apiKey = "", profile = {}, extraText = "", documents = {}, settings = {} } =
+    await chrome.storage.local.get(["apiKey", "profile", "extraText", "documents", "settings"]);
+  $("acknowledge").checked = Boolean(settings.acknowledge);
   state = { profile, documents };
   $("key").value = apiKey;
   renderGroups(profile);

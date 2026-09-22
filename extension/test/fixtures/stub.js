@@ -33,6 +33,10 @@ const ANSWERS = [
   [/^Education: Field of study$/, "Computer Science"], [/^Education: Start$/, "Sep 2023"], [/^Education: End/, "May 2027"],
   [/degree are you currently pursuing/, "Bachelors"], [/expected graduation date\?$/, "January - June 2027"],
   [/Armed Forces/, "No, I am not a veteran or active member"],
+  // vercel.html
+  [/based in any of these countries/, "United States"], [/London office/, "Yes"],
+  [/^GitHub$/, "https://github.com/aidanobrien5599"], [/^Portfolio$/, "https://aidanobrien.dev"],
+  [/following states\?/, "No"], [/authorization to work in the country/, "I am authorized to work in the country due to my nationality"],
   // My Experience (workday-experience.html); specific ones first.
   [/Work Experience 1: Location/, "Los Gatos, CA"], [/Work Experience 2: Location/, "Remote"],
   [/Work Experience 2: I currently work here/, "Yes"], [/Work Experience \d: I currently work here/, "No"],
@@ -121,6 +125,8 @@ window.chrome = {
   },
   storage: { local: { async get() {
     return {
+      // Set window.__settings before content.js runs to turn settings on.
+      ...(window.__settings ? { settings: window.__settings } : {}),
       profile: {
         experience: [{ company: "Netflix", title: "Software Engineer Intern" }, { company: "Intelligible AI", title: "Founding Engineer" }],
         education: [{ school: "University of Wisconsin - Madison" }],

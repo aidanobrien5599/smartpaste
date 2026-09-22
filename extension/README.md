@@ -311,6 +311,47 @@ Live, real Jev and my real profile (`bench/dogfood-real.mjs`): **36 fields,
 7 entries added, resume attached, in 9.9s**; left alone: Faculty, and dates
 the profile has no ISO form for ("Present").
 
+### Vercel — its own form, questions in a `<p>`
+
+Vercel builds its careers form from its own Geist components over the
+Greenhouse API. Every question is a plain `<p>` beside a `role="radiogroup"`:
+no legend, no label, no `aria-labelledby`.
+
+- **Five questions were asked as "First Name".** With no label of its own
+  in reach, the walk up from the options found the First Name box's
+  `<label>`. A label that holds or names another control now belongs to that
+  control, and the text block just before the options is the question.
+- **"Where did you first hear about this role?" was never asked.** It has 14
+  options, and radio groups were capped at 12. The cap is now 20.
+- **Every option starts with a zero-width space**, so `​Yes` never equalled
+  `Yes`. `clean()` strips them.
+- **Link boxes take a handle.** The LinkedIn box shows `linkedin.com/in/`
+  before it, as an `aria-hidden` label, and a full URL typed in would read
+  `linkedin.com/in/https://www.linkedin.com/in/…`. A URL whose start matches
+  the shown prefix has the prefix cut off, so the box gets `aidanobrien5599`.
+  That hidden prefix is also left out of the label.
+- **The two acknowledgements are one-option radios**, so they aren't
+  questions. See *Acknowledgements* below.
+
+Live, real Jev and my real profile: **12 fields + resume in 0.9s**, 5 of the
+6 radio questions answered (none were reached before). Jev left "work from
+our London office 3 days a week?" alone at 0.14. It answers the same question
+about "our office" Yes at 0.93, but every place in my profile is in the US.
+
+## Acknowledgements
+
+Most forms end with *"I have read the privacy notice"* or *"I confirm this
+information is accurate"*. These are off by default and left for you. Turn on
+**Settings → Autofill → Tick acknowledgements for me** and Autofill ticks
+them, whether they are a lone checkbox or a one-option radio. Code makes the
+call from the wording. Jev is never asked.
+
+Wording that is a marketing opt-in, SMS, a talent community, job alerts or
+do-not-sell is **never** ticked, even with the setting on and even when it
+also says "I acknowledge". The setting lives in `chrome.storage.local.settings`,
+not the profile, so it is never offered to Jev as an answer, and **Clear all
+fields** keeps it.
+
 ### Autocompletes
 
 A field whose placeholder says *"Start typing…"* has an empty menu until you

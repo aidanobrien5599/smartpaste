@@ -629,3 +629,104 @@ test("collect: a lone consent box, by its own text or by the question around it"
     });
     assert.deepEqual(labels, ["I currently work here"]);
   }));
+
+/* ---------------------------------------------------------------- Vercel */
+
+const vercelField = (pattern) =>
+  `window.__messages.find(m => m.type === 'answer-fields')?.fields.find(f => ${pattern}.test(f.label)) ?? null`;
+
+test("labels: Vercel -- a <p> beside the radiogroup is the question, not a neighbour's label", { skip }, () =>
+  withPage("vercel.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const q of [
+      /^Are you currently based in any of these countries\?/,
+      /^Are you able to work from our London office on a hybrid schedule, 3 days a week\?$/,
+      /^Will you require Visa Sponsorship now, or in the future\?$/,
+      /^Your authorization to work in the country where you live\./,
+      /^Do you live in one of the following states\? Alabama, Alaska/,
+      /^Where did you first hear about this role\?$/,
+    ]) assert.ok(labels.some((l) => q.test(l)), `${q} not asked; asked: ${labels.join(" | ")}`);
+    // Only the real First Name box is called First Name.
+    assert.equal(labels.filter((l) => /first name/i.test(l)).length, 1, labels.join(" | "));
+    const sponsorship = await page.eval(vercelField("/Sponsorship/"));
+    assert.deepEqual(sponsorship.options, ["Yes", "No"]);
+    const heard = await page.eval(vercelField("/first hear/"));
+    assert.equal(heard.options.length, 14);
+    assert.ok(heard.options.includes("LinkedIn"));
+  }));
+
+const checked = (name) =>
+  `document.querySelector('input[name="${name}"]:checked')?.closest('label')?.textContent.replace(/\\u200b/g, '').trim() ?? null`;
+
+test("fill: Vercel -- radio questions are answered by clicking", { skip }, () =>
+  withPage("vercel.html", async (page) => {
+    await autofill(page);
+    assert.equal(await page.eval(checked("question_19385414004")), "United States");
+    assert.equal(await page.eval(checked("question_19392536004")), "Yes");
+    assert.equal(await page.eval(checked("question_19385415004")), "No");
+    assert.equal(await page.eval(checked("question_19385416004")), "I am authorized to work in the country due to my nationality");
+    assert.equal(await page.eval(checked("question_19385417004")), "No");
+    assert.equal(await page.eval(checked("question_19385422004")), "LinkedIn");
+    assert.equal(await page.eval(value('[name="first_name"]')), "Aidan");
+    assert.equal(await page.eval("window.__submitted ?? false"), false);
+  }));
+
+const ACK_PRIVACY = "question_19385423004";
+const ACK_ACCURATE = "question_19385424004";
+
+async function withSettings(fixture, settings, fn) {
+  const page = await browser.open(fixture, { scripts: [`window.__settings = ${JSON.stringify(settings)};`] });
+  try { return await fn(page); } finally { await page.close(); }
+}
+
+test("acknowledge: off by default -- one-option acknowledgements are left for you, and never sent to Jev", { skip }, () =>
+  withPage("vercel.html", async (page) => {
+    await autofill(page);
+    assert.equal(await page.eval(checked(ACK_PRIVACY)), null);
+    assert.equal(await page.eval(checked(ACK_ACCURATE)), null);
+    const labels = await page.eval(`window.__messages.filter(m => m.type === 'answer-fields').flatMap(m => m.fields.map(f => f.label))`);
+    assert.ok(!labels.some((l) => /acknowledge|double-check/i.test(l)), labels.join(" | "));
+  }));
+
+test("acknowledge: on -- Vercel's privacy notice and accuracy confirmation are ticked", { skip }, () =>
+  withSettings("vercel.html", { acknowledge: true }, async (page) => {
+    const note = await autofill(page);
+    assert.equal(await page.eval(checked(ACK_PRIVACY)), "Acknowledge/Confirm");
+    assert.equal(await page.eval(checked(ACK_ACCURATE)),
+      "I have reviewed and confirmed that all the information provided is accurate and complete.");
+    assert.match(note, /2 acknowledged/);
+    assert.equal(await page.eval("window.__submitted ?? false"), false);
+  }));
+
+test("acknowledge: on -- C3's I Accept is ticked, the cookie banner's Do Not Sell never is", { skip }, () =>
+  withSettings("c3.html", { acknowledge: true }, async (page) => {
+    await autofill(page, 60000);
+    assert.equal(await page.eval(`document.querySelector(".gh-apply-form__checkbox input").checked`), true, "I Accept");
+    assert.equal(await page.eval(`document.getElementById("ckyCCPAOptOut").checked`), false, "ticked Do Not Sell");
+  }));
+
+test("acknowledge: marketing, texts and talent pools are never ticked, however they are worded", { skip }, () =>
+  withPage("contact.html", async (page) => {
+    const picked = await page.eval(() => {
+      document.body.insertAdjacentHTML("beforeend", `<form id="acks">
+        <label><input type="checkbox" id="a1">I have read and understood the Privacy Notice</label>
+        <label><input type="checkbox" id="a2">I acknowledge and agree to receive marketing emails</label>
+        <label><input type="checkbox" id="a3">I accept being added to the talent community for future roles</label>
+        <label><input type="checkbox" id="a4">I consent to receive SMS text messages about my application</label>
+        <label><input type="checkbox" id="a5">I currently work here</label>
+        <label><input type="checkbox" id="a6">I certify that my answers are true and complete</label>
+      </form>`);
+      return window.__smartpasteTest.acknowledgements().map((b) => b.id);
+    });
+    assert.deepEqual(picked, ["a1", "a6"]);
+  }));
+
+test("fill: Vercel -- a box after a shown linkedin.com/in/ prefix takes the handle, not the URL", { skip }, () =>
+  withPage("vercel.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const l of ["LinkedIn", "GitHub", "Portfolio"]) assert.ok(labels.includes(l), `${l}: ${labels.join(" | ")}`);
+    await autofill(page);
+    assert.equal(await page.eval(value('[name="question_19385418004"]')), "aidanobrien5599");
+    assert.equal(await page.eval(value('[name="question_19385420004"]')), "aidanobrien5599");
+    assert.equal(await page.eval(value('[name="question_19385421004"]')), "aidanobrien.dev");
+  }));

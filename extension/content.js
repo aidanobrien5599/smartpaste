@@ -68,6 +68,15 @@
     return box ? box.querySelector(QUESTION_TEXT) : null;
   }
 
+  // A label's text without what it hides from screen readers: Vercel's
+  // "LinkedIn" label also holds the box's decorative "linkedin.com/in/".
+  function shownText(node) {
+    if (!node.querySelector('[aria-hidden="true"]')) return node.textContent;
+    const copy = node.cloneNode(true);
+    copy.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+    return copy.textContent;
+  }
+
   function labelFor(field) {
     const byFor =
       field.id && document.querySelector(`label[for="${CSS.escape(field.id)}"]`);
@@ -82,9 +91,7 @@
     ];
     for (const candidate of candidates) {
       if (!candidate) continue;
-      const text = clean(
-        typeof candidate === "string" ? candidate : candidate.textContent
-      );
+      const text = clean(typeof candidate === "string" ? candidate : shownText(candidate));
       if (text) return text;
     }
     // A label whose for= names nothing on the page, just above the field's
@@ -149,6 +156,8 @@
   function clean(text) {
     if (!text) return "";
     return text
+      // Zero-width spaces: Vercel starts every radio option with one.
+      .replace(/[\u200b-\u200d\ufeff]/g, "")
       .replace(/\s+/g, " ")
       // Screen-reader text inside a label: Workday's "current value is MM/YYYY".
       .replace(/\s*current value is\b.*$/i, "")
@@ -240,14 +249,28 @@
    * question in a <label> just above; looking only for a legend dropped the
    * degree, graduation, veteran, disability and transgender questions.
    */
+  //
+  // Vercel puts the question in a plain <p> just before the role="radiogroup",
+  // and walking on up found the First Name box's <label> instead -- five
+  // questions asked as "First Name". A label holding or naming some other
+  // control is that control's; the text block just before the options is ours.
   function questionFor(inputs) {
     const own = (node) => inputs.some((i) => node.contains(i) || (i.id && node.htmlFor === i.id));
+    const foreign = (node) =>
+      [...node.querySelectorAll(ANY_CONTROL)].some((c) => !inputs.includes(c)) ||
+      (node.htmlFor && !inputs.some((i) => i.id === node.htmlFor));
     let node = inputs[0].parentElement;
     for (let depth = 0; node && depth < 6; depth++, node = node.parentElement) {
       const direct = questionText(inputs[0]);
       if (direct && !own(direct) && clean(direct.textContent)) return clean(direct.textContent);
-      const found = [...node.querySelectorAll("label, legend, .application-label")].find((l) => !own(l) && clean(l.textContent));
+      const found = [...node.querySelectorAll("label, legend, .application-label")]
+        .find((l) => !own(l) && !foreign(l) && clean(l.textContent));
       if (found) return clean(found.textContent);
+      const before = node.previousElementSibling;
+      if (before && before.matches("p, h1, h2, h3, h4, h5, h6, div, span") &&
+          !before.matches(ANY_CONTROL) && !before.querySelector(`${ANY_CONTROL}, button`) && clean(before.textContent)) {
+        return clean(before.textContent);
+      }
     }
     return "";
   }
@@ -261,7 +284,8 @@
     }
     const fields = [];
     for (const radios of groups.values()) {
-      if (radios.length < 2 || radios.length > 12) continue;
+      // Vercel's "Where did you first hear about this role?" has 14.
+      if (radios.length < 2 || radios.length > 20) continue;
       const first = radios[0];
       const label = questionFor(radios);
       const options = radios.map((r) =>
@@ -516,6 +540,52 @@
       fields.push({ element: box, label, options: ["Yes", "No"], buttons: [box], combobox: false, single: true });
     }
     return fields;
+  }
+
+  // Opt-in (Settings -> "Tick acknowledgements for me"): the "I have read the
+  // privacy notice" and "I confirm this is accurate" boxes most forms end
+  // with. Vercel asks both as a radio group with one option, so they are not
+  // questions at all -- there is nothing to choose, only something to tick.
+  // Decided here, never by Jev, and only on wording that is an acknowledgement:
+  // marketing, texts, talent pools and do-not-sell stay the applicant's even
+  // with the setting on, whatever else the label says.
+  const ACKNOWLEDGEMENT = /acknowledg|have read|read and understood?|reviewed and confirm|confirm(?:ed)? that|accurate and complete|true and (?:correct|complete)|certify|attest|i accept|privacy (?:notice|policy|statement)|terms (?:and|&) conditions/i;
+  const NEVER_ACKNOWLEDGE = /marketing|newsletter|subscribe|promotion|special offers|\bsms\b|text messages?|contact me|do not sell|share my personal|remember me|talent (?:community|network|pool)|future (?:roles|opportunities|openings)|job alerts/i;
+
+  function acknowledgements() {
+    const found = [];
+    const consider = (box, ...texts) => {
+      if (box.disabled || box.checked || pageChrome(box)) return;
+      const text = texts.filter(Boolean).join(" ");
+      if (!ACKNOWLEDGEMENT.test(text) || NEVER_ACKNOWLEDGE.test(text)) return;
+      const shown = box.closest("label") || box;
+      if (nodeVisible(shown) || nodeVisible(box)) found.push(box);
+    };
+    const radios = new Map();
+    for (const radio of document.querySelectorAll('input[type="radio"]')) {
+      if (radio.name) radios.set(radio.name, [...(radios.get(radio.name) || []), radio]);
+    }
+    for (const group of radios.values()) {
+      if (group.length === 1) consider(group[0], clean(group[0].closest("label")?.textContent), questionFor(group));
+    }
+    for (const [box, ...rest] of groupCheckboxes()) {
+      if (!rest.length) consider(box, labelFor(box), ownerLabel(box));
+    }
+    return found;
+  }
+
+  /** Tick every acknowledgement, if the setting is on. Returns how many. */
+  async function acknowledge() {
+    let settings = {};
+    try { ({ settings = {} } = await chrome.storage.local.get("settings")); } catch { return 0; }
+    if (!settings.acknowledge) return 0;
+    let ticked = 0;
+    for (const box of acknowledgements()) {
+      click(box);
+      if (!box.checked) box.click();
+      if (box.checked) ticked++;
+    }
+    return ticked;
   }
 
   // ByteDance labels its phone box just "Mobile", and Jev took that for the
@@ -1640,8 +1710,38 @@
    * its placeholder or label) gets exactly that, a native date input gets
    * YYYY-MM-DD, and anything else keeps the profile's own wording.
    */
+  // Text shown inside a box, ahead of what you type: Vercel's LinkedIn box
+  // reads "linkedin.com/in/ [handle]", its Portfolio box "https:// [...]".
+  // The prefix is a label for= the box (aria-hidden, so it is not the
+  // question), or a sibling right beside it.
+  const URL_PREFIX = /^(?:https?:\/\/)?(?:[\w-]+\.)*[a-z]{2,}\/[\w./-]*$|^https?:\/\/$/i;
+  function shownPrefix(field) {
+    const candidates = [
+      ...(field.id ? document.querySelectorAll(`label[for="${CSS.escape(field.id)}"]`) : []),
+      field.previousElementSibling, field.nextElementSibling,
+    ];
+    for (const node of candidates) {
+      if (!node || node.matches(ANY_CONTROL) || node.querySelector(ANY_CONTROL)) continue;
+      const text = clean(node.textContent);
+      if (URL_PREFIX.test(text)) return text;
+    }
+    return "";
+  }
+  const bareUrl = (url) => url.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+
+  /** A URL with the box's shown prefix cut off: the handle, or the host. */
+  function afterShownPrefix(field, value) {
+    const prefix = shownPrefix(field);
+    if (!prefix || typeof value !== "string" || !/^(?:https?:\/\/|www\.)/i.test(value)) return value;
+    const want = bareUrl(prefix).toLowerCase();
+    const have = bareUrl(value);
+    if (!have.toLowerCase().startsWith(want)) return value;
+    return have.slice(want.length).replace(/\/+$/, "");
+  }
+
   function formatForField(field, value) {
     if (field.tagName !== "INPUT") return value;
+    value = afterShownPrefix(field, value);
     const hint = `${field.placeholder || ""} ${field.getAttribute("aria-label") || ""} ${labelFor(field)}`;
     const shape = field.type === "date" ? "YYYY-MM-DD"
       : (hint.match(/\b(MM\/DD\/YYYY|DD\/MM\/YYYY|MM\/YYYY|YYYY-MM-DD|MM-DD-YYYY)\b/i) || [])[1]?.toUpperCase();
@@ -1985,6 +2085,11 @@
       }
       const attached = await attachDocuments();
       await fillFields(started, attached);
+      const acknowledged = await acknowledge();
+      if (acknowledged) {
+        lastSummary += `, ${acknowledged} acknowledged`;
+        note(lastSummary);
+      }
       // Newly revealed questions first -- they are the user's to see now --
       // then keep watch for a resume re-parse, over those fields too.
       await fillRevealed();
@@ -2350,7 +2455,7 @@
   // Tests (extension/test/content.test.mjs) reach the pure helpers here.
   // The flag is only ever set by the test stub, never by a real page.
   if (window.__smartpasteTest) {
-    Object.assign(window.__smartpasteTest, { dateParts, formatForField, localMatch, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize, setPrompt });
+    Object.assign(window.__smartpasteTest, { dateParts, formatForField, localMatch, looksLikeApplication, looksLikeAutocomplete, collectFields, normalize, setPrompt, acknowledgements });
   }
 
   // The manifest runs this at document_idle, but an injected or early copy can
