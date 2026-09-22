@@ -66,6 +66,15 @@
   </div>
 </div>
 
+<!-- cx-select: opens from its arrow button; typing filters; rows are
+     gridcells of the role="grid" the input names in aria-controls. -->
+<div class="input-row input-row--has-picker"><label class="input-row__label" for="gender-1"><span class="input-row__linebreak">Gender</span></label>
+  <div class="cx-select-container"><input autocomplete="none" name="gender" id="gender-1" type="text" role="combobox" aria-autocomplete="list" aria-haspopup="grid" aria-controls="gender-1-listbox" aria-expanded="false" class="cx-select-input" data-options="Male|Female|Declines to Self-Identify">
+  <button type="button" id="gender-1-toggle-button" aria-controls="gender-1-listbox" aria-label="Open the drop-down list for Gender."></button></div></div>
+<div class="input-row input-row--has-picker"><label class="input-row__label" for="vet-1"><span class="input-row__linebreak">Veteran Self-Identification Status</span></label>
+  <div class="cx-select-container"><input autocomplete="none" name="US-DDF-VeteranSelfIdentification-PER_INFORMATION14" id="vet-1" type="text" role="combobox" aria-autocomplete="list" aria-haspopup="grid" aria-controls="vet-1-listbox" aria-expanded="false" class="cx-select-input" data-options="Not a Protected Veteran|Declines to Self-Identify|Protected Veteran Declines to Self-Identify">
+  <button type="button" id="vet-1-toggle-button" aria-controls="vet-1-listbox" aria-label="Open the drop-down list for Veteran Self-Identification Status."></button></div></div>
+
 <h2>Supporting Documents and URLs</h2>
 <div class="input-row"><label for="attachment-upload-resume">Upload Resume</label><input type="file" id="attachment-upload-resume" name="resume"></div>
 
@@ -76,6 +85,27 @@
 </div></div>
 </form></main>
 <script>
+window.__model = {};
+document.querySelectorAll(".cx-select-input[data-options]").forEach((input) => {
+  const all = input.dataset.options.split("|");
+  const toggle = document.getElementById(input.id + "-toggle-button");
+  const close = () => { document.getElementById(input.id + "-listbox")?.remove(); input.setAttribute("aria-expanded", "false"); };
+  const open = (filter) => {
+    close();
+    const grid = document.createElement("div");
+    grid.setAttribute("role", "grid"); grid.id = input.id + "-listbox"; grid.className = "cx-select__list";
+    for (const text of all.filter((t) => !filter || t.toLowerCase().includes(filter.toLowerCase()))) {
+      const row = document.createElement("div"); row.setAttribute("role", "row");
+      row.innerHTML = `<div role="gridcell" tabindex="-1" aria-selected="false" class="cx-select__list-item"><span class="cx-select__list-item--content">${text}</span></div>`;
+      row.firstChild.addEventListener("click", () => { input.value = text; window.__model[input.name] = text; close(); });
+      grid.appendChild(row);
+    }
+    input.closest(".cx-select-container").appendChild(grid);
+    input.setAttribute("aria-expanded", "true");
+  };
+  toggle.addEventListener("click", () => (input.getAttribute("aria-expanded") === "true" ? close() : open("")));
+  input.addEventListener("input", () => open(input.value));
+});
 // Pills: a click checks one and unchecks the rest, as Knockout does.
 document.querySelectorAll('[role="radiogroup"]').forEach((group) => group.addEventListener("click", (e) => {
   const pill = e.target.closest('[role="radio"]'); if (!pill) return;

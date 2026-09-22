@@ -48,7 +48,7 @@ const ANSWERS = [
   [/Websites 1: URL/, "https://www.linkedin.com/in/aidanobrien5599"], [/Websites 2: URL/, "https://github.com/aidanobrien5599"],
   [/Add Skills/, "Languages: Python, TypeScript, Java\nFrameworks: React, Next.js"],
   // oracle.html
-  [/come into the office/i, "Yes"], [/^Degree$/, "Bachelor of Science"],
+  [/come into the office/i, "Yes"], [/Veteran Self-Identification/, "None"], [/^Degree$/, "Bachelor of Science"],
   [/hear about/i, "LinkedIn"],
   [/first see this job/i, "Career Site"],
   [/^date$/i, "09/21/2026"], [/available start/i, "May 15, 2027"],
@@ -77,7 +77,7 @@ const ANSWERS = [
   [/location/i, "Madison, WI"],
   [/gpa/i, "3.9"],
 ];
-const JEV = { "B.S.": "Bachelor of Science", "Undergraduate science degree": "Bachelor of Science", "May 2027": "Spring 2027", "Prefer not to say": "I do not wish to answer",
+const JEV = { "None": "Not a Protected Veteran", "B.S.": "Bachelor of Science", "Undergraduate science degree": "Bachelor of Science", "May 2027": "Spring 2027", "Prefer not to say": "I do not wish to answer",
   "Yes": /^yes/i, "Madison, WI": "Madison, Wisconsin, United States",
   "San Jose": /^United States of America \/ California \/ San Jose$/ };
 const words = (t) => t.toLowerCase().match(/[a-z0-9]+/g) || [];

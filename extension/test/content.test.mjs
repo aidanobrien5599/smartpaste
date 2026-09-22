@@ -412,6 +412,9 @@ test("fill: Oracle Recruiting Cloud -- pills, a two-id aria-labelledby, hidden r
     assert.equal(await pill("q-office"), "Yes");
     assert.equal(await pill("q-sponsor"), "No");
     assert.equal(await pill("q-degree"), "Bachelor's Degree");
+    // cx-select: a row of the grid was clicked, not text left in the box.
+    assert.equal((await page.eval("window.__model")).gender, "Declines to Self-Identify") // the stub says "Prefer not to say";
+    assert.equal((await page.eval("window.__model"))["US-DDF-VeteranSelfIdentification-PER_INFORMATION14"], "Not a Protected Veteran");
     assert.deepEqual(await page.eval("[...document.querySelectorAll('.input-row--radiogroup input:checked')].map(b => b.id)"), ["dq-option-3"]);
     assert.equal(await page.eval(value("#country-codes-dropdownphoneNumber")), "+1");
   }));

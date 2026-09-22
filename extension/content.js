@@ -990,7 +990,10 @@
   // Its location picker is a tree -- country, state, city -- of checkbox rows.
   const UD_TREE_NODE = ".ud__treeSelect__overlay .ud__tree__node";
   const UD_OPTION = `.ud__select__list__item, ${UD_TREE_NODE}`;
-  const MENU_OPTION = `[role="option"], ${UD_OPTION}`;
+  // Oracle's cx-select lists its rows as gridcells of a role="grid". Only
+  // ever read inside the field's own aria-controls menu (menuFor), so a date
+  // picker's calendar grid is never taken for a list of answers.
+  const MENU_OPTION = `[role="option"], [role="gridcell"], ${UD_OPTION}`;
 
   /**
    * A menu's rows as choices. In a tree only the leaves are, each named by
@@ -1166,6 +1169,14 @@
     // An autocomplete has nothing to show until you type -- that is what a
     // "Start typing..." placeholder means. Opening it yields an empty menu,
     // so here typing is the only way to get any options at all.
+    // Oracle's cx-select opens from its arrow button, not a click on the box.
+    const controls = field.getAttribute("aria-controls");
+    const toggle = !nodes.length && controls && !needsTyping(field) &&
+      [...document.querySelectorAll(`button[aria-controls="${CSS.escape(controls)}"]`)].find((b) => b !== field);
+    if (toggle) {
+      toggle.click();
+      read(await menuOptions(field, 1500, { opening: true }));
+    }
     if (!nodes.length) {
       searched = true;
       // A place's generic tail finds nothing in a list of places: "New York
