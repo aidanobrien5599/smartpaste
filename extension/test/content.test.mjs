@@ -77,6 +77,25 @@ test("formatForField: a date in the shape the box asks for", { skip }, () =>
     assert.deepEqual(out, ["09/21/2026", "05/01/2026", "21/09/2026", "05/2027", "2026-09-21", "Present", "May 2026"]);
   }));
 
+test("formatForField: a box asking only for a year gets the year", { skip }, () =>
+  withPage("contact.html", async (page) => {
+    const out = await page.eval(() => {
+      const { formatForField } = window.__smartpasteTest;
+      const input = (attrs) => Object.assign(document.createElement("input"), attrs);
+      const labelled = (text) => { const i = input({}); i.setAttribute("aria-label", text); return i; };
+      return [
+        formatForField(labelled("Year of Graduation"), "May 2027"),
+        formatForField(labelled("Expected graduation year"), "May 2027"),
+        formatForField(input({ type: "number", placeholder: "Year" }), "May 2027"),
+        formatForField(labelled("Graduation date"), "May 2027"),                 // a date, not a year
+        formatForField(labelled("Month and year of graduation"), "May 2027"),    // asks for the month too
+        formatForField(labelled("Years of experience"), "3"),
+        formatForField(labelled("Year in school"), "Senior"),                    // no year to cut out
+      ];
+    });
+    assert.deepEqual(out, ["2027", "2027", "2027", "May 2027", "May 2027", "3", "Senior"]);
+  }));
+
 test("localMatch: exact, or the one option that starts with the answer", { skip }, () =>
   withPage("contact.html", async (page) => {
     const picks = await page.eval(() => {
@@ -479,4 +498,134 @@ test("cmd-v: inserts the answer, and leaves an unanswered field to a normal past
     })()`);
     assert.deepEqual(await press("last_name"), { prevented: true, value: "O'Brien" });
     assert.deepEqual(await press("why"), { prevented: false, value: "" });
+  }));
+
+/* ------------------------------------------ company-built forms (live-found) */
+
+// c3.html is C3 AI's own form over the Greenhouse API, as served. Every
+// question is a <label> beside the input's <div>, with no for= and no id:
+// before it, only School and Degree were read and 0 of 16 fields filled.
+test("labels: C3 -- a label beside the input's wrapper, no search box, no consents", { skip }, () =>
+  withPage("c3.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const label of ["First Name", "Last Name", "Email", "Phone", "LinkedIn Profile", "Location",
+      "What is your expected graduation month and year?", "How did you hear about C3 AI?",
+      "Do you now or will you in the future require immigration sponsorship to work at C3 AI?",
+      "Education: School", "Education: Degree", "Education: Field of study",
+      // Month dropdown + Year box: one split date each, not a lone "Start" menu.
+      "Education: Start", "Education: End (or expected)"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${JSON.stringify(labels)}`);
+    }
+    // The header's site search and the cookie banner are page chrome, and a
+    // bare "I Accept" under a privacy notice is a consent -- never a question.
+    for (const bad of [/search/i, /do not sell/i, /^i accept$/i]) {
+      assert.ok(!labels.some((l) => bad.test(l)), `${bad} was asked: ${JSON.stringify(labels)}`);
+    }
+    // Two dates, two fields: the page-level id'd wrapper once merged them
+    // into one field labelled with the whole job description.
+    assert.equal(labels.filter((l) => /^Education: (Start|End)/.test(l)).length, 2);
+  }));
+
+test("fill: C3 -- text, month + year pairs, resume; consent boxes left alone", { skip }, () =>
+  withPage("c3.html", async (page) => {
+    await autofill(page, 60000);
+    const model = await page.eval("window.__model");
+    const want = {
+      "First Name": "Aidan", "Last Name": "O'Brien", Email: "aidanobrien5599@gmail.com", Phone: "9082160389",
+      "LinkedIn Profile": "https://www.linkedin.com/in/aidanobrien5599", "Resume/CV": "resume.pdf",
+      School: "University of Wisconsin - Madison", "Field of study": "Computer Science",
+      "Start month": "September", "Start year": "2023", "End (or expected) month": "May", "End (or expected) year": "2027",
+    };
+    for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model)}`);
+    assert.equal(await page.eval(`[...document.querySelectorAll(".gh-apply-form__checkbox input")][0].checked`), false, "ticked I Accept");
+    assert.equal(await page.eval(`document.getElementById("ckyCCPAOptOut").checked`), false, "ticked Do Not Sell");
+  }));
+
+// bytedance.html rebuilds ByteDance's signed-in application and its widgets
+// (see the fixture's header for each quirk).
+test("labels: ByteDance -- questions far above empty labels; Mobile is the number", { skip }, () =>
+  withPage("bytedance.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const label of ["Name", "Mobile phone number", "Email", "Preferred work location",
+      "Education 1 (University of Wisconsin - Madison): Degree",
+      "Education 1 (University of Wisconsin - Madison): Start & end date (start)",
+      "Education 1 (University of Wisconsin - Madison): Start & end date (end)",
+      "Where did you hear about this opportunity? Choose the option(s) that influenced your decision to apply.",
+      "Are you legally authorized to work in the US without restriction?",
+      "Will you now or in the future require visa sponsorship or a visa transfer?"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${JSON.stringify(labels)}`);
+    }
+    // A bare "Mobile" was answered with my phone *type*.
+    assert.ok(!labels.includes("Mobile"));
+    assert.ok(!labels.some((l) => /privacy/i.test(l)), "asked about the privacy consent");
+  }));
+
+test("fill: ByteDance -- Yes / No right after a dropdown whose pick failed", { skip }, () =>
+  withPage("bytedance.html", async (page) => {
+    // "Where did you hear" has no option matching its answer, so its pick
+    // fails and its menu is left open over the next two questions. Reading
+    // that leftover menu once made sponsorship click "No" in the
+    // *authorization* menu -- live, on a real application.
+    await autofill(page, 60000);
+    const model = await page.eval("window.__model");
+    assert.equal(model.Authorized, "Yes");
+    assert.equal(model.Sponsorship, "No");
+    assert.equal(model["Where did you hear"], undefined, "clicked an option that is not the answer");
+    assert.equal(model["Interview language"], undefined, "clicked the only option, which is not the answer");
+    assert.equal(await page.eval("document.querySelectorAll('.ud__select__dropdown').length"), 0, "left a menu open");
+  }));
+
+test("fill: ByteDance -- read-only dropdown, location tree, ISO dates, hidden resume input", { skip }, () =>
+  withPage("bytedance.html", async (page) => {
+    await autofill(page, 60000);
+    const model = await page.eval("window.__model");
+    // Each row in a wrapper of its own: read as one menu, not one row.
+    assert.equal(model["Education 1: Degree"], "Bachelor's degree");
+    // Leaves only, named by path: San Jose is in Costa Rica too.
+    assert.deepEqual(model["Preferred work location"], ["United States of America/California/San Jose"]);
+    // The picker keeps YYYY-MM and clears "Sep 2023" on blur.
+    assert.equal(model["Education 1: Start & end date start"], "2023-09");
+    assert.equal(model["Education 1: Start & end date end"], "2027-05");
+    assert.equal(model.Mobile, "9082160389");
+    assert.equal(model.Attachment, "resume.pdf");
+    assert.equal(model.Privacy, undefined, "ticked the privacy consent");
+  }));
+
+test("fill: ByteDance -- bare Add buttons by section title, roles split intern / work", { skip }, () =>
+  withPage("bytedance.html", async (page) => {
+    await autofill(page, 60000);
+    // The stub profile: Netflix (Software Engineer Intern), Intelligible AI
+    // (Founding Engineer), no projects -- so no Project card.
+    assert.deepEqual(await page.eval("window.__added"), { "Work Experience": 1, "Internship Experience": 1 });
+    const labels = await page.eval("window.__messages.filter(m => m.type === 'answer-fields').flatMap(m => m.fields.map(f => f.label))");
+    // Each card names the entry it is for: Work Experience 1 is my 2nd most
+    // recent role, and without its subject Jev answered it as the 1st.
+    assert.ok(labels.includes("Work Experience 1 (Intelligible AI): Company name"), JSON.stringify(labels));
+    assert.ok(labels.includes("Internship Experience 1 (Netflix): Company name"), JSON.stringify(labels));
+    const model = await page.eval("window.__model");
+    const want = {
+      "Work Experience 1: Company name": "Intelligible AI", "Work Experience 1: Title": "Founding Engineer",
+      "Work Experience 1: Start & end date start": "2025-12", "Work Experience 1: Start & end date end": "2026-05",
+      "Internship Experience 1: Company name": "Netflix", "Internship Experience 1: Title": "Software Engineer Intern",
+      "Internship Experience 1: Start & end date start": "2026-05", "Internship Experience 1: Start & end date end": "2026-08",
+    };
+    for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model[key])}`);
+  }));
+
+test("collect: a lone consent box, by its own text or by the question around it", { skip }, () =>
+  withPage("contact.html", async (page) => {
+    const labels = await page.eval(() => {
+      const box = (question, text) => {
+        const field = document.createElement("div");
+        field.innerHTML = `<label>${question}</label><div><label><input type="checkbox">${text}</label></div>`;
+        document.body.append(field);
+      };
+      box("Please confirm you have read the notice above", "I Accept"); // the box's own text says so
+      box("I consent to receiving text messages about my application", "Yes"); // only the question does
+      const job = document.createElement("div"); // a real yes/no question, as Workday draws it
+      job.innerHTML = `<label><input type="checkbox">I currently work here</label>`;
+      document.body.append(job);
+      return window.__smartpasteTest.collectFields().filter((f) => f.single).map((f) => f.label);
+    });
+    assert.deepEqual(labels, ["I currently work here"]);
   }));

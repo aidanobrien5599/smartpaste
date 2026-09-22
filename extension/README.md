@@ -168,6 +168,28 @@ domain, the escape option still wins outside it. Across ten questions: five
 logistics answered, and unpaid work, background checks, graduation date,
 sponsorship and salary all declined or answered from their own fields.
 
+### The ties-and-history catch-all
+
+The same idea, pointing the other way. *"Close personal relationship with a
+partner?"*, *"worked with an engagement team as a client?"*, *"third-party
+labor or contractor to us?"*, *"hold an active CPA license?"* are all No for
+almost everyone. **Work authorization** holds:
+
+> **Default answer on any other yes/no question about my past or present ties
+> to the company, my prior work, certifications or licenses held, or conflicts
+> and restrictions** — *"No."*
+
+It, `related_employee` and `non_compete` default to "No" when left blank (in
+`derived()`), so they work without being filled in; anything typed wins. Work
+authorization, sponsorship and age keep their own fields, and a background
+check or unpaid trial still gets no answer.
+
+Asked to pick Yes or No straight off a dropdown, Jev rarely leans on a
+catch-all (0.35–0.46 on the PwC questions). Asked which profile entry answers
+the question, it picks this one at 0.9+. So a Yes/No dropdown asks both in
+the same batch, and a confident entry that starts with Yes or No selects the
+matching option (`yesNoFromEntry`).
+
 ## Forms in the wild
 
 Every ATS builds its controls differently, and each one broke something.
@@ -232,6 +254,63 @@ Live: **10 of 10**, both radios answered, GPA `3.9` chosen from the native
 select's options for a profile value of `3.9/4.00`, and `selectedLocation`
 populated. Greenhouse and Ashby re-run clean afterwards.
 
+### C3 AI — its own form over the Greenhouse API
+
+Not Greenhouse's markup: every question is `<label>Question</label>` beside
+the input's own `<div>`, with no `for=` and no id. Only School and Degree
+(label and input in one div) were read — 0 of 16 fields filled.
+
+- **Labels by ownership.** The label of the smallest wrapper holding this
+  field and no other control is its label. A wrapper with a second control
+  stops the climb, since its label may be the neighbour's.
+- **A bare "I Accept" under a privacy notice was ticked.** The box's own text
+  passed the consent filter, so the question around it is checked too.
+- **Month dropdown + Year number box** is a split date. The wrapper is the
+  smallest holding one month and one year; the nearest id'd ancestor was the
+  whole page, which merged both dates into one field labelled with the job
+  description.
+- Site search and cookie-banner toggles are page chrome, not questions.
+
+Live: **15 fields plus the resume**, consent left for you.
+
+### ByteDance — Universe Design widgets, signed in
+
+Each input sits in an **empty** `<label>`, with the question 7–11 levels up
+(sometimes in a plain `div.ud-formily-item-label`). One field was read.
+
+- **Menus have no role and no `aria-controls`.** Rows are
+  `.ud__select__list__item`, each in a wrapper of its own — reading the row's
+  parent as the menu saw one option, and the one-option shortcut clicked
+  **"No" for "authorized to work?"**. The menu is the whole `.ud__select__list`,
+  and a lone row is taken only when it is a search's result.
+- **Read-only comboboxes** (Degree, Yes/No) are dropdowns, not disabled boxes.
+- **Location is a tree** of country / state / city checkbox rows. Only
+  leaves are options, named by path — "San Jose" is in Costa Rica too.
+- **Start & end date** is one label over two boxes; each gets `(start)` /
+  `(end)`, and a calendar picker's box takes `YYYY-MM` — anything else is
+  dropped on blur.
+- The resume input is hidden and labelled "Attachment"; its dropzone saying
+  "Drag your resume here" is the evidence. ByteDance then offers to parse it
+  and overwrite the form — left unanswered.
+
+- **A failed pick left its menu open**, and the next dropdown read it: Degree
+  read the location list, and sponsorship clicked "No" in the *authorization*
+  menu. Every ByteDance dropdown now closes whatever is open first, remembers
+  which menus were already showing, and closes its own afterwards.
+- **"Add" sections are bare "Add" buttons** beside a section title. The title
+  names the section, the cards in it are counted, and Add is clicked up to one
+  card per profile entry. Roles whose title says intern go under Internship
+  Experience, the rest under Work Experience; projects and awards have
+  sections too. Each card's fields carry the entry they are for — *"Work
+  Experience 1 (Intelligible AI): Company name"* — because the first work card
+  is not my most recent role, and Jev would otherwise answer it as if it were.
+- **"Mobile"** alone on a text box is the number; Jev read it as the phone
+  *type* and typed "Mobile" in. It is asked as "Mobile phone number".
+
+Live, real Jev and my real profile (`bench/dogfood-real.mjs`): **36 fields,
+7 entries added, resume attached, in 9.9s**; left alone: Faculty, and dates
+the profile has no ISO form for ("Present").
+
 ### Autocompletes
 
 A field whose placeholder says *"Start typing…"* has an empty menu until you
@@ -278,15 +357,29 @@ deliver it.
 - `refine()` applies only to unlabelled **Extra lines** and to resume drafting.
   Labelled profile values bypass it — no regex can improve a value you typed
   yourself, and every regex can spoil one.
-- It is a port of `smartpaste/answer.py`. They drift: the JS copy silently lost
-  `end` from its end-of-range words. If you change one, change the other.
 
 ## Tests
 
 ```bash
-node --test extension/test/      # the lib: refine, resolve, buildOptions, unwrap
+node --test extension/test/          # lib + content script in headless Chrome
+node bench/mutation-check.mjs        # does each live-found fix have a test that sees it?
+node bench/dogfood-live.mjs <url>    # a live page, the stub playing Jev
+node bench/dogfood-real.mjs <url>    # a live page, real Jev and my real profile
 ```
 
-The DOM half is verified against live Greenhouse, Ashby and Lever pages rather
-than fixtures, because every real defect so far lived in how a specific site
-built its controls.
+Every real defect so far lived in how a specific site built its controls, so
+the content tests run against fixtures shaped like each site
+(`test/fixtures/`): Greenhouse, Ashby, Lever, Workday, and the two
+company-built forms found live — `c3.html` (C3's markup as served) and
+`bytedance.html` (a working fake of ByteDance's widgets, each quirk drawn the
+way it broke smartpaste).
+
+**A live bug is fixed when it has a test and a mutation entry.** The test
+reproduces it in a fixture; the entry in `bench/mutation-check.mjs` undoes
+the fix and checks that the test goes red. A `MISSED` there means the fixture
+is kinder than the site: `bytedance.html`'s menus once closed each other,
+which the real page never does, and the stale-menu bug that answered No to
+work authorization passed every test until the fake stopped being polite.
+
+The stub cannot judge. Whether Jev picks the right San Jose or reads
+"Mobile" as a number needs `dogfood-real.mjs` now and then.

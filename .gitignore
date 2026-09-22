@@ -1,9 +1,5 @@
 __pycache__/
 *.pyc
-.venv/
-build/
-dist/
-*.egg-info/
 .DS_Store
 corpus/build/
 corpus/results/
@@ -12,3 +8,5 @@ corpus/pdf/aidan-obrien-real.pdf
 corpus/truth/aidan-obrien-real.json
 # third-party corpora are downloaded locally, not redistributed
 corpus/external/*/
+bench/.dogfood-profile/
+bench/.real-profile/

@@ -1,0 +1,250 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply</title>
+<style>body{font:14px system-ui;max-width:760px;margin:20px auto}
+.applyFormModuleWrapper{display:flex;gap:20px;margin:16px 0}.applyFormModuleWrapper-left{width:180px}
+.ud-formily-item{margin:8px 0}.ud-formily-item-label{font-weight:600}
+input{padding:4px;width:280px}.ud__select__selector{border:1px solid #999;min-height:28px;display:flex;flex-wrap:wrap;gap:4px;padding:2px;width:300px;cursor:pointer}
+.ud__select__selector__search input{width:40px;border:0}
+.ud__select__dropdown{position:absolute;background:#fff;border:1px solid #999;width:320px;z-index:9}
+.ud__select__list__item,.ud__tree__node{padding:3px 6px;cursor:pointer}
+.atsx-upload input[type=file]{width:0;height:0;opacity:0;position:absolute}
+.atsx-upload{border:1px dashed #999;padding:12px}</style></head>
+<body>
+<!-- ByteDance's application (jobs.bytedance.com/en/resume/<id>/apply),
+     signed in, rebuilt from its live DOM on 2026-09-21. Its "Universe
+     Design" widgets, each drawn the way it broke smartpaste:
+       - every input sits in an EMPTY <label>; the question is 7-11 levels
+         up, in div.ud-formily-item-label (sometimes with no <label> at all)
+       - dropdowns: input[role=combobox][type=search], readonly when
+         select-only. The menu renders in a wrapper away from the control,
+         with no aria-controls, and each row (.ud__select__list__item, no
+         role) sits in a wrapper div of its own
+       - a menu stays open until a row is clicked or the page is clicked
+         elsewhere -- a failed pick leaves it on screen for the next field,
+         and the next field's own menu renders a moment after its click
+       - location: a tree of country / state / city rows with checkboxes,
+         empty until typed into; picks are tags, and the menu stays open
+       - start & end date: two boxes under one label; each keeps only
+         YYYY-MM on blur and clears anything else
+       - the resume input is hidden, labelled "Attachment", inside a
+         dropzone saying "Drag your resume here"
+       - repeated sections (Work / Internship / Project Experience) are a
+         title and a bare "Add" button; each click adds a card -->
+<div class="resumeEditForm-wrapper"><form id="apply"></form></div>
+<script>
+window.__model = {};
+window.__added = {};
+const form = document.getElementById("apply");
+const portal = document.querySelector(".resumeEditForm-wrapper");
+const h = (tag, cls, ...kids) => {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  for (const k of kids) el.append(k);
+  return el;
+};
+const record = (key, value) => { window.__model[key] = value; };
+
+// A formily item: label far above, control far below.
+function item(label, control, { plainLabel = false } = {}) {
+  const labelEl = plainLabel ? h("span", "", label) : h("label", "", label);
+  return h("div", "ud-formily-item",
+    h("div", "ud-formily-item-label", h("div", "ud-formily-item-label-content", h("span", "", labelEl))),
+    h("div", "ud-formily-item-control", h("div", "ud-formily-item-control-content",
+      h("div", "ud-formily-item-control-content-component", control))));
+}
+// A text box in an empty label, as ByteDance wraps every one.
+function textBox(key, { onBlur } = {}) {
+  const input = h("input", "ud__native-input");
+  input.addEventListener("input", () => record(key, input.value));
+  if (onBlur) input.addEventListener("blur", () => onBlur(input));
+  return h("div", "", h("label", "", h("div", "u16gdikw", input)));
+}
+
+// ---- dropdowns
+const openMenus = new Set();
+let openMenu = null;
+function closeMenu(menu = openMenu) {
+  if (!menu) return;
+  menu.remove();
+  openMenus.delete(menu);
+  if (openMenu === menu) openMenu = null;
+}
+document.addEventListener("mousedown", (e) => {
+  for (const menu of [...openMenus]) if (!menu.contains(e.target) && !e.target.closest(".ud__select")) closeMenu(menu);
+});
+function place(menu, anchor) {
+  const r = anchor.getBoundingClientRect();
+  menu.style.left = (scrollX + r.left) + "px";
+  menu.style.top = (scrollY + r.bottom + 2) + "px";
+  portal.append(menu); // away from the control, as the live page does
+}
+function select(key, options, { readonly = true, shown = "" } = {}) {
+  const input = h("input", "ud__select__selector__search__input ud__native-input");
+  Object.assign(input, { type: "search", autocomplete: "off", readOnly: readonly });
+  input.setAttribute("role", "combobox");
+  const content = h("div", "ud__select__selector__content");
+  const value = h("div", "ud__select__selector__selectItem", shown);
+  if (shown) content.append(value);
+  content.append(h("div", "ud__select__selector__search", input));
+  const root = h("div", "ud__select", h("div", "ud__select__selector", content));
+  const open = () => {
+    if ([...openMenus].some((m) => m.dataset.for === key)) return;
+    // Opening another select does NOT close this one: live, a menu left open
+    // by a failed pick stayed on screen, over the next question.
+    let menu;
+    const rows = options.map((text) => {
+      const row = h("div", "ud__select__list__item", h("div", "ud__select__list__item__content", h("span", "", text)));
+      row.addEventListener("click", () => {
+        value.textContent = text;
+        if (!value.isConnected) content.prepend(value);
+        record(key, text);
+        closeMenu(menu);
+      });
+      return h("div", "", row); // one wrapper per row
+    });
+    menu = h("div", "ud__select__dropdown", h("div", "",
+      h("div", "ud__select__list", h("div", "ud__select__list__menu", h("div", "rc-virtual-list", ...rows)))));
+    menu.dataset.for = key;
+    openMenu = menu;
+    openMenus.add(menu);
+    place(menu, root);
+  };
+  // Rendered a moment after the click, as React does: until then the only
+  // menu on screen is whichever one was left open before.
+  input.addEventListener("click", () => setTimeout(open, 60));
+  return root;
+}
+
+// ---- the location tree: empty until typed, picks are tags, stays open
+const PLACES = [
+  ["Costa Rica", "San Jose", "San Jose"],
+  ["United Kingdom", "North Yorkshire"],
+  ["United States of America", "California", "San Jose"],
+  ["United States of America", "New York", "Brooklyn"],
+  ["United States of America", "New York", "New York"],
+];
+function treeSelect(key) {
+  const input = h("input", "ud__select__selector__search__input ud__native-input");
+  Object.assign(input, { type: "search", autocomplete: "off" });
+  input.setAttribute("role", "combobox");
+  const content = h("div", "ud__select__selector__content", h("div", "ud__select__selector__search", input));
+  const root = h("div", "ud__select", h("div", "ud__select__selector", content));
+  const picked = [];
+  let menu = null;
+  const render = () => {
+    closeMenu(menu);
+    const q = input.value.trim().toLowerCase();
+    if (!q) return;
+    const hits = PLACES.filter((p) => p.some((part) => part.toLowerCase().includes(q)));
+    if (!hits.length) return;
+    const rows = [];
+    const seen = new Set();
+    for (const path of hits) {
+      path.forEach((name, depth) => {
+        const id = path.slice(0, depth + 1).join("/");
+        if (seen.has(id)) return;
+        seen.add(id);
+        const leaf = depth === path.length - 1;
+        const box = h("input", "ud__checkbox__input");
+        box.type = "checkbox";
+        box.addEventListener("click", () => {
+          picked.push(id);
+          record(key, [...picked]);
+          content.prepend(h("span", "ud__tag ud__select__selector__tag", h("div", "ud__tag__content", name)));
+        });
+        const indents = Array.from({ length: depth }, () => h("span", "ud__tree__node__indent"));
+        rows.push(h("div", "", h("div", "ud__tree__node", ...indents,
+          h("button", "ud__expandButton" + (leaf ? " ud__expandButton-as-placeholder" : "")),
+          h("label", "ud__checkbox__wrapper", h("span", "ud__checkbox", box)),
+          h("div", "ud__tree__node__label", h("span", "", name)))));
+      });
+    }
+    menu = h("div", "ud__select__dropdown", h("div", "",
+      h("div", "ud__select__list ud__treeSelect__overlay", h("div", "ud__tree", h("div", "ud__tree__list", ...rows)))));
+    menu.dataset.for = key;
+    openMenu = menu;
+    openMenus.add(menu);
+    place(menu, root);
+  };
+  input.addEventListener("input", () => setTimeout(render, 50));
+  return root;
+}
+
+// ---- start & end date: YYYY-MM or nothing
+function dateRange(key) {
+  const keep = (which) => (input) => {
+    if (!/^\d{4}-\d{2}$/.test(input.value)) input.value = "";
+    record(`${key} ${which}`, input.value);
+  };
+  return h("div", "throne-biz-date-range-picker-wrapper",
+    h("div", "throne-biz-date-range-picker-input", textBox(`${key} start (typed)`, { onBlur: keep("start") })),
+    h("div", "throne-biz-date-range-picker-rangeInput-seperator"),
+    h("div", "throne-biz-date-range-picker-input", textBox(`${key} end (typed)`, { onBlur: keep("end") })));
+}
+
+function module(title, ...content) {
+  return h("div", "applyFormModuleWrapper",
+    h("div", "applyFormModuleWrapper-left", h("div", "applyFormModuleWrapper-title", h("p", "applyFormModuleWrapper-text", title))),
+    h("div", "applyFormModuleWrapper-right", ...content));
+}
+
+// ---- a repeated section: a title and a bare Add; each click adds a card
+function repeated(title, fields) {
+  const cards = h("div", "cards");
+  const add = h("button", "apply-form-array-card-add-float-right", "Add");
+  add.type = "button";
+  add.addEventListener("click", () => {
+    const n = cards.children.length + 1;
+    window.__added[title] = n;
+    const key = (f) => `${title} ${n}: ${f}`;
+    cards.append(h("div", "apply-form-array-card", h("div", "apply-form-array-card-content",
+      ...fields.map(([label, kind]) => item(label, kind === "date" ? dateRange(key(label)) : textBox(key(label)))))));
+  });
+  return module(title, h("div", "ud-formily-item", cards, add));
+}
+const ROLE = [["Company name"], ["Title"], ["Start & end date", "date"], ["Description"]];
+
+const upload = h("input");
+upload.type = "file";
+upload.addEventListener("change", () => record("Attachment", upload.files[0]?.name));
+const privacy = h("input", "atsx-checkbox-input");
+privacy.type = "checkbox";
+privacy.addEventListener("change", () => record("Privacy", privacy.checked));
+
+form.append(
+  module("Application Information",
+    item("Referral code", textBox("Referral code"))),
+  module("Resume",
+    item("Attachment", h("div", "uploadResume", h("span", "atsx-upload atsx-upload-drag",
+      upload, h("p", "uploadPlaceholder-secondRow", "Drag your resume here"),
+      h("p", "", "Supported file formats: PDF, DOC, DOCX"))))),
+  module("Basic Information",
+    item("Name", textBox("Name")),
+    // Just "Mobile": a country-code select beside the number box.
+    item("Mobile", h("span", "", select("Country code", ["+1", "+44"], { readonly: false, shown: "+1" }), textBox("Mobile"))),
+    item("Email", textBox("Email")),
+    item("Preferred work location", treeSelect("Preferred work location"))),
+  repeated("Work Experience", ROLE),
+  module("Education", h("div", "ud-formily-item", h("div", "apply-form-array-card", h("div", "apply-form-array-card-content",
+    item("School name", textBox("Education 1: School name")),
+    item("Degree", select("Education 1: Degree", ["PhD", "Master's degree", "Bachelor's degree", "High school"])),
+    item("Field of study", textBox("Education 1: Field of study")),
+    item("Start & end date", dateRange("Education 1: Start & end date")))))),
+  repeated("Internship Experience", ROLE),
+  repeated("Project Experience", [["Project name"], ["Description"]]),
+  module("Others",
+    // Before the Yes/No pair on purpose: none of its options matches the
+    // answer, so its pick fails and its menu stays open over them.
+    item("Where did you hear about this opportunity? Choose the option(s) that influenced your decision to apply.",
+      select("Where did you hear", ["Campus Event", "Internet Search", "Others"]), { plainLabel: true })),
+  module("Interview",
+    // One option, and it is not the answer: a lone row seen on opening is
+    // not a match (a half-read menu showed a lone "No" to a "Yes").
+    item("Preferred interview language", select("Interview language", ["Chinese"]))),
+  module("Work Authorization",
+    item("Are you legally authorized to work in the US without restriction?", select("Authorized", ["Yes", "No"])),
+    item("Will you now or in the future require visa sponsorship or a visa transfer?", select("Sponsorship", ["Yes", "No"]))),
+  h("label", "atsx-checkbox", privacy, " I have read and agreed to the Privacy Policy"),
+);
+</script>
+</body></html>

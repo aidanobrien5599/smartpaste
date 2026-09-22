@@ -106,8 +106,45 @@
       const text = clean(node.textContent);
       if (text) return text;
     }
-    return clean(field.placeholder) || clean(field.name) || "";
+    return ownerLabel(field) || clean(field.placeholder) || clean(field.name) || "";
   }
+
+  // The label of the smallest wrapper that holds this field and no other:
+  // C3's Greenhouse-API form puts <label>Question</label> beside the input's
+  // own <div>, with no for= and no id to tie them. Stops at the first
+  // wrapper holding a second control, whose label may be the neighbour's.
+  //
+  // ByteDance wraps each input in an empty <label> and keeps the question
+  // seven levels up, sometimes in a plain <div class="…-label">. Two things
+  // may share the wrapper without making the label someone else's: a phone
+  // number's country-code picker, and the other half of a start / end range.
+  const ANY_CONTROL = 'input:not([type="hidden"]):not([type="file"]), textarea, select';
+  const LABEL_LIKE = 'label, legend, [class*="item-label"], [class*="field-label"], [class*="form__label"]';
+  const RANGE = /\b(?:start|from)\b.*\b(?:end|to|until)\b/i;
+  function ownerLabel(field) {
+    let node = field.parentElement;
+    for (let depth = 0; node && depth < 12; depth++, node = node.parentElement) {
+      const controls = [...node.querySelectorAll(ANY_CONTROL)];
+      const others = controls.filter((c) => c !== field && !(c.type === "search" && field.type !== "search"));
+      if (others.length > 1) return "";
+      const label = [...node.querySelectorAll(LABEL_LIKE)].find((l) =>
+        !l.contains(field) && !(l.htmlFor && l.htmlFor !== field.id) && !l.querySelector(ANY_CONTROL) && clean(l.textContent));
+      const text = label ? clean(label.textContent) : "";
+      if (!others.length && text) return text;
+      if (others.length && text) {
+        if (!RANGE.test(text) || others[0].tagName !== field.tagName) return "";
+        const first = field.compareDocumentPosition(others[0]) & Node.DOCUMENT_POSITION_FOLLOWING;
+        return `${text} (${first ? "start" : "end"})`;
+      }
+    }
+    return "";
+  }
+
+  // Page chrome that is not the application: a site's search box, a cookie
+  // banner's "Do Not Sell" toggle.
+  const PAGE_CHROME = '[role="search"], form[action*="search" i], ' +
+    '[id*="cookie" i], [class*="cookie" i], [id*="onetrust" i], [class*="cky-"], [id^="cky"]';
+  const pageChrome = (element) => element.closest(PAGE_CHROME) !== null;
 
   function clean(text) {
     if (!text) return "";
@@ -127,7 +164,9 @@
   }
 
   function visible(field) {
-    if (field.disabled || field.readOnly) return false;
+    // A read-only combobox is a select-only dropdown (ByteDance's Degree):
+    // it opens on click and takes a value from its menu.
+    if (field.disabled || (field.readOnly && !isCombobox(field))) return false;
     // The hidden twin inside a React Select is not a field of its own; it
     // otherwise gets picked up and labelled from the "Select..." placeholder.
     if (field.closest(SELECT_SHELL) && !isCombobox(field)) return false;
@@ -262,8 +301,27 @@
       // entry, whose own fields are just "Start Date", "Degree"...
       const path = element.closest("[data-field-path]")?.getAttribute("data-field-path") || "";
       const section = path.replace(/^_systemfield_/, "").replace(/_/g, " ").trim();
-      return /\b(education|experience|employment|work) history\b/i.test(section)
-        ? `${section.replace(/\b\w/g, (c) => c.toUpperCase())}: ` : "";
+      if (/\b(education|experience|employment|work) history\b/i.test(section)) {
+        return `${section.replace(/\b\w/g, (c) => c.toUpperCase())}: `;
+      }
+      // A card in a titled section: its number, and the profile entry it is
+      // for, since ByteDance's Work Experience 1 is my 2nd most recent role.
+      const card = element.closest?.(CARD);
+      const titled = card && titledSection(card);
+      if (titled) {
+        const n = [...titled.root.querySelectorAll(CARD)].indexOf(card) + 1;
+        const kind = ENTRY_SECTIONS.find((k) => k.test.test(titled.name));
+        const entry = kind?.entries(profileCache, splitsInternships())[n - 1];
+        const subject = entry && kind.summary ? String(entry[kind.summary] || "").trim() : "";
+        return `${titled.name} ${n}${subject ? ` (${subject})` : ""}: `;
+      }
+      // A section headed "Education" around bare "School" / "Start" boxes.
+      for (let node = element.parentElement, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
+        const heading = node.querySelector(":scope > h2, :scope > h3, :scope > h4");
+        const text = heading ? clean(heading.textContent) : "";
+        if (/^(education|work experience|experience|employment)$/i.test(text)) return `${text}: `;
+      }
+      return "";
     }
     const name = ENTRY_NAMES[stem] || stem.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
     // Workday's ids number entries its own way (the first job is
@@ -329,7 +387,31 @@
       const text = node ? clean(node.textContent) : "";
       if (text && !PART_NAME.test(text)) return text;
     }
-    return "";
+    // No label at all, only a hint beside the boxes: C3's "Start" / "End".
+    const hint = [...wrapper.children].find((c) => !c.matches("input, select, textarea") && clean(c.textContent));
+    return hint ? clean(hint.textContent) : "";
+  }
+
+  // A Month... dropdown with a Year beside it under one label is a split
+  // date: a Year... <select> (Ashby's education Start Date / End Date), or a
+  // number box whose placeholder says Year (C3's Greenhouse-API form).
+  const YEAR_BOX = 'input[placeholder="Year" i]';
+  function monthYearWrapper(select) {
+    if (select.tagName !== "SELECT" || !/^month/i.test(select.options[0]?.textContent.trim() || "")) return null;
+    const isMonth = (s) => /^month/i.test(s.options[0]?.textContent.trim() || "");
+    const hasYear = (node) => node.querySelector(YEAR_BOX) ||
+      [...node.querySelectorAll("select")].some((s) => /^year/i.test(s.options[0]?.textContent.trim() || ""));
+    // One date only: the nearest id'd wrapper (Ashby, whose label points at
+    // it) unless that holds a second date too -- C3's is the whole page.
+    const onlyDate = (node) => node && [...node.querySelectorAll("select")].filter(isMonth).length === 1 && hasYear(node);
+    const byId = select.parentElement?.closest("[id]");
+    if (onlyDate(byId)) return byId;
+    let node = select.parentElement;
+    for (let depth = 0; node && depth < 3; depth++, node = node.parentElement) {
+      if (onlyDate(node)) return node;
+      if ([...node.querySelectorAll("select")].filter(isMonth).length > 1) break;
+    }
+    return null;
   }
 
   function collectWidgets() {
@@ -339,14 +421,9 @@
       fields.push({ element: button, label: listboxLabel(button), options: null, combobox: false, widget: "listbox" });
     }
     const wrappers = new Set();
-    // A Month... / Year... pair of <select>s under one label (Ashby's
-    // education Start Date / End Date) is a split date too.
     for (const select of document.querySelectorAll("select")) {
-      if (!/^month/i.test(select.options[0]?.textContent.trim() || "")) continue;
-      const wrapper = select.parentElement?.closest("[id]") || select.parentElement;
-      if (wrapper && [...wrapper.querySelectorAll("select")].some((s) => /^year/i.test(s.options[0]?.textContent.trim() || "")) && nodeVisible(wrapper)) {
-        wrappers.add(wrapper);
-      }
+      const wrapper = monthYearWrapper(select);
+      if (wrapper && nodeVisible(wrapper)) wrappers.add(wrapper);
     }
     for (const part of document.querySelectorAll(DATE_PART)) {
       const wrapper = part.closest(DATE_WRAPPER) || part.closest('[data-automation-id^="formField"]') || part.parentElement;
@@ -423,21 +500,29 @@
 
   // A lone checkbox is a yes/no question -- "I currently work here" -- unless
   // it is a consent. Those are the applicant's to tick, never ours.
-  const CONSENT = /agree|consent|terms|privacy|acknowledg|certif|attest|marketing|newsletter|subscribe|remember me|sms|text messages?|contact me/i;
+  const CONSENT = /agree|accept|consent|terms|privacy|acknowledg|certif|attest|marketing|newsletter|subscribe|remember me|sms|text messages?|contact me|do not sell/i;
 
   function collectSingleCheckboxes() {
     const fields = [];
     for (const [box, ...rest] of groupCheckboxes()) {
-      if (rest.length) continue;
+      if (rest.length || pageChrome(box)) continue;
       const label = labelFor(box) ||
         clean(box.closest('[data-automation-id^="formField"]')?.querySelector("label, legend")?.textContent || "");
-      if (label.length < 3 || CONSENT.test(label)) continue;
+      // The box's own text can be a bare "I Accept" under a privacy notice,
+      // so the question around it gets a say too.
+      if (label.length < 3 || CONSENT.test(label) || CONSENT.test(ownerLabel(box))) continue;
       const shown = box.closest("label, [data-automation-id^='formField']") || box;
       if (!nodeVisible(shown) && !nodeVisible(box)) continue;
       fields.push({ element: box, label, options: ["Yes", "No"], buttons: [box], combobox: false, single: true });
     }
     return fields;
   }
+
+  // ByteDance labels its phone box just "Mobile", and Jev took that for the
+  // phone *type* in my profile and typed "Mobile" into it. On a box you type
+  // into, a bare Mobile / Cell is the number.
+  const bareMobile = (element, label) =>
+    element.tagName === "INPUT" && /^(?:mobile|cell)$/i.test(label) ? `${label} phone number` : label;
 
   /** A write-in ("Other: ___") inside a choice question is not that question. */
   function insideChoiceQuestion(element) {
@@ -447,10 +532,10 @@
 
   function collectFields() {
     return [...document.querySelectorAll(FIELD_SELECTOR)]
-      .filter((element) => visible(element) && !element.matches(DATE_PART) && !insideChoiceQuestion(element))
+      .filter((element) => visible(element) && !element.matches(DATE_PART) && !insideChoiceQuestion(element) && !pageChrome(element) && !monthYearWrapper(element))
       .map((element) => ({
         element,
-        label: labelFor(element),
+        label: bareMobile(element, labelFor(element)),
         options: selectOptions(element),
         combobox: isCombobox(element),
         widget: element.matches(PROMPT_INPUT) ? "prompt" : null,
@@ -802,10 +887,70 @@
    * menu. Figma's location box has no aria-controls at all, so looking only
    * there never saw its menu and sat out every timeout.
    */
+  // ByteDance's own select (its "Universe Design"): the menu is rendered
+  // away from the control, with no aria-controls, and its rows carry no role.
+  const UD_SELECT = ".ud__select";
+  // Its location picker is a tree -- country, state, city -- of checkbox rows.
+  const UD_TREE_NODE = ".ud__treeSelect__overlay .ud__tree__node";
+  const UD_OPTION = `.ud__select__list__item, ${UD_TREE_NODE}`;
+  const MENU_OPTION = `[role="option"], ${UD_OPTION}`;
+
+  /**
+   * A menu's rows as choices. In a tree only the leaves are, each named by
+   * its path: "San Jose" alone is in Costa Rica and in California.
+   */
+  function menuChoices(nodes) {
+    const tree = nodes.filter((n) => n.matches(UD_TREE_NODE));
+    if (!tree.length) return { nodes, texts: nodes.map((n) => n.textContent.trim()) };
+    const depth = (n) => n.querySelectorAll(".ud__tree__node__indent").length;
+    const name = (n) => n.querySelector(".ud__tree__node__label")?.textContent.trim() || n.textContent.trim();
+    const path = [];
+    const leaves = [];
+    for (const node of tree) {
+      path.length = depth(node);
+      path.push(name(node));
+      const leaf = !node.querySelector(".ud__expandButton") || node.querySelector(".ud__expandButton-as-placeholder");
+      if (leaf) leaves.push([node, path.join(" / ")]);
+    }
+    return { nodes: leaves.map(([n]) => n), texts: leaves.map(([, t]) => t) };
+  }
+
+  const staleMenus = new WeakMap(); // field -> menus already open when it opened
+  const udLists = () => [...new Set([...document.querySelectorAll(UD_OPTION)].filter(nodeVisible)
+    .map((n) => n.closest(".ud__select__list") || n.parentElement))];
+
+  /** Close whatever ByteDance menu is open; true once none shows. */
+  async function closeUdMenus() {
+    for (let attempt = 0; attempt < 3 && udLists().length; attempt++) {
+      const active = document.activeElement;
+      if (active && active !== document.body) {
+        press(active, "Escape", 27);
+        active.blur();
+      }
+      for (const type of ["mousedown", "mouseup", "click"]) {
+        document.body.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+      }
+      for (let i = 0; i < 10 && udLists().length; i++) await sleep(30);
+    }
+    return !udLists().length;
+  }
+
   function menuFor(field) {
     const id = field.getAttribute("aria-controls");
-    return (id && document.getElementById(id)) ||
-      selectRoot(field)?.querySelector('[class*="select__menu"]') || null;
+    const menu = (id && document.getElementById(id)) ||
+      selectRoot(field)?.querySelector('[class*="select__menu"]');
+    if (menu || !field.closest(UD_SELECT)) return menu || null;
+    // Each row has a wrapper of its own, so the list is the menu, not a parent.
+    // A menu left open by the field before is not this one's -- reading it
+    // answered "authorized to work?" from the sponsorship menu, with No.
+    const stale = staleMenus.get(field) || new Set();
+    const lists = udLists().filter((l) => !stale.has(l));
+    const at = field.getBoundingClientRect();
+    const gap = (list) => {
+      const r = list.getBoundingClientRect();
+      return Math.min(Math.abs(r.top - at.bottom), Math.abs(at.top - r.bottom));
+    };
+    return lists.sort((a, b) => gap(a) - gap(b))[0] || null;
   }
 
   /** The whole React Select: control, menu and notices all live under it. */
@@ -823,7 +968,7 @@
     const started = Date.now();
     while (Date.now() - started < timeout) {
       const menu = menuFor(field);
-      const nodes = menu ? [...menu.querySelectorAll('[role="option"]')] : [];
+      const nodes = menu ? [...menu.querySelectorAll(MENU_OPTION)] : [];
       if (nodes.length) return nodes;
       // An open menu saying "No options" is an answer, not a slow load.
       const notice = menuNotice(field);
@@ -854,11 +999,17 @@
   function isReactSelect(field) {
     return (
       field.classList.contains("select__input") ||
-      Boolean(field.closest(SELECT_SHELL))
+      Boolean(field.closest(SELECT_SHELL)) ||
+      (field.matches(COMBO_SELECTOR) && Boolean(field.closest(UD_SELECT)))
     );
   }
 
   function currentValue(field) {
+    const ud = field.matches(COMBO_SELECTOR) && field.closest(UD_SELECT);
+    if (ud) {
+      const shown = [...ud.querySelectorAll('[class*="selector__selectItem"], [class*="selector__tag"]')];
+      return shown.map((n) => n.textContent.trim()).filter(Boolean).join(", ");
+    }
     const shell = field.closest(SELECT_SHELL);
     if (!shell) return field.value.trim(); // not a React Select (Ashby's search boxes): its text is its value
     const shown = shell.querySelector('[class*="single-value"], [class*="multi-value__label"]');
@@ -893,39 +1044,53 @@
    * on its own. Then one distinctive word narrows it, never the whole value.
    */
   async function setCombobox(field, want) {
+    const ud = Boolean(field.closest(UD_SELECT));
+    if (ud) {
+      await closeUdMenus();
+      staleMenus.set(field, new Set(udLists()));
+      try { return await pickCombobox(field, want); } finally { await closeUdMenus(); }
+    }
+    return pickCombobox(field, want);
+  }
+
+  async function pickCombobox(field, want) {
     field.focus();
     fire(field, "mousedown");
     fire(field, "mouseup");
     fire(field, "click");
 
     // A type-first menu is empty when opened: waiting on it only costs time.
-    let nodes = needsTyping(field) ? [] : await menuOptions(field, 1500, { opening: true });
-    let texts = nodes.map((n) => n.textContent.trim());
+    const read = (found) => ({ nodes, texts } = menuChoices(found));
+    let nodes, texts;
+    read(needsTyping(field) ? [] : await menuOptions(field, 1500, { opening: true }));
     const exact = () => texts.findIndex((t) => normalize(t) === normalize(want));
+    let searched = false;
 
     // An autocomplete has nothing to show until you type -- that is what a
     // "Start typing..." placeholder means. Opening it yields an empty menu,
     // so here typing is the only way to get any options at all.
     if (!nodes.length) {
-      for (const probe of [want, narrowingToken(want)]) {
+      searched = true;
+      // A place's generic tail finds nothing in a list of places: "New York
+      // City" is listed as "New York".
+      const place = want.replace(/\s+(?:city|metro(?:politan)?(?: area)?|area|greater)$/i, "").replace(/^greater\s+/i, "");
+      for (const probe of [...new Set([want, place, narrowingToken(want)])]) {
         nativeSet(field, probe);
-        nodes = await menuOptions(field, 3000);
+        read(await menuOptions(field, 3000));
         if (nodes.length) break;
       }
-      texts = nodes.map((n) => n.textContent.trim());
     }
 
     if (exact() < 0 && texts.length >= LONG_MENU) {
       nativeSet(field, narrowingToken(want));
       const narrowed = await menuOptions(field, 3000);
       if (narrowed.length) {
-        nodes = narrowed;
-        texts = nodes.map((n) => n.textContent.trim());
+        searched = true;
+        read(narrowed);
       } else {
         // The narrowing matched nothing; restore the full menu.
         nativeSet(field, "");
-        nodes = await menuOptions(field);
-        texts = nodes.map((n) => n.textContent.trim());
+        read(await menuOptions(field));
       }
     }
     if (!nodes.length) {
@@ -942,7 +1107,10 @@
     }
 
     let index = exact();
-    if (index < 0 && texts.length === 1) index = 0;
+    // The one result of a search is the match; the one row of a menu we only
+    // opened is just what it shows (a menu half-read showed a lone "No" to a
+    // "Yes", and it was clicked).
+    if (index < 0 && texts.length === 1 && searched) index = 0;
     if (index < 0) index = await askChoice(labelFor(field), want, texts.slice(0, MAX_MENU));
     if (index < 0 || !nodes[index]) {
       field.blur();
@@ -955,9 +1123,12 @@
     let target = nodes[index];
     if (!target.isConnected) {
       const want = texts[index];
-      target = (await menuOptions(field, 1500)).find((n) => n.textContent.trim() === want);
+      const now = menuChoices(await menuOptions(field, 1500));
+      target = now.nodes[now.texts.indexOf(want)];
       if (!target) { field.blur(); return false; }
     }
+    // A tree row is ticked by its checkbox, not by a click on the row.
+    if (target.matches(UD_TREE_NODE)) target = target.querySelector('input[type="checkbox"]') || target;
     fire(target, "mousedown");
     fire(target, "mouseup");
     fire(target, "click");
@@ -1474,8 +1645,17 @@
     const hint = `${field.placeholder || ""} ${field.getAttribute("aria-label") || ""} ${labelFor(field)}`;
     const shape = field.type === "date" ? "YYYY-MM-DD"
       : (hint.match(/\b(MM\/DD\/YYYY|DD\/MM\/YYYY|MM\/YYYY|YYYY-MM-DD|MM-DD-YYYY)\b/i) || [])[1]?.toUpperCase();
-    if (!shape) return value;
     const parts = dateParts(value);
+    // "Year of Graduation" wants 2027, not the profile's "May 2027". Only
+    // when the box names a year and nothing finer: "Month and year" and
+    // "Graduation date" keep the whole date, "Years of experience" is a count.
+    const onlyYear = /\byear\b/i.test(hint) && !/\b(?:month|day|date|mm|dd)\b/i.test(hint);
+    if (onlyYear && parts && !shape) return parts.year;
+    // A calendar picker's text box with no format stated (ByteDance's start
+    // / end range) takes ISO, and drops anything else on blur.
+    const picker = !shape && field.closest('[class*="date-range-picker"], [class*="date-picker"], [class*="picker-input"]');
+    if (picker && parts?.month) return parts.day ? `${parts.year}-${pad(parts.month)}-${pad(parts.day)}` : `${parts.year}-${pad(parts.month)}`;
+    if (!shape) return value;
     if (!parts || !parts.month) return value;
     const [y, m, d] = [parts.year, pad(parts.month), pad(parts.day || 1)];
     return { "MM/DD/YYYY": `${m}/${d}/${y}`, "DD/MM/YYYY": `${d}/${m}/${y}`, "MM/YYYY": `${m}/${y}`,
@@ -1488,7 +1668,7 @@
     if (!parts) return false;
     const selectFor = (name) => [...wrapper.querySelectorAll("select")]
       .find((s) => new RegExp(`^${name}`, "i").test(s.options[0]?.textContent.trim() || ""));
-    const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"], input[aria-label="${name}"]`) || selectFor(name);
+    const box = (name) => wrapper.querySelector(`[data-automation-id="dateSection${name}-input"], input[aria-label="${name}"], input[placeholder="${name}" i]`) || selectFor(name);
     // Workday's date widget re-renders on every change: a box held from
     // before is no longer on the page, and a value set on it goes nowhere.
     // Its ids are stable ("workExperience-1--startDate-dateSectionYear-input"),
@@ -1586,7 +1766,10 @@
        input.closest('[data-fkit-id*="resume" i]') ? "resume" : ""].join(" "),
       [labelFor(input),
        (input.closest(FIELD_ENTRY) || input.closest("[class*='field'], fieldset"))
-         ?.textContent?.slice(0, 140) || ""].join(" "),
+         ?.textContent?.slice(0, 140) || "",
+       // ByteDance: a bare input labelled "Attachment", inside a dropzone
+       // that says "Drag your resume here".
+       input.closest("[class*='upload' i]")?.textContent?.slice(0, 140) || ""].join(" "),
     ];
   }
 
@@ -1669,16 +1852,44 @@
   // school or website exists only once you click its section's Add button.
   // Nothing to fill until then, so the whole step used to be skipped.
   const LINK_KEYS = ["linkedin", "github", "portfolio", "other_link"];
+  // ByteDance splits roles into Work and Internship sections: a role whose
+  // title says intern goes under Internship, and then only there.
+  const isIntern = (role) => /\bintern(?:ship)?\b/i.test(role.title || "");
+  // Most specific first: "Internship Experience" and "Project Experience"
+  // would otherwise count as work experience.
   const ENTRY_SECTIONS = [
-    { test: /experience|employment|work.?history|where.*worked/i, stems: ["workExperience"],
-      count: (p) => (p.experience || []).length },
-    { test: /education|school/i, stems: ["education"], count: (p) => (p.education || []).length },
+    { test: /intern/i, stems: [], summary: "company",
+      entries: (p) => (p.experience || []).filter(isIntern) },
+    { test: /project/i, stems: [], summary: "name", entries: (p) => p.projects || [] },
+    { test: /award|hono(?:u)?r/i, stems: [], summary: "title", entries: (p) => p.awards || [] },
+    { test: /experience|employment|work.?history|where.*worked/i, stems: ["workExperience"], summary: "company",
+      entries: (p, split) => (p.experience || []).filter((role) => !split || !isIntern(role)) },
+    { test: /education|school/i, stems: ["education"], summary: "school", entries: (p) => p.education || [] },
     { test: /website/i, stems: ["websitePanelSet", "webAddress"],
-      count: (p) => LINK_KEYS.filter((k) => String(p[k] || "").trim()).length },
+      entries: (p) => LINK_KEYS.filter((k) => String(p[k] || "").trim()) },
   ];
+  let profileCache = {};
+  const splitsInternships = () => [...document.querySelectorAll(SECTION_TITLE)].some((t) => /intern/i.test(t.textContent));
+
+  // A repeated entry drawn as a card (ByteDance), under a section title
+  // rather than a labelled group.
+  const CARD = '[class*="array-card-content"]';
+  const SECTION_TITLE = 'h2, h3, h4, [class*="Wrapper-title"], [class*="section-title"], [class*="sectionTitle"]';
+
+  /** The titled section around a node: its root and its title's text. */
+  function titledSection(node) {
+    for (let root = node.parentElement, depth = 0; root && depth < 8; root = root.parentElement, depth++) {
+      const title = [...root.querySelectorAll(SECTION_TITLE)].find((t) => !t.contains(node) && clean(t.textContent));
+      const text = title ? clean(title.textContent) : "";
+      if (text && text.length < 40) return { root, name: text };
+    }
+    return null;
+  }
 
   /** Entries already on the page for a section: panels, marked boxes, or ids. */
-  function countEntries(kind, prefix) {
+  function countEntries(kind, prefix, root) {
+    const cards = root && !prefix ? root.querySelectorAll(CARD).length : 0;
+    if (cards) return cards;
     // One entry can carry both a panel label and ids; count one or the other.
     const panels = prefix ? document.querySelectorAll(
       `[role="group"][aria-labelledby^="${CSS.escape(prefix)}"][aria-labelledby$="-panel"]`).length : 0;
@@ -1703,20 +1914,28 @@
     for (const button of document.querySelectorAll("button")) {
       const name = button.getAttribute("aria-label") || button.textContent.trim();
       if (!/^add\b/i.test(name) || !nodeVisible(button) || found.some((f) => f.root.contains(button))) continue;
-      if (/^add(?: another)?$/i.test(name.trim())) continue; // says nothing about which section
+      if (/^add(?: another)?$/i.test(name.trim())) {
+        // A bare "Add" says nothing about its section, but a title beside
+        // it can: ByteDance's "Work Experience  [Add]".
+        const section = titledSection(button);
+        if (section && !found.some((f) => f.root === section.root)) found.push({ ...section, prefix: "", button });
+        continue;
+      }
       found.push({ root: button.parentElement, name, prefix: "", button });
     }
     if (!found.length) return [];
     let profile = {};
     try { ({ profile = {} } = await chrome.storage.local.get("profile")); } catch { return []; }
+    profileCache = profile;
+    const split = splitsInternships();
     const plan = [];
     const taken = new Set();
     for (const { root, name, prefix, button } of found) {
       const kind = ENTRY_SECTIONS.find((k) => k.test.test(name));
       if (!kind || taken.has(kind)) continue;
       taken.add(kind);
-      const panels = () => countEntries(kind, prefix);
-      const want = Math.min(kind.count(profile), MAX_ENTRIES);
+      const panels = () => countEntries(kind, prefix, root);
+      const want = Math.min(kind.entries(profile, split).length, MAX_ENTRIES);
       if (panels() < want) plan.push({ section: root, add: button, panels, want });
     }
     return plan;
@@ -2108,6 +2327,9 @@
 
   function start() {
     document.addEventListener("keydown", onKeyDown, true);
+    try {
+      chrome.storage.local.get("profile").then(({ profile = {} } = {}) => { profileCache = profile; }, () => {});
+    } catch { /* not in the extension */ }
     // Touch nothing until the page's own app has taken over. On Greenhouse,
     // scanning at DOMContentLoaded put our marks and button into the page
     // before React hydrated it: React hit a mismatch (error #418), threw the

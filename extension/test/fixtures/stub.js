@@ -13,6 +13,24 @@ const ANSWERS = [
   // ashby-eeo.html
   [/^Education History: School$/, "University of Wisconsin - Madison"], [/^Education History: Degree$/, "Bachelor of Science"],
   [/^Education History: Start Date$/, "Sep 2023"], [/^Education History: End Date$/, "May 2027"],
+  // bytedance.html: cards named by section, number and the entry they are for.
+  [/^Work Experience 1 \(Intelligible AI\): Company name$/, "Intelligible AI"],
+  [/^Work Experience 1 \(Intelligible AI\): Title$/, "Founding Engineer"],
+  [/^Work Experience 1 \(Intelligible AI\): Start & end date \(start\)$/, "Dec 2025"],
+  [/^Work Experience 1 \(Intelligible AI\): Start & end date \(end\)$/, "May 2026"],
+  [/^Internship Experience 1 \(Netflix\): Company name$/, "Netflix"],
+  [/^Internship Experience 1 \(Netflix\): Title$/, "Software Engineer Intern"],
+  [/^Internship Experience 1 \(Netflix\): Start & end date \(start\)$/, "May 2026"],
+  [/^Internship Experience 1 \(Netflix\): Start & end date \(end\)$/, "August 2026"],
+  [/^Education 1 \(University of Wisconsin - Madison\): School name$/, "University of Wisconsin - Madison"],
+  [/^Education 1 \(University of Wisconsin - Madison\): Degree$/, "Bachelor of Science"],
+  [/^Education 1 \(University of Wisconsin - Madison\): Field of study$/, "Computer Science"],
+  [/^Education 1 \(University of Wisconsin - Madison\): Start & end date \(start\)$/, "Sep 2023"],
+  [/^Education 1 \(University of Wisconsin - Madison\): Start & end date \(end\)$/, "May 2027"],
+  [/^Preferred work location$/, "San Jose"], [/^Preferred interview language$/, "English"],
+  // C3's Greenhouse-API form: an "Education" section of bare labels.
+  [/^Education: School$/, "University of Wisconsin - Madison"], [/^Education: Degree$/, "Bachelor's Degree"],
+  [/^Education: Field of study$/, "Computer Science"], [/^Education: Start$/, "Sep 2023"], [/^Education: End/, "May 2027"],
   [/degree are you currently pursuing/, "Bachelors"], [/expected graduation date\?$/, "January - June 2027"],
   [/Armed Forces/, "No, I am not a veteran or active member"],
   // My Experience (workday-experience.html); specific ones first.
@@ -52,7 +70,8 @@ const ANSWERS = [
   [/gpa/i, "3.9"],
 ];
 const JEV = { "B.S.": "Bachelor of Science", "Undergraduate science degree": "Bachelor of Science", "May 2027": "Spring 2027", "Prefer not to say": "I do not wish to answer",
-  "Yes": /^yes/i, "Madison, WI": "Madison, Wisconsin, United States" };
+  "Yes": /^yes/i, "Madison, WI": "Madison, Wisconsin, United States",
+  "San Jose": /^United States of America \/ California \/ San Jose$/ };
 const words = (t) => t.toLowerCase().match(/[a-z0-9]+/g) || [];
 window.chrome = {
   runtime: {
