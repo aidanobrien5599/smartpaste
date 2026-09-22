@@ -58,7 +58,8 @@ window.chrome = {
         return { ok: true, results: m.fields.map((f) => {
           if (f.multi) {
             // What real Jev ticks for these two Lever questions.
-            const pick = /language/i.test(f.label) ? ["English (ENG)"]
+            const pick = /check one of the boxes/i.test(f.label) ? ["No, I do not have a disability and have not had one in the past"]
+              : /language/i.test(f.label) ? ["English (ENG)"]
               : /office/i.test(f.label) ? ["New York, NY", "Washington, DC", "Seattle, WA"] : [];
             const value = f.options.filter((o) => pick.includes(o));
             return value.length

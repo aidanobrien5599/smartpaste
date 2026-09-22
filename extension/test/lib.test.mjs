@@ -142,6 +142,8 @@ test("maxTicks: how many boxes a question allows", () => {
   assert.equal(maxTicks("Select 1-3 from below."), 3);
   assert.equal(maxTicks("Choose up to 2 locations"), 2);
   assert.equal(maxTicks("Pick 3"), 3);
+  assert.equal(maxTicks("Please check one of the boxes below:"), 1);
+  assert.equal(maxTicks("Select only one"), 1);
   assert.equal(maxTicks("Language Skill(s) (Check all that apply)"), Infinity);
   assert.equal(maxTicks("Which offices? (select all)"), Infinity);
 });

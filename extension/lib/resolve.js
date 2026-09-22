@@ -221,6 +221,8 @@ export function resolve(label, answer, options) {
 
 /** "Select 1-3", "choose up to 3", "pick 2": the most boxes to tick. */
 export function maxTicks(label) {
+  // "Please check one of the boxes below", "select one", "choose only one"
+  if (/\b(?:select|choose|pick|check|tick)\s+(?:only\s+)?one\b/i.test(String(label))) return 1;
   const m = String(label).match(/\b(?:select|choose|pick|check|tick)\s+(?:up to\s+|at most\s+|\d+\s*(?:-|–|to)\s*)?(\d+)\b/i) ||
     String(label).match(/\bup to (\d+)\b/i);
   return m ? Number(m[1]) : Infinity;

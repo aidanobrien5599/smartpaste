@@ -329,34 +329,48 @@
    * so by name alone two jobs' boxes looked like one check-all-that-apply
    * question with no text, and neither was ever answered.
    */
-  function checkboxKey(box) {
-    const field = box.closest('[data-automation-id^="formField"], ' + QUESTION_BOX);
-    return field ? [box.name || box.id, field] : [box.name || box.id, null];
-  }
+  // One question's box: Workday's form field, or Lever's / a fieldset.
+  const CHOICE_FIELD = '[data-automation-id^="formField"], ' + QUESTION_BOX;
 
+  /**
+   * Checkboxes in one form field are one question, whatever their names:
+   * Workday's Self Identify asks "Please check one of the boxes below" over
+   * three boxes with names of their own. Outside any field, a name groups
+   * them. A field with one box is a yes/no question ("I currently work here").
+   */
   function groupCheckboxes() {
     const groups = [];
     for (const box of document.querySelectorAll('input[type="checkbox"]')) {
       if (box.disabled) continue;
-      const [name, field] = checkboxKey(box);
-      if (!name) { groups.push([box]); continue; }
-      const group = groups.find((g) => g.name === name && g.field === field);
+      const field = box.closest(CHOICE_FIELD);
+      const name = box.name || box.id;
+      const group = field
+        ? groups.find((g) => g.field === field)
+        : name && groups.find((g) => !g.field && g.name === name);
       if (group) group.push(box);
       else groups.push(Object.assign([box], { name, field }));
     }
     return groups;
   }
 
+  /** A group's question: its form field's own label, or Lever's / a legend. */
+  function groupLabel(group) {
+    const first = group[0];
+    const own = group.field && [...group.field.querySelectorAll("label, legend")]
+      .find((node) => !group.some((box) => node.contains(box) || node.htmlFor === box.id));
+    return clean(
+      questionText(first)?.textContent || own?.textContent ||
+        first.closest("fieldset")?.querySelector("legend")?.textContent || ""
+    );
+  }
+
   function collectCheckboxGroups() {
-    const groups = new Map(groupCheckboxes().filter((g) => g.length > 1 && g[0].name).map((g, i) => [i, g]));
+    const groups = new Map(groupCheckboxes().filter((g) => g.length > 1).map((g, i) => [i, g]));
     const fields = [];
     for (const boxes of groups.values()) {
       if (boxes.length < 2 || boxes.length > 60) continue;
       const first = boxes[0];
-      const label = clean(
-        questionText(first)?.textContent ||
-          first.closest("fieldset")?.querySelector("legend")?.textContent || ""
-      );
+      const label = groupLabel(boxes);
       const options = boxes.map((b) =>
         clean(
           b.closest("label")?.textContent ||
@@ -365,7 +379,7 @@
         )
       );
       if (label.length < 2 || options.some((o) => !o)) continue;
-      const element = first.closest(QUESTION_BOX) || first.parentElement;
+      const element = boxes.field || first.closest(QUESTION_BOX) || first.parentElement;
       if (!nodeVisible(element)) continue;
       fields.push({ element, label, options, buttons: boxes, combobox: false, multi: true });
     }

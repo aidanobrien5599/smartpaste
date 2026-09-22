@@ -333,6 +333,17 @@ test("fill: a whole Workday page", { skip }, () =>
     assert.deepEqual(asked.sort(), ["Education 1: Degree", "Gender"]);
   }));
 
+test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
+  withPage("workday-questions.html", async (page) => {
+    await page.waitFor(asked);
+    const sent = await page.eval("window.__messages.find(m => m.type === 'answer-fields').fields.find(f => /check one/.test(f.label))");
+    assert.equal(sent?.label, "Please check one of the boxes below");
+    assert.equal(sent.multi, true);
+    assert.equal(sent.options.length, 3);
+    await autofill(page);
+    assert.deepEqual(await page.eval("[...document.querySelectorAll('#disability input:checked')].map(b => b.id)"), ["d-no"]);
+  }));
+
 test("fill: Workday My Experience -- entries added, then filled", { skip }, () =>
   withPage("workday-experience.html", async (page) => {
     // Its sections start empty: each job, school and website exists only

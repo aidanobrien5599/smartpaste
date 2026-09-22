@@ -14,5 +14,13 @@
  <button type="button" aria-haspopup="listbox" id="q2">Select One</button></div>
 <div data-automation-id="formField-q3"><label for="q3">Do you need, or will you need in the future, any immigration related support or sponsorship?</label>
  <button type="button" aria-haspopup="listbox" id="q3">Select One</button></div>
+<!-- Self Identify (CC-305): one question, three checkboxes with their own
+     names, "check one of the boxes below". -->
+<div data-automation-id="formField-disabilityStatus" id="disability">
+ <label>Please check one of the boxes below:<abbr>*</abbr></label>
+ <div><input type="checkbox" id="d-yes" name="disability-yes"><label for="d-yes">Yes, I have a disability, or have had one in the past</label></div>
+ <div><input type="checkbox" id="d-no" name="disability-no"><label for="d-no">No, I do not have a disability and have not had one in the past</label></div>
+ <div><input type="checkbox" id="d-decline" name="disability-decline"><label for="d-decline">I do not want to answer</label></div>
+</div>
 </main>
 </body></html>
