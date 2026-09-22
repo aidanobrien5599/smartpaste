@@ -125,8 +125,14 @@ function commitOnBlur(input,key){input.addEventListener("blur",()=>{window.__mod
 
 <script>
 // Month / Year boxes marked only by aria-label, as on this step.
-const monthYear = (id, label, stem) => `<div data-automation-id="formField-${id}"><label>${label}</label>
-  <div class="date" data-automation-id="dateInputWrapper"><input type="text" role="spinbutton" aria-label="Month" placeholder="MM" data-k="${id}-m" ${stem ? `id="${stem}-dateSectionMonth-input"` : ""}><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y" ${stem ? `id="${stem}-dateSectionYear-input"` : ""}></div></div>`;
+// As on the live page: the question's label carries hidden screen-reader
+// text ("current value is MM/YYYY"), and each box has its own hidden label
+// -- "Month", "Year" -- tied to it by for=.
+const hidden = 'style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"';
+const monthYear = (id, label, stem) => `<div data-automation-id="formField-${id}"><label>${label}<span ${hidden}> current value is MM/YYYY</span></label>
+  <div class="date" data-automation-id="dateInputWrapper">
+  ${stem ? `<label for="${stem}-dateSectionMonth-input" ${hidden}>Month</label>` : ""}<input type="text" role="spinbutton" aria-label="Month" placeholder="MM" data-k="${id}-m" ${stem ? `id="${stem}-dateSectionMonth-input"` : ""}>
+  ${stem ? `<label for="${stem}-dateSectionYear-input" ${hidden}>Year</label>` : ""}<input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y" ${stem ? `id="${stem}-dateSectionYear-input"` : ""}></div></div>`;
 const year = (id, label) => `<div data-automation-id="formField-${id}"><label>${label}</label>
   <div class="date"><input type="text" role="spinbutton" aria-label="Year" placeholder="YYYY" data-k="${id}-y"></div></div>`;
 const text = (id, label, tag, key) => `<div data-automation-id="formField-${id}"><label for="${id}">${label}</label><${tag||"input"} type="text" id="${id}" ${key ? `data-k="${key}"` : ""}></${tag||"input"}></div>`;

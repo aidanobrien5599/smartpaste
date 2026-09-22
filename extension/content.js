@@ -104,6 +104,8 @@
     if (!text) return "";
     return text
       .replace(/\s+/g, " ")
+      // Screen-reader text inside a label: Workday's "current value is MM/YYYY".
+      .replace(/\s*current value is\b.*$/i, "")
       // "*", and Lever's heavy asterisk "✱"
       .replace(/\s*(?:[*\u2731\u2217]+|\(required\)|\(optional\)|required|optional)\s*$/i, "")
       .replace(/[:*]\s*$/, "")
@@ -256,11 +258,26 @@
   }
 
   /** A date split into boxes is one question, labelled by its form field. */
+  const PART_NAME = /^(?:month|day|year|mm|dd|yyyy)$/i;
+
+  /**
+   * The question a split date answers: "From", not "Month". Live, each
+   * Workday date box has its own hidden label ("Month", "Year") tied to it
+   * with for=; taking that one asked Jev about "Work Experience 1: Month",
+   * which nothing answers, and From / To were never filled.
+   */
   function dateLabel(wrapper) {
-    const part = wrapper.querySelector(DATE_PART);
-    const byFor = part && part.id && document.querySelector(`label[for="${CSS.escape(part.id)}"]`);
     const entry = wrapper.closest(FIELD_ENTRY);
-    return clean((byFor || entry?.querySelector("label, legend"))?.textContent || "");
+    const candidates = [
+      ...(entry ? entry.querySelectorAll("label, legend") : []),
+      wrapper.getAttribute("aria-labelledby") && document.getElementById(wrapper.getAttribute("aria-labelledby")),
+      ...[...wrapper.querySelectorAll(DATE_PART)].map((p) => p.id && document.querySelector(`label[for="${CSS.escape(p.id)}"]`)),
+    ];
+    for (const node of candidates) {
+      const text = node ? clean(node.textContent) : "";
+      if (text && !PART_NAME.test(text)) return text;
+    }
+    return "";
   }
 
   function collectWidgets() {
@@ -329,7 +346,8 @@
     const fields = [];
     for (const box of document.querySelectorAll('input[type="checkbox"]')) {
       if (box.disabled || byName.get(box.name || box.id || box) !== 1) continue;
-      const label = labelFor(box);
+      const label = labelFor(box) ||
+        clean(box.closest('[data-automation-id^="formField"]')?.querySelector("label, legend")?.textContent || "");
       if (label.length < 3 || CONSENT.test(label)) continue;
       const shown = box.closest("label, [data-automation-id^='formField']") || box;
       if (!nodeVisible(shown) && !nodeVisible(box)) continue;
@@ -991,9 +1009,35 @@
    * ("Other" -> "Other Source", but not "Job Board Other"; "Yes" -> "Yes,
    * I am authorized"). Simplify's Workday rules use the same two tiers.
    */
+  // A degree has many spellings, and a Workday list holds several at once
+  // ("BSc (Hons)", "B.S.", "Bachelor's Degree"...). Asked to pick among them,
+  // Jev's probability splits across the near-equivalents and none clears
+  // the bar, so a degree is matched here: its spellings, most specific first.
+  const DEGREE_ALIASES = [
+    [/^b(achelor'?s?)?\.?\s*(of\s*)?s(cience)?\.?$|^b\.?\s?sc?\.?$/i, ["Bachelor of Science", "BS", "B.S.", "BSc", "B.Sc", "B.Sc.", "Bachelors of Science", "Bachelor's of Science", "Bachelor of Science (BS)", "Bachelor's Degree", "Bachelors Degree", "Bachelor's", "Bachelors"]],
+    [/^b(achelor'?s?)?\.?\s*(of\s*)?a(rts)?\.?$/i, ["Bachelor of Arts", "BA", "B.A.", "Bachelors of Arts", "Bachelor's of Arts", "Bachelor of Arts (BA)", "Bachelor's Degree", "Bachelors Degree", "Bachelor's", "Bachelors"]],
+    [/^b(achelor'?s?)?\.?\s*(of\s*)?e(ng(ineering)?)?\.?$/i, ["Bachelor of Engineering", "BE", "B.E.", "BEng", "B.Eng", "B.Eng.", "Bachelor's Degree", "Bachelors Degree"]],
+    [/^m(aster'?s?)?\.?\s*(of\s*)?s(cience)?\.?$|^m\.?\s?sc?\.?$/i, ["Master of Science", "MS", "M.S.", "MSc", "M.Sc", "M.Sc.", "Masters of Science", "Master's of Science", "Master's Degree", "Masters Degree", "Master's", "Masters"]],
+    [/^m(aster'?s?)?\.?\s*(of\s*)?a(rts)?\.?$/i, ["Master of Arts", "MA", "M.A.", "Master's Degree", "Masters Degree"]],
+    [/^(ph\.?\s?d\.?|doctor(ate)?( of philosophy)?)$/i, ["PhD", "Ph.D.", "Ph.D", "Doctor of Philosophy", "Doctorate", "Doctoral Degree"]],
+    [/^(mba|master of business administration)$/i, ["MBA", "M.B.A.", "Master of Business Administration", "Master's Degree"]],
+  ];
+
+  function degreeMatch(texts, want) {
+    const row = DEGREE_ALIASES.find(([test]) => test.test(String(want).trim()));
+    if (!row) return -1;
+    for (const alias of row[1]) {
+      const i = texts.findIndex((t) => normalize(t) === normalize(alias));
+      if (i >= 0) return i;
+    }
+    return -1;
+  }
+
   function localMatch(texts, want) {
     const exact = texts.findIndex((t) => normalize(t) === normalize(want));
     if (exact >= 0) return exact;
+    const degree = degreeMatch(texts, want);
+    if (degree >= 0) return degree;
     const head = want.trim().toLowerCase();
     if (head.length < 2) return -1;
     const starts = texts
@@ -1426,8 +1470,9 @@
       [explicit, input.id || "", input.name || "",
        input.getAttribute("aria-label") || "",
        // Workday: <div data-automation-id="resumeUpload"> around a bare input
-       input.closest('[data-automation-id*="resume" i], [aria-labelledby*="resume" i]')
-         ?.getAttribute("data-automation-id") || ""].join(" "),
+       input.closest('[data-automation-id*="resume" i], [aria-labelledby*="resume" i], [data-fkit-id*="resume" i]')
+         ?.getAttribute("data-automation-id") || "",
+       input.closest('[data-fkit-id*="resume" i]') ? "resume" : ""].join(" "),
       [labelFor(input),
        (input.closest(FIELD_ENTRY) || input.closest("[class*='field'], fieldset"))
          ?.textContent?.slice(0, 140) || ""].join(" "),

@@ -34,7 +34,7 @@ const ANSWERS = [
   [/Work Experience 2: Job Title/, "Founding Engineer"],
   [/Work Experience 2: Company/, "Intelligible AI"],
   [/Education 1: School/, "University of Wisconsin - Madison"],
-  [/Education 1: Degree/, "B.S."],
+  [/Education 1: Degree/, "Undergraduate science degree"],
   [/Education 1: To/, "May 2027"],
   [/authori[sz]ed/i, "Yes"],
   [/sponsorship/i, "No"],
@@ -46,7 +46,7 @@ const ANSWERS = [
   [/location/i, "Madison, WI"],
   [/gpa/i, "3.9"],
 ];
-const JEV = { "B.S.": "Bachelor of Science", "May 2027": "Spring 2027", "Prefer not to say": "I do not wish to answer",
+const JEV = { "B.S.": "Bachelor of Science", "Undergraduate science degree": "Bachelor of Science", "May 2027": "Spring 2027", "Prefer not to say": "I do not wish to answer",
   "Yes": /^yes/i, "Madison, WI": "Madison, Wisconsin, United States" };
 const words = (t) => t.toLowerCase().match(/[a-z0-9]+/g) || [];
 window.chrome = {

@@ -88,10 +88,25 @@ test("localMatch: exact, or the one option that starts with the answer", { skip 
         localMatch(["No", "No, not now", "Yes"], "No"),                // exact beats prefix
         localMatch(["Yes, now", "Yes, later", "No"], "Yes"),           // two prefixes: ask Jev
         localMatch(["Nothing", "Yes"], "No"),                          // "No" is not a word of "Nothing"
-        localMatch(["Bachelor of Science", "Master of Science"], "B.S."),
+        localMatch(["Bachelor of Science", "Master of Science"], "Undergrad in science"), // no spelling of a degree: Jev
       ];
     });
     assert.deepEqual(picks, [0, 0, 0, -1, -1, -1]);
+    // Degrees, from a live Workday list: near-equivalents split Jev's vote,
+    // so a degree's spellings are matched here, plainest first.
+    const degrees = await page.eval(() => {
+      const { localMatch } = window.__smartpasteTest;
+      const live = ["Select One", "MIT", "Not Applicable", "BSc (Hons)", "B.Com", "B.A.", "B.A (Hons)", "B Com (Hons)", "A.A.", "B.S.", "Bachelor's Degree", "M.S."];
+      return [
+        live[localMatch(live, "Bachelor of Science")],
+        live[localMatch(live, "BS")],
+        live[localMatch(live, "Bachelor of Arts")],
+        live[localMatch(live, "Master of Science")],
+        ((short) => short[localMatch(short, "Bachelor of Science")])(["BSc (Hons)", "Bachelor's Degree", "Master's Degree"]),
+        localMatch(["BSc (Hons)", "B.Com"], "Bachelor of Science"), // nothing plain: Jev decides
+      ];
+    });
+    assert.deepEqual(degrees, ["B.S.", "B.S.", "B.A.", "M.S.", "Bachelor's Degree", -1]);
   }));
 
 /* ------------------------------------------------------ application gate */
