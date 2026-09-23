@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Application Form</title>
+<style>body{font:14px system-ui;margin:0;padding:16px;min-height:1500px}
+label{display:block;font-weight:600;margin-top:10px}
+input,select{padding:4px;width:300px}</style></head>
+<body class="iCIMS_chrome iCIMS_chrome153">
+<!-- What loads inside #icims_content_iframe (see icims.html for the site and
+     date, and for why the fields themselves are a reconstruction). The frame
+     is 1500px+ tall and never scrolls on its own: the wrapper sizes it to fit,
+     so a position: fixed pill drawn here lands at the bottom of the frame,
+     not the bottom of the reader's window. -->
+<div class="iCIMS_JobHeader"><h1>Software Engineer II</h1></div>
+<form id="applicationForm" class="iCIMS_ApplicationForm">
+  <div class="iCIMS_Table"><div class="iCIMS_TableRow">
+    <div class="iCIMS_InfoData iCIMS_TableCell">
+      <label for="firstname">First Name</label>
+      <input type="text" id="firstname" name="firstname" class="iCIMS_RoundedInput form-control" data-key="First Name">
+    </div>
+    <div class="iCIMS_InfoData iCIMS_TableCell">
+      <label for="lastname">Last Name</label>
+      <input type="text" id="lastname" name="lastname" class="iCIMS_RoundedInput form-control" data-key="Last Name">
+    </div>
+  </div></div>
+  <div class="iCIMS_InfoData">
+    <label for="email">Email Address</label>
+    <input type="text" id="email" name="email" class="iCIMS_RoundedInput form-control" data-key="Email">
+  </div>
+  <div class="iCIMS_InfoData">
+    <label for="phone">Phone Number</label>
+    <input type="text" id="phone" name="phone" class="iCIMS_RoundedInput form-control" data-key="Phone">
+  </div>
+  <div class="iCIMS_InfoData">
+    <label for="linkedin">LinkedIn Profile URL</label>
+    <input type="text" id="linkedin" name="linkedin" class="iCIMS_RoundedInput form-control" data-key="LinkedIn">
+  </div>
+  <div class="iCIMS_InfoData">
+    <label for="sponsorship">Will you now or in the future require sponsorship for employment visa status?</label>
+    <select id="sponsorship" name="sponsorship" class="iCIMS_RoundedInput" data-key="Sponsorship">
+      <option value="">Please select</option><option>Yes</option><option>No</option>
+    </select>
+  </div>
+  <div class="iCIMS_InfoData">
+    <label for="resume">Attach a resume</label>
+    <input type="file" id="resume" name="resume">
+  </div>
+</form>
+<script>
+window.__model = {};
+const record = (el) => { if (el.dataset.key) window.__model[el.dataset.key] = el.value; };
+document.addEventListener("input", (e) => record(e.target), true);
+document.addEventListener("change", (e) => {
+  if (e.target.type === "file") window.__model.Resume = e.target.files[0]?.name;
+  else record(e.target);
+}, true);
+</script>
+</body></html>

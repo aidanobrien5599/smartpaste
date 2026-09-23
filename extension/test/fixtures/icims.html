@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Software Engineer II in Arlington, Virginia | Careers at Arlington</title>
+<style>body{font:14px system-ui;margin:0}
+.topnav{padding:12px 20px;background:#eee}
+iframe{display:block;margin:0 auto}</style></head>
+<body>
+<!-- An iCIMS careers site (careers-arccorp.icims.com/jobs/<id>/job), trimmed
+     from its live markup on 2026-09-23. The employer's page holds no form at
+     all: the whole ATS lives in a same-origin <iframe id="icims_content_iframe">
+     that iCIMS's own script sizes to its content (height="2075" on the live
+     job page), so that frame has no viewport of its own.
+
+     What broke smartpaste: the content script runs in every frame and did
+     find the form in there, but drew its Autofill pill on the frame's own
+     body. position: fixed inside a frame that tall pins the pill ~2000px
+     down the page, below everything the reader sees -- and the sweep, which
+     reads the top document, saw no pill and one control: the site's search
+     box below.
+
+     The application form itself (icims-frame.html) is a reconstruction: every
+     iCIMS apply link now goes through /login -- an email step behind an
+     invisible hCaptcha -- so the form could not be read without signing in.
+     Its markup uses the iCIMS classes and layout this page really serves. -->
+<div class="topnav">
+  <form class="topnav-search" action="/search/">
+    <input type="text" id="topnav-search-input" name="q" placeholder="Search">
+  </form>
+  <!-- The employer's own partner login, hidden until a menu opens it. -->
+  <form id="frmMyARCLogin" action="https://myarc.example.com/PortalApp/PreLogin.portal" style="display:none">
+    <input type="text" id="myarcusername" name="user">
+    <input type="password" id="myarcpassword" name="password">
+  </form>
+</div>
+<iframe id="icims_content_iframe" name="icims_content_iframe" title="iCIMS Content iFrame"
+        src="icims-frame.html" height="1600" style="width:960px;border:none;margin:0px"></iframe>
+</body></html>

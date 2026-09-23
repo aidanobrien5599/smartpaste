@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(root, "extension", "content.js");
-const TESTS = "C3|ByteDance|Eightfold|Workable|year|consent box|search";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|year|consent box|search";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -65,6 +65,28 @@ const MUTATIONS = [
   ["Workable's Education / Experience group names its boxes", "      if (named) return `${named}: `;\n", ""],
   ["a box hidden from screen readers is the widget's",
     "    if (field.getAttribute(\"aria-hidden\") === \"true\") return false;\n", ""],
+  ["a div is a dropdown too (Rippling)",
+    "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"], ' +\n    '[role=\"combobox\"][aria-haspopup=\"listbox\"]:not(input):not(select):not(textarea)';",
+    "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"]';"],
+  // Rippling's EEO dropdowns are named twice over -- by aria-labelledby and
+  // by the block above them -- so either path alone still labels them: undo
+  // both. Its sponsorship question has only the block above.
+  ["a dropdown's own name, then the question above it",
+    "    const text = clean(byFor?.textContent || \"\") || clean(labelledBy(button)) || clean(inEntry?.textContent || \"\");\n" +
+    "    if (text) return text;\n    const own = clean(\n" +
+    "      (button.getAttribute(\"aria-label\") || \"\")\n        .replace(button.textContent.trim(), \"\")\n" +
+    "        .replace(/\\b(?:select one|required)\\b/gi, \"\")\n    );\n" +
+    "    return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);",
+    "    const text = clean((byFor || inEntry)?.textContent || \"\");\n" +
+    "    if (text) return text;\n    return clean(\n" +
+    "      (button.getAttribute(\"aria-label\") || \"\")\n        .replace(button.textContent.trim(), \"\")\n" +
+    "        .replace(/\\b(?:select one|required)\\b/gi, \"\")\n    );"],
+  ["the question above a dropdown that names nothing",
+    "return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);", "return own;"],
+  ["'Select...' is an empty dropdown",
+    "/^(?:select one|select(?:\\.{3}|…)?|choose one|choose(?:\\.{3}|…)?|--)?$/i",
+    "/^(?:select one|select|choose one|choose|--)?$/i"],
+  ["a framed form's pill goes in the top document", "root.body.appendChild(button);", "document.body.appendChild(button);"],
 ];
 
 const filter = process.argv[2] ? new RegExp(process.argv[2], "i") : null;

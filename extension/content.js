@@ -29,7 +29,12 @@
   // dropdown is a <button> that opens a listbox, a searchable picker is a text
   // input that only takes a value by choosing from its results, and a date is
   // split into month / day / year boxes.
-  const LISTBOX_BUTTON = 'button[aria-haspopup="listbox"]';
+  // Others draw the same dropdown as a plain element: Rippling's whole EEO
+  // block is <div role="combobox" aria-haspopup="listbox" tabindex="0">. An
+  // <input> with that role is a searchable combobox instead, and stays a
+  // field of its own (COMBO_SELECTOR) rather than a menu.
+  const LISTBOX_BUTTON = 'button[aria-haspopup="listbox"], ' +
+    '[role="combobox"][aria-haspopup="listbox"]:not(input):not(select):not(textarea)';
   const PROMPT_INPUT =
     'input[data-uxi-widget-type="selectinput"], ' +
     '[data-automation-id="multiSelectContainer"] input[type="text"]';
@@ -39,7 +44,9 @@
   const DATE_PART = '[data-automation-id^="dateSection"], input[aria-label="Month"], ' +
     'input[aria-label="Day"], input[aria-label="Year"]';
   const dateWrappers = new WeakSet();
-  const EMPTY_BUTTON = /^(?:select one|select|choose one|choose|--)?$/i;
+  // What a dropdown shows while it holds nothing. Rippling's placeholder is
+  // "Select...", so the ellipsis is part of the emptiness, not of an answer.
+  const EMPTY_BUTTON = /^(?:select one|select(?:\.{3}|…)?|choose one|choose(?:\.{3}|…)?|--)?$/i;
   const OPTION = '[role="option"], [data-automation-id*="promptOption"]';
   // A Workday result row: a radio circle plus a promptOption label. The row
   // takes the click; the label inside it does not.
@@ -458,6 +465,25 @@
   const ENTRY_NAMES = { workExperience: "Work Experience", education: "Education", websitePanelSet: "Websites",
     webAddress: "Websites", certification: "Certifications", language: "Languages" };
 
+  /**
+   * The question a dropdown answers, for a widget with no label of its own.
+   * Rippling's custom questions keep theirs in a paragraph above the field's
+   * block -- six wrappers up from the combobox, tied to it by nothing. Walk
+   * out until something above has text, and stop at anything holding another
+   * control: that text is the neighbour's question, not ours.
+   */
+  function questionAbove(widget) {
+    const somebodysField = `${ANY_CONTROL}, ${LISTBOX_BUTTON}`;
+    for (let node = widget, depth = 0; node && depth < 8; node = node.parentElement, depth++) {
+      for (let above = node.previousElementSibling; above; above = above.previousElementSibling) {
+        if (above.matches(somebodysField) || above.querySelector(somebodysField)) return "";
+        const text = clean(above.textContent);
+        if (text) return text;
+      }
+    }
+    return "";
+  }
+
   /** A listbox button's question. Its aria-label also holds its current value. */
   function listboxLabel(button) {
     const byFor =
@@ -465,13 +491,17 @@
     const entry = button.closest(FIELD_ENTRY);
     const inEntry = entry && entry.querySelectorAll("label, legend").length === 1
       ? entry.querySelector("label, legend") : null;
-    const text = clean((byFor || inEntry)?.textContent || "");
+    // What the widget names as its label outranks the box it sits in, as it
+    // does for a field: Rippling's EEO dropdowns say "Gender" that way and
+    // nowhere else (their aria-label is the placeholder, "Select...").
+    const text = clean(byFor?.textContent || "") || clean(labelledBy(button)) || clean(inEntry?.textContent || "");
     if (text) return text;
-    return clean(
+    const own = clean(
       (button.getAttribute("aria-label") || "")
         .replace(button.textContent.trim(), "")
         .replace(/\b(?:select one|required)\b/gi, "")
     );
+    return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);
   }
 
   /** A date split into boxes is one question, labelled by its form field. */
@@ -525,7 +555,9 @@
   function collectWidgets() {
     const fields = [];
     for (const button of document.querySelectorAll(LISTBOX_BUTTON)) {
-      if (!nodeVisible(button) || button.disabled || button.closest(".smartpaste-button")) continue;
+      // A div says it is disabled with aria-disabled; only a button has .disabled.
+      if (!nodeVisible(button) || button.disabled || button.getAttribute("aria-disabled") === "true" ||
+        button.closest(".smartpaste-button")) continue;
       fields.push({ element: button, label: listboxLabel(button), options: null, combobox: false, widget: "listbox" });
     }
     const wrappers = new Set();
@@ -776,7 +808,7 @@
   function forget() {
     known = [];
     lastSignature = "";
-    document.querySelector(".smartpaste-button")?.remove();
+    ourPill()?.remove();
   }
 
   let filling = false;
@@ -2543,13 +2575,35 @@
     setTimeout(() => badge.remove(), 1400);
   }
 
+  /**
+   * Where the pill and the summary note belong. Both are position: fixed,
+   * which pins them to their own frame -- and an ATS inside an iframe has no
+   * viewport of its own: iCIMS's wrapper sizes #icims_content_iframe to its
+   * content (2075px tall on a live job page), so a pill "fixed" to the bottom
+   * of that frame sat ~2000px down the page, where nobody scrolled to it.
+   * The top document is the window the reader actually sees, so draw there
+   * when the frame can reach it; a cross-origin parent is out of reach and
+   * keeps its frame's own body. (Flash badges stay put: they are absolute,
+   * placed over a field, and the field is here.)
+   */
+  function pillRoot() {
+    if (window.top === window) return document;
+    try { return window.top.document.body ? window.top.document : document; } catch { return document; }
+  }
+
+  // Which frame drew a pill, so this one only ever clears away its own.
+  const FRAME_TAG = Math.random().toString(36).slice(2);
+  const ourPill = () =>
+    pillRoot().querySelector(`.smartpaste-button[data-smartpaste-frame="${FRAME_TAG}"]`);
+
   function note(text, isError = false, ms = 4000) {
-    const existing = document.querySelector(".smartpaste-note");
+    const root = pillRoot();
+    const existing = root.querySelector(".smartpaste-note");
     if (existing) existing.remove();
     const el = document.createElement("div");
     el.className = "smartpaste-note" + (isError ? " smartpaste-error" : "");
     el.textContent = text;
-    document.body.appendChild(el);
+    root.body.appendChild(el);
     setTimeout(() => el.remove(), ms);
   }
 
@@ -2567,11 +2621,18 @@
   }
 
   async function showButton(count) {
-    document.querySelector(".smartpaste-button")?.remove();
+    ourPill()?.remove();
     const files = await countAttachable();
     const entries = await entriesToAdd();
     // Nothing answered, nothing to attach, nothing to add: no button at all.
     if (!count && !files && !entries) return;
+    const root = pillRoot();
+    // Two frames with forms would stack two pills in the same corner. The
+    // one that found more to do wins; the other stays quiet.
+    const theirs = [...root.querySelectorAll(".smartpaste-button")]
+      .find((b) => b.dataset.smartpasteFrame !== FRAME_TAG);
+    if (theirs && Number(theirs.dataset.smartpasteCount || 0) >= count + files + entries) return;
+    theirs?.remove();
     const button = document.createElement("button");
     button.className = "smartpaste-button";
     button.textContent =
@@ -2582,7 +2643,9 @@
       event.preventDefault();
       fillPage();
     });
-    document.body.appendChild(button);
+    button.dataset.smartpasteFrame = FRAME_TAG;
+    button.dataset.smartpasteCount = String(count + files + entries);
+    root.body.appendChild(button);
   }
 
   chrome.runtime.onMessage.addListener((message) => {
@@ -2595,6 +2658,9 @@
 
   function start() {
     document.addEventListener("keydown", onKeyDown, true);
+    // A pill this frame left in the top document would outlive the frame:
+    // iCIMS navigates its iframe at every step of an application.
+    addEventListener("pagehide", () => ourPill()?.remove());
     try {
       chrome.storage.local.get("profile").then(({ profile = {} } = {}) => { profileCache = profile; }, () => {});
     } catch { /* not in the extension */ }
