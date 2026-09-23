@@ -46,6 +46,9 @@ const ANSWERS = [
   [/^Education: Field of study$/, "Computer Science"], [/^Education: Start$/, "Sep 2023"], [/^Education: End/, "May 2027"],
   // greenhouse-school.html: Greenhouse's own School question, unprefixed.
   [/^School$/, "University of Wisconsin - Madison"],
+  // lever-questions.html: Shield AI's school picker holds every university
+  // select2 knows, so the question goes out without its options.
+  [/school or university/i, "University of Wisconsin - Madison"],
   [/degree are you currently pursuing/, "Bachelors"], [/expected graduation date\?$/, "January - June 2027"],
   [/Armed Forces/, "No, I am not a veteran or active member"],
   // vercel.html

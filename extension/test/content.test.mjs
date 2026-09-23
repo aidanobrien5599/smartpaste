@@ -336,6 +336,45 @@ test("fill: Lever radios and check-all-that-apply boxes", { skip }, () =>
     assert.equal(await page.eval(value("input[name=email]")), "aidanobrien5599@gmail.com");
   }));
 
+test("labels: a Lever question whose own text is \"Select One\" is named by its card", { skip }, () =>
+  withPage("lever-questions.html", async (page) => {
+    // Hermeus, live: the question is the card's <h4> and all fifteen radios
+    // are labelled "Select One", so it was asked as "Select One" -- nothing
+    // in a profile answers that -- and left blank on a required field.
+    const labels = await page.waitFor(asked);
+    assert.ok(labels.includes("How did you hear about us?"), labels.join(" | "));
+    assert.ok(!labels.includes("Select One"), labels.join(" | "));
+    await autofill(page);
+    assert.equal(await page.eval("document.querySelector('#heard input:checked')?.value"), "LinkedIn");
+  }));
+
+test("fill: Lever's school picker is matched against its whole list, not asked as a menu", { skip }, () =>
+  withPage("lever-questions.html", async (page) => {
+    // Shield AI, live: 2,965 schools, alphabetical by country. Sent as a
+    // choice, only the first sixty fit -- Australia's -- and Jev picked none
+    // of them. The answer comes from the profile instead, and is matched
+    // here against every option the select holds.
+    await page.waitFor(asked);
+    // Any batch: which round a field lands in is not this test's business.
+    const school = await page.eval("window.__messages.flatMap(m => m.fields || []).find(f => /school or university/.test(f.label))");
+    assert.equal(school.options, null, JSON.stringify(school).slice(0, 200));
+    await autofill(page);
+    assert.equal(await page.eval(value("#school")), "University of Wisconsin - Madison");
+    assert.equal(await page.eval(text("#school-shown")), "University of Wisconsin - Madison");
+  }));
+
+test("fill: Lever's location search is run again when the first one finds nothing", { skip }, () =>
+  withPage("lever-questions.html", async (page) => {
+    // Live (2026-09-23), four of eight Lever forms answered the first search
+    // with "No location found. Try entering a different location". The typed
+    // text was left in the box and counted as filled, but Lever keeps the
+    // real answer in a hidden field only a click on a match sets, so the
+    // form went in with no location at all.
+    await autofill(page);
+    assert.equal(await page.eval(value("#selected")), "Madison, WI, USA");
+    assert.equal(await page.eval(value("input[name=location]")), "Madison, WI, USA");
+  }));
+
 test("fill: a whole Workday page", { skip }, () =>
   withPage("workday.html", async (page) => {
     const summary = await autofill(page, 60000);
