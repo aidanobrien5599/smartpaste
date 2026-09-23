@@ -40,6 +40,8 @@ const ANSWERS = [
   // C3's Greenhouse-API form: an "Education" section of bare labels.
   [/^Education: School$/, "University of Wisconsin - Madison"], [/^Education: Degree$/, "Bachelor's Degree"],
   [/^Education: Field of study$/, "Computer Science"], [/^Education: Start$/, "Sep 2023"], [/^Education: End/, "May 2027"],
+  // greenhouse-school.html: Greenhouse's own School question, unprefixed.
+  [/^School$/, "University of Wisconsin - Madison"],
   [/degree are you currently pursuing/, "Bachelors"], [/expected graduation date\?$/, "January - June 2027"],
   [/Armed Forces/, "No, I am not a veteran or active member"],
   // vercel.html

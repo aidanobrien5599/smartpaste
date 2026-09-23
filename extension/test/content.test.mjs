@@ -253,6 +253,25 @@ test("fill: Greenhouse comboboxes pick by meaning, scoped to their own menu", { 
     assert.equal(await page.eval(text("#loc-value")), "Madison, Wisconsin, United States");
   }));
 
+test("gate: a form posting to a URL with \"search\" inside a word is not a site search", { skip }, () =>
+  withPage("greenhouse-school.html", async (page) => {
+    // HPR, live: its form posts to /hyannisportresearch/jobs/…, and matching
+    // "search" anywhere in the action made every field page chrome -- no
+    // fields, no button, 16 blank controls.
+    const labels = await page.waitFor(asked);
+    for (const label of ["First Name", "Last Name", "Email", "School"]) assert.ok(labels.includes(label), `missing ${label}: ${labels}`);
+    assert.match(await page.waitFor(BUTTON), /^Autofill \d+ field/);
+  }));
+
+test("fill: a searched school list is read after its search, not at its first notice", { skip }, () =>
+  withPage("greenhouse-school.html", async (page) => {
+    // Garner Health, live: typing "Wisconsin" showed "No options" for a
+    // tick before "Loading...". That notice was taken as the answer, the
+    // full A-list restored, and School left blank.
+    await autofill(page);
+    assert.equal(await page.eval("document.querySelector('.select__single-value')?.textContent"), "University of Wisconsin - Madison");
+  }));
+
 test("fill: attaching a resume does not hold up the fill", { skip }, () =>
   withPage("form.html", async (page) => {
     // This page does not re-render on upload; waiting 2.5s "in case" it did

@@ -180,9 +180,16 @@
 
   // Page chrome that is not the application: a site's search box, a cookie
   // banner's "Do Not Sell" toggle.
-  const PAGE_CHROME = '[role="search"], form[action*="search" i], ' +
+  const PAGE_CHROME = '[role="search"], ' +
     '[id*="cookie" i], [class*="cookie" i], [id*="onetrust" i], [class*="cky-"], [id^="cky"]';
-  const pageChrome = (element) => element.closest(PAGE_CHROME) !== null;
+  // A search form's action says "search" as a word of its own: "/search",
+  // "/job-search?q=", "search.php", "?search=". A "search" inside a word
+  // is not one -- HPR's Greenhouse form posts to
+  // "/hyannisportresearch/jobs/…", and a substring match made its whole
+  // application page chrome: no fields, no button.
+  const SEARCH_ACTION = /(?:^|[/?&=._-])search(?:$|[/?&=.#_-])/i;
+  const pageChrome = (element) => element.closest(PAGE_CHROME) !== null ||
+    SEARCH_ACTION.test(element.closest("form")?.getAttribute("action") || "");
 
   function clean(text) {
     if (!text) return "";
@@ -1094,15 +1101,24 @@
   // until typed into.
   const OPENS_WITHIN = 300;
 
+  // A search box says "No options" the moment it is typed into, before its
+  // debounced search has begun: Garner Health's School showed it for a tick,
+  // then "Loading...", then the Wisconsin schools. Believed at once, it had
+  // the fill give up on the search and School left blank.
+  const NOTICE_HOLDS = 250;
+
   async function menuOptions(field, timeout = 2500, { opening = false } = {}) {
     const started = Date.now();
+    let settled = null; // since when a "No options" notice has stood
     while (Date.now() - started < timeout) {
       const menu = menuFor(field);
       const nodes = menu ? [...menu.querySelectorAll(MENU_OPTION)] : [];
       if (nodes.length) return nodes;
-      // An open menu saying "No options" is an answer, not a slow load.
+      // An open menu saying "No options" is an answer, not a slow load --
+      // once it has stood long enough not to be the pre-search tick.
       const notice = menuNotice(field);
-      if (notice && !/loading|searching/i.test(notice)) return [];
+      settled = notice && !/loading|searching/i.test(notice) ? settled ?? Date.now() : null;
+      if (settled !== null && Date.now() - settled >= NOTICE_HOLDS) return [];
       // Opened and still empty with no "Loading" notice: it lists nothing
       // until typed into (Greenhouse's location box shows a bare empty list).
       if (opening && Date.now() - started > OPENS_WITHIN) return [];

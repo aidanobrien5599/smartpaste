@@ -21,14 +21,19 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(root, "extension", "content.js");
-const TESTS = "C3|ByteDance|Eightfold|year|consent box";
+const TESTS = "C3|ByteDance|Eightfold|year|consent box|search";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
   ["ownership label", "return ownerLabel(field) || clean(field.placeholder)", "return clean(field.placeholder)"],
   ["consent: the question around a lone box", "|| CONSENT.test(ownerLabel(box))) continue;", ") continue;"],
   ["consent: a bare 'I Accept'", "agree|accept|consent", "agree|consent"],
-  ["page chrome (site search, cookie banner)", "const pageChrome = (element) => element.closest(PAGE_CHROME) !== null;", "const pageChrome = () => false;"],
+  ["page chrome (site search, cookie banner)",
+    "const pageChrome = (element) => element.closest(PAGE_CHROME) !== null ||\n    SEARCH_ACTION.test(element.closest(\"form\")?.getAttribute(\"action\") || \"\");",
+    "const pageChrome = () => false;"],
+  ["'search' inside a word is not a search form", "const SEARCH_ACTION = /(?:^|[/?&=._-])search(?:$|[/?&=.#_-])/i;", "const SEARCH_ACTION = /search/i;"],
+  ["a 'No options' tick before a search is not its answer",
+    "if (settled !== null && Date.now() - settled >= NOTICE_HOLDS) return [];", "if (settled !== null) return [];"],
   ["month dropdown + Year box", "const hasYear = (node) => node.querySelector(YEAR_BOX) ||", "const hasYear = (node) =>"],
   ["smallest date wrapper", "if (onlyDate(byId)) return byId;", "if (byId && hasYear(byId)) return byId;"],
   ["read-only combobox is a dropdown", "(field.readOnly && !isCombobox(field))", "field.readOnly"],

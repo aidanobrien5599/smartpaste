@@ -1,0 +1,79 @@
+<!doctype html><meta charset="utf-8"><title>Job Application for Software Engineering Intern - Summer 2027 at HPR</title>
+<body style="font:14px system-ui;max-width:600px;margin:30px auto">
+<!-- job-boards.greenhouse.io, 2026-09-22. Trimmed from two live forms:
+     - HPR (hyannisportresearch/jobs/7822989003): the form posts to its own
+       job URL, and the company slug has "search" inside "research".
+     - Garner Health (garnerhealth/jobs/6164698004): School is a React
+       Select whose options come from a server search. Opened, it says
+       "Loading..." and then shows a first page of 100 schools (A..., no
+       Wisconsin). Typed into, it says "No options" for a tick, then
+       "Loading...", then the matches (~375ms). -->
+<h1>Software Engineering Intern - Summer 2027</h1>
+<form method="get" action="/hyannisportresearch/jobs/7822989003" id="application-form" class="application--form">
+<div class="field-wrapper"><div class="input-wrapper"><label id="first_name-label" for="first_name" class="label">First Name<span aria-hidden="true">*</span></label>
+  <input id="first_name" class="input input__single-line" type="text" aria-required="true"></div></div>
+<div class="field-wrapper"><div class="input-wrapper"><label id="last_name-label" for="last_name" class="label">Last Name<span aria-hidden="true">*</span></label>
+  <input id="last_name" class="input input__single-line" type="text" aria-required="true"></div></div>
+<div class="field-wrapper"><div class="input-wrapper"><label id="email-label" for="email" class="label">Email<span aria-hidden="true">*</span></label>
+  <input id="email" class="input input__single-line" type="text" aria-required="true"></div></div>
+<div class="field-wrapper"><div class="select"><div class="select__container">
+  <label id="school--0-label" for="school--0" class="label select__label">School<span aria-hidden="true">*</span></label>
+  <div class="select-shell"><div><div class="select__control"><div class="select__value-container">
+    <div class="select__placeholder" id="react-select-school--0-placeholder">Select...</div>
+    <div class="select__input-container" data-value=""><input class="select__input" autocomplete="off" id="school--0" type="text"
+      aria-autocomplete="list" aria-expanded="false" aria-haspopup="true" aria-labelledby="school--0-label" aria-required="true" role="combobox"></div>
+  </div></div></div>
+  <input required="" tabindex="-1" aria-hidden="true" class="requiredInput" style="opacity:0;height:1px"></div>
+</div></div></div>
+<div class="field-wrapper"><div class="input-wrapper"><label id="q1-label" for="q1" class="label">LinkedIn Profile</label>
+  <input id="q1" class="input input__single-line" type="text"></div></div>
+</form>
+<script>
+const FIRST_PAGE = ["Aalborg University", "Aalto University", "Aarhus University", "Abertay University", "Aberystwyth University",
+  "Abilene Christian University", "Abo Akademi University", "Academy of Art University", "Adams State University", "Adelphi University"];
+for (let i = 0; FIRST_PAGE.length < 100; i++) FIRST_PAGE.push(`Athens Institute ${i}`);
+const ALL = [...FIRST_PAGE, "Concordia University Wisconsin", "University of Wisconsin - Eau Claire", "University of Wisconsin - Green Bay",
+  "University of Wisconsin - La Crosse", "University of Wisconsin - Madison", "University of Wisconsin - Milwaukee", "Madison College"];
+(() => {
+  const input = document.getElementById("school--0"), shell = input.closest(".select-shell");
+  let timer;
+  const render = (notice, list) => {
+    shell.querySelector(".select__menu")?.remove();
+    input.setAttribute("aria-expanded", "true");
+    const menu = document.createElement("div"); menu.className = "select__menu";
+    const box = document.createElement("div"); box.className = "select__menu-list"; box.setAttribute("role", "listbox");
+    box.id = "react-select-school--0-listbox";
+    if (notice) box.innerHTML = `<div class="select__menu-notice select__menu-notice--${notice === "Loading..." ? "loading" : "no-options"}">${notice}</div>`;
+    else for (const o of list) {
+      const d = document.createElement("div"); d.className = "select__option"; d.setAttribute("role", "option"); d.textContent = o;
+      box.appendChild(d);
+    }
+    menu.appendChild(box); shell.appendChild(menu);
+  };
+  const search = (q) => {
+    clearTimeout(timer);
+    // The query is set before the debounced search starts: for that tick
+    // React Select has no options for it and says so.
+    render(q ? "No options" : "Loading...");
+    timer = setTimeout(() => {
+      render("Loading...");
+      timer = setTimeout(() => {
+        const list = q ? ALL.filter((o) => o.toLowerCase().includes(q.toLowerCase())) : FIRST_PAGE;
+        list.length ? render(null, list) : render("No options");
+      }, q ? 350 : 200);
+    }, q ? 25 : 0);
+  };
+  shell.addEventListener("click", (e) => {
+    const o = e.target.closest && e.target.closest('[role="option"]');
+    if (!o) return;
+    const vc = shell.querySelector(".select__value-container");
+    vc.querySelector(".select__placeholder, .select__single-value")?.remove();
+    vc.insertAdjacentHTML("afterbegin", `<div class="select__single-value">${o.textContent}</div>`);
+    input.value = "";
+    clearTimeout(timer);
+    shell.querySelector(".select__menu")?.remove();
+  });
+  input.addEventListener("click", () => search(input.value));
+  input.addEventListener("input", () => search(input.value));
+})();
+</script></body>
