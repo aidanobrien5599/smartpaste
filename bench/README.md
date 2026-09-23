@@ -35,6 +35,5 @@ can only time a click or a later step of a single-page app.
 An unpacked extension's id is a hash of its path, so a worktree's copy gets a
 different id from the main checkout's -- and `bench/.sweep-template`, whose
 stored profile lives under the main checkout's id, does not apply: every page
-comes back `no-pill`. Copy the template's
-`Default/Local Extension Settings/<id>` folder to the worktree's id first, or
-run the sweep from the main checkout.
+comes back `no-pill`. sweep.mjs copies the stored
+profile to whatever id its own path gives, so a worktree run works as-is.

@@ -25,6 +25,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EXT = join(here, "..", "extension");
@@ -111,10 +112,20 @@ const READOUT = `(() => {
   return docs.flatMap(readDoc);
 })()`;
 
-let template = null;
+// Chrome derives an unpacked extension's id from its path (sha256, hex as
+// a-p), so a worktree's copy has a different id from the main checkout's --
+// and the stored profile, which lives under the template's id, would not be
+// found: every page came back with no pill at all. Rename it on the way in.
+const extensionId = [...createHash("sha256").update(EXT).digest("hex").slice(0, 32)]
+  .map((c) => String.fromCharCode(97 + parseInt(c, 16))).join("");
+
 function freshProfile() {
   const dir = mkdtempSync(join(tmpdir(), "smartpaste-sweep-"));
   cpSync(TEMPLATE, dir, { recursive: true });
+  const settings = join(dir, "Default", "Local Extension Settings");
+  for (const stored of existsSync(settings) ? readdirSync(settings) : []) {
+    if (stored !== extensionId) cpSync(join(settings, stored), join(settings, extensionId), { recursive: true });
+  }
   return dir;
 }
 
