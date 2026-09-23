@@ -251,14 +251,23 @@
     return rect.width > 0 && rect.height > 0;
   }
 
+  // What a question may carry with it. Past this a dropdown is a directory,
+  // not a set of answers: Lever's school picker holds 2,965 universities,
+  // alphabetical by country, and the sixty that used to be sent were
+  // Australia's -- Jev rightly picked none of them, live, and Shield AI's
+  // required school was left blank. Sent without options the question is
+  // answered from the profile as text, and setSelect matches that answer
+  // against the whole list (localMatch first, then a narrowed askChoice).
+  const MAX_SENT_OPTIONS = 60;
+
   /** A dropdown carries its own answer set, so send it along with the label. */
   function selectOptions(element) {
     if (element.tagName !== "SELECT") return null;
     // Each wording once, for the same reason as askChoice().
-    return [...new Set([...element.options]
+    const texts = [...new Set([...element.options]
       .map((o) => o.textContent.trim())
-      .filter((t) => t && !/^(?:select|choose|please select|--)/i.test(t)))]
-      .slice(0, 60);
+      .filter((t) => t && !/^(?:select|choose|please select|--)/i.test(t)))];
+    return texts.length > MAX_SENT_OPTIONS ? null : texts;
   }
 
   function nodeVisible(node) {
@@ -443,6 +452,21 @@
     // workExperience-20); a form's "Work Experience 1" is the first on the page.
     const order = entryNumbers(stem);
     return `${name} ${order.indexOf(n) + 1 || n}: `;
+  }
+
+  // A question whose own text names nothing is named by the card it sits in.
+  // Hermeus (Lever) writes "How did you hear about us?" in the card's <h4>
+  // and labels all fifteen of its radios "Select One"; asked as "Select One",
+  // a required question no profile could answer was left blank.
+  const NAMELESS = /^(?:select|choose|pick)(?:\s+(?:one|an?\s+option|from(?:\s+the)?\s+(?:list|below)))?$/i;
+  function cardQuestion(element, label) {
+    if (!NAMELESS.test(label)) return label;
+    for (let node = element?.parentElement, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
+      const heading = node.querySelector(":scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > legend");
+      const text = heading ? clean(heading.textContent) : "";
+      if (text.length > 2) return text;
+    }
+    return label;
   }
 
   /** An entry stem's numbers ("20", "21"...) in page order. */
@@ -750,7 +774,7 @@
       .concat(collectRadioGroups())
       .concat(collectCheckboxGroups())
       .concat(collectSingleCheckboxes())
-      .map((f) => ({ ...f, label: sectionPrefix(f.element) + f.label }));
+      .map((f) => ({ ...f, label: sectionPrefix(f.element) + cardQuestion(f.element, f.label) }));
   }
 
   /* ----------------------------------------------------------------- fetch */
@@ -989,19 +1013,44 @@
     return items;
   }
 
-  /**
-   * A plain-text autocomplete: typed text alone is not an answer. Lever keeps
-   * the real value in a hidden selectedLocation that is only set by clicking
-   * a suggestion, so a field that merely looks filled is submitted empty.
-   */
-  async function setAutocomplete(field, value) {
-    await typeLikeAPerson(field, value);
+  /** One search: type `probe`, then wait for the suggestions it brings back. */
+  async function searchSuggestions(field, probe) {
+    await typeLikeAPerson(field, probe);
     let items = [];
     for (let i = 0; i < 12 && !items.length; i++) {
       await sleep(100);
       items = suggestionsNear(field);
     }
-    if (!items.length) return Boolean(field.value);
+    return items;
+  }
+
+  // A geocoder that knows no state abbreviation finds nothing for "Madison,
+  // WI" and everything for "Madison", so the second search asks for less.
+  const cityOf = (value) => value.split(",")[0].trim() || value;
+
+  /**
+   * A plain-text autocomplete: typed text alone is not an answer. Lever keeps
+   * the real value in a hidden selectedLocation that is only set by clicking
+   * a suggestion, so a field that merely looks filled is submitted empty.
+   *
+   * And one search is not an answer either: live on 2026-09-23, four of eight
+   * Lever forms met the first search with "No location found. Try entering a
+   * different location", kept the typed text, and went in with no location.
+   * So the search is run again before the field is given up on.
+   */
+  async function setAutocomplete(field, value) {
+    let items = await searchSuggestions(field, value);
+    if (!items.length) {
+      items = await searchSuggestions(field, cityOf(value));
+      if (!items.length) {
+        // Two searches, no suggestions: the box may be a plain one after all
+        // (Workday's "Location"), where what was typed is the answer -- so
+        // put the whole of it back, the shortened probe included.
+        nativeSet(field, value);
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+        return Boolean(field.value);
+      }
+    }
     const want = normalize(value);
     const pick =
       items.find((i) => normalize(i.text) === want) ||

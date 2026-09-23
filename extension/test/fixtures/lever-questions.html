@@ -1,0 +1,127 @@
+<!doctype html><meta charset="utf-8"><title>Apply - Lever</title>
+<!-- Lever's custom-question cards, trimmed from the live forms of
+     jobs.lever.co/shieldai, /hermeus and /acronaviation (2026-09-23):
+     a school picker of 2,965 options, a question whose only text is
+     "Select One", and the location box with its own search. -->
+<style>
+  body { font: 14px system-ui; max-width: 600px; margin: 30px auto }
+  /* select2's own rule: the real <select> stays in the page at 1x1, clipped,
+     and a <span> is drawn in its place. */
+  .select2-hidden-accessible { border: 0 !important; clip: rect(0 0 0 0) !important; height: 1px !important;
+    overflow: hidden !important; padding: 0 !important; position: absolute !important; width: 1px !important }
+  .dropdown-results { border: 1px solid #ccc }
+  .dropdown-results div { padding: 2px }
+</style>
+<body>
+<div class="application-question"><label><div class="application-label">Full name ✱</div><input name="name" type="text"></label></div>
+<div class="application-question"><label><div class="application-label">Email ✱</div><input name="email" type="email"></label></div>
+
+<!-- Lever's location box: it searches as you type, draws the matches in
+     .dropdown-results, and keeps the real answer in a hidden field that only
+     a click on a match sets. Live, the first search of a form came back with
+     "No location found. Try entering a different location" on four of eight
+     Lever forms, and the typed text was dropped on submit. -->
+<div class="application-question"><label><div class="application-label">Current location ✱</div>
+  <input name="location" type="text" autocomplete="off" placeholder="Type to find your location">
+  <input type="hidden" name="selectedLocation" id="selected">
+  <div class="dropdown-results" id="places"></div></label></div>
+
+<!-- Shield AI's Education card. Its school picker is one <select> holding
+     every university select2 knows, alphabetical by country: Australia's
+     first, Wisconsin's 2,000 rows down. -->
+<div class="section page-centered application-form" data-qa="additional-cards">
+  <h4 data-qa="card-name">Education</h4>
+  <input type="hidden" name="cards[edu][baseTemplate]" value="{&quot;text&quot;:&quot;Education&quot;}">
+  <ul><li class="application-question custom-question"><div>
+    <div class="application-label full-width university"><div class="text">Current school or university:<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><div class="application-university">
+      <select data-qa="university-dropdown" name="cards[edu][field0]" id="school" required
+              class="select2-hidden-accessible" tabindex="-1" aria-hidden="true" style="width:100%">
+        <option value="">Select a university or college</option>
+      </select>
+      <span class="select2 select2-container"><span class="select2-selection" role="combobox">
+        <span class="select2-selection__rendered" id="school-shown">Select a university or college</span></span></span>
+    </div></div>
+  </div></li></ul>
+</div>
+
+<!-- Hermeus's "How did you hear about us?" card: the question is the card's
+     own heading, and all fifteen radios are labelled "Select One". -->
+<div class="section page-centered application-form" data-qa="additional-cards">
+  <h4 data-qa="card-name">How did you hear about us?</h4>
+  <input type="hidden" name="cards[heard][baseTemplate]" value="{&quot;text&quot;:&quot;How did you hear about us?&quot;}">
+  <ul><li class="application-question custom-question"><div>
+    <div class="application-label full-width multiple-choice"><div class="text">Select One<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><ul data-qa="multiple-choice" id="heard"></ul></div>
+  </div></li></ul>
+</div>
+
+<script>
+// The school list, as Lever serves it: the head of the real one, then the
+// Wisconsin block 2,000 rows later. Seventy-odd options here stand in for
+// 2,965 -- more than any menu a question can be asked with.
+const SCHOOLS = ["ACAP University College", "Auckland University of Technology", "Australian Catholic University",
+  "Australian National University", "Bond University", "Carnegie Mellon University - Australia",
+  "Central Queensland University (CQUniversity)", "Charles Darwin University", "Charles Sturt University - Australia",
+  "Curtin University", "Deakin University", "Edith Cowan University", "Federation University of Australia",
+  "Flinders University", "Griffith University", "James Cook University", "La Trobe University", "Macquarie University",
+  "Monash University", "Murdoch University", "Queensland University of Technology (QUT)", "RMIT University",
+  "Royal Melbourne Institute of Technology", "Southern Cross University", "Swinburne University of Technology",
+  "Torrens University Australia", "University of Adelaide", "University of Canberra", "University of Divinity",
+  "University of Melbourne", "University of New England - Australia", "University of New South Wales (UNSW) - Australia",
+  "University of Newcastle - Australia", "University of Notre Dame Australia", "University of Queensland",
+  "University of South Australia", "University of Southern Queensland", "University of Sydney", "University of Tasmania",
+  "University of Technology, Sydney", "University of the Sunshine Coast", "University of Western Australia",
+  "University of Western Sydney", "University of Wollongong", "Victoria University", "Fachhochschule Technikum Wien",
+  "University of Natural Resources and Life Sciences, Vienna", "University of Vienna", "University of Ghent",
+  "Technological Institute of Aeronautics", "Acadia University", "Athabasca University", "Brock University",
+  "Carleton University", "Concordia University", "Dalhousie University", "McGill University", "McMaster University",
+  "Concordia University - Wisconsin", "Medical College of Wisconsin", "University of Wisconsin - Eau Claire",
+  "University of Wisconsin - Green Bay", "University of Wisconsin - La Crosse", "University of Wisconsin - Madison",
+  "University of Wisconsin - Milwaukee", "University of Wisconsin - Oshkosh", "University of Wisconsin - Parkside",
+  "University of Wisconsin - Platteville", "University of Wisconsin - River Falls", "University of Wisconsin - Stevens Point",
+  "University of Wisconsin - Stout", "University of Wisconsin - Superior", "University of Wisconsin - Whitewater",
+  "University of Wisconsin System", "Wisconsin Lutheran College"];
+document.getElementById("school").insertAdjacentHTML("beforeend",
+  SCHOOLS.map((s) => `<option value="${s}">${s}</option>`).join(""));
+// select2 draws the chosen school itself, off the select's change event.
+document.getElementById("school").addEventListener("change", (e) => {
+  document.getElementById("school-shown").textContent = e.target.value || "Select a university or college";
+});
+
+document.getElementById("heard").innerHTML = ["Company Website", "LinkedIn", "YouTube", "X (formerly Twitter)",
+  "University – Career Services", "Facebook", "Glassdoor", "Indeed", "Built In", "Event – Recruiting",
+  "Event – Industry", "Referral", "Recruiter Outreach", "HyTech - Fall 2026", "PDK Airshow 2026"].map((o) =>
+  `<li><label><input type="radio" name="cards[heard][field0]" value="${o}" required>` +
+  `<span class="application-answer-alternative">${o}</span></label></li>`).join("");
+
+// The location search. A search starts when typing begins in an empty box;
+// the first one of the page finds nothing, as Lever's did live.
+const box = document.querySelector("input[name=location]");
+const places = document.getElementById("places");
+window.__searches = 0;
+let typing = false;
+box.addEventListener("input", () => {
+  if (!typing) { typing = true; window.__searches++; }
+  const query = box.value.trim();
+  const nth = window.__searches;
+  setTimeout(() => {
+    if (box.value.trim() !== query || !query) return;
+    const hits = nth < 2 ? [] : ["Madison, WI, USA", "Madison, AL, USA"].filter((p) =>
+      p.toLowerCase().startsWith(query.toLowerCase().split(",")[0]));
+    places.innerHTML = hits.length
+      ? hits.map((p) => `<div class="dropdown-result">${p}</div>`).join("")
+      : '<div class="no-results">No location found. Try entering a different location</div>';
+    for (const hit of places.querySelectorAll(".dropdown-result")) {
+      hit.addEventListener("click", () => {
+        box.value = hit.textContent;
+        document.getElementById("selected").value = hit.textContent;
+        places.innerHTML = "";
+      });
+    }
+  }, 60);
+});
+// Typing into an empty box starts the next search.
+box.addEventListener("keydown", () => { if (!box.value) typing = false; });
+</script>
+</body>

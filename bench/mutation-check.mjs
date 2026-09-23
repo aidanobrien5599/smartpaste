@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(root, "extension", "content.js");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|year|consent box|search";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent box|search";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -87,6 +87,12 @@ const MUTATIONS = [
     "/^(?:select one|select(?:\\.{3}|…)?|choose one|choose(?:\\.{3}|…)?|--)?$/i",
     "/^(?:select one|select|choose one|choose|--)?$/i"],
   ["a framed form's pill goes in the top document", "root.body.appendChild(button);", "document.body.appendChild(button);"],
+  ["a dropdown too long to choose from is asked as a question",
+    "return texts.length > MAX_SENT_OPTIONS ? null : texts;", "return texts.slice(0, MAX_SENT_OPTIONS);"],
+  ["a card names its \"Select One\" question",
+    "sectionPrefix(f.element) + cardQuestion(f.element, f.label)", "sectionPrefix(f.element) + f.label"],
+  ["a location search that found nothing is run again",
+    "      items = await searchSuggestions(field, cityOf(value));", "      items = [];"],
 ];
 
 const filter = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
