@@ -54,7 +54,9 @@ const MUTATIONS = [
   ["a section-wide fieldset is not a write-in", "return [...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length <= 1;", "return true;"],
   ["a section's legend is no field's label", "if ([...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length > 1) return null;", ""],
   ["aria-labelledby outranks the legend", "      labelledBy(field),\n      questionText(field),", "      questionText(field),\n      labelledBy(field),"],
-  ["label for= a group's container", "&&\n        !document.getElementById(node.htmlFor)?.contains(inputs[0]));", ");"],
+  // Rewritten by e49ddca (an Ashby title's for= names nothing on the page):
+  // the mutant is now the line that decides whether that target counts.
+  ["label for= a group's container", "return Boolean(target) && !target.contains(inputs[0]);", "return true;"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],
