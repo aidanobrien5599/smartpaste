@@ -10,3 +10,6 @@ corpus/truth/aidan-obrien-real.json
 corpus/external/*/
 bench/.dogfood-profile/
 bench/.real-profile/
+bench/.sweep-template/
+bench/sweeps/
+.claude/

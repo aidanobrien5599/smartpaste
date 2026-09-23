@@ -1,0 +1,48 @@
+# Sweep corpus 2026-09-22: public, no-login application forms (from speedyapply 2027 SWE list)
+# greenhouse (55 companies available)
+https://job-boards.greenhouse.io/garnerhealth/jobs/6164698004
+https://job-boards.greenhouse.io/rocketlab/jobs/7989724003
+https://job-boards.greenhouse.io/relaypro/jobs/8176774
+https://job-boards.greenhouse.io/hudl/jobs/8114314
+https://job-boards.greenhouse.io/hyannisportresearch/jobs/7822989003
+https://job-boards.greenhouse.io/syskahennessy/jobs/8177938
+https://job-boards.greenhouse.io/doordashusa/jobs/8171041
+https://job-boards.greenhouse.io/hpiq/jobs/6176783004
+https://job-boards.greenhouse.io/stokespacetechnologies/jobs/6176786004
+https://job-boards.greenhouse.io/tanium/jobs/8181017
+https://job-boards.greenhouse.io/ctccampusboard/jobs/4708230005
+https://job-boards.greenhouse.io/clockworksystems/jobs/6174230004
+# ashby (57 companies available)
+https://jobs.ashbyhq.com/gecko-robotics/01138338-ff3c-4982-8ba3-5401386bf082/application
+https://jobs.ashbyhq.com/rilla/0e111ca4-3837-43d2-8507-6030a0dc32d9/application
+https://jobs.ashbyhq.com/antares/922a527d-9826-446d-9aba-ffc611995830/application
+https://jobs.ashbyhq.com/the-exploration-company/86270058-8eec-4692-b49d-97ce59fd54ac/application
+https://jobs.ashbyhq.com/abridge/6569d8f7-bd0b-4bb0-a3af-37f83e19ec5e/application
+https://jobs.ashbyhq.com/vital-lyfe/43a79d8f-a8bb-4c57-a411-1bac946128af/application
+https://jobs.ashbyhq.com/exa/a9e01521-66f1-481b-89da-ec01d4620f16/application
+https://jobs.ashbyhq.com/bild-ai/b333f0f7-0ca6-4509-8697-9303396b5364/application
+https://jobs.ashbyhq.com/rivianvw.tech/f5aa59d9-4fdc-42d5-931d-efd9e6d96f2f/application
+https://jobs.ashbyhq.com/base-power/a8ee9a66-e90b-42c2-a4a2-28d997c3e8c7/application
+https://jobs.ashbyhq.com/composio/eea3c0be-8589-4e3d-a684-de29a9eada0d/application
+https://jobs.ashbyhq.com/junior/23ee686b-d305-4ac9-860d-16c99ddb4891/application
+# lever (15 companies available)
+https://jobs.lever.co/xcimer/fee9965c-8040-4614-8fd1-10bddfe3b911/apply
+https://jobs.lever.co/sep/4efbdbce-a753-41b5-8ed7-0661cd193178/apply
+https://jobs.lever.co/hermeus/555263f6-c5ec-4489-ab07-1aea546b70e7/apply
+https://jobs.lever.co/shieldai/8c850c75-081d-4d09-bebf-096379a93010/apply
+https://jobs.lever.co/solopulseco/00fbde18-a387-4c9f-97d4-77059aec7b56/apply
+https://jobs.lever.co/diversified-automation/827a092d-b8a3-4ca9-a84a-e8c236d1aabc/apply
+https://jobs.lever.co/CesiumAstro/96e97f22-a5b2-4e95-af84-b4f765343663/apply
+https://jobs.lever.co/acronaviation/19dbac7d-b4fb-4d21-9247-dc610bf55fed/apply
+# workable (6 companies available)
+https://apply.workable.com/talentpluto/j/6A02556484/apply/
+https://apply.workable.com/smartflower-solar-llc/j/240CCDA520/apply/
+https://apply.workable.com/raveaerospace/j/739753C003/apply/
+https://apply.workable.com/onlogic-inc/j/10EC1527D8/apply/
+https://apply.workable.com/pony-dot-ai/j/BA5FFDBC71/apply/
+# others
+https://ats.rippling.com/rippling/jobs/00cbc991-d2fb-452c-a8b6-2978f109a484/apply
+https://jobs.ashbyhq.com/ambrook/29ffbcea-17c3-4488-9d57-a9f7249b49a5/application
+https://careers-arccorp.icims.com/jobs/2471/software-engineer-intern/job
+https://job-boards.greenhouse.io/figma/jobs/6131089004
+https://jobs.lever.co/shieldai/8c850c75-081d-4d09-bebf-096379a93010/apply
