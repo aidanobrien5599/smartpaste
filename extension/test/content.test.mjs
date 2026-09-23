@@ -355,7 +355,8 @@ test("fill: Lever's school picker is matched against its whole list, not asked a
     // of them. The answer comes from the profile instead, and is matched
     // here against every option the select holds.
     await page.waitFor(asked);
-    const school = await page.eval("window.__messages[0].fields.find(f => /school or university/.test(f.label))");
+    // Any batch: which round a field lands in is not this test's business.
+    const school = await page.eval("window.__messages.flatMap(m => m.fields || []).find(f => /school or university/.test(f.label))");
     assert.equal(school.options, null, JSON.stringify(school).slice(0, 200));
     await autofill(page);
     assert.equal(await page.eval(value("#school")), "University of Wisconsin - Madison");

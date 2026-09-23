@@ -246,7 +246,10 @@
     // applicant's: Workable parks city / postcode / country in 1px boxes
     // beside the address autocomplete and writes them itself from the place
     // you pick, so asking about them only spent a Jev call on "country".
-    if (field.getAttribute("aria-hidden") === "true") return false;
+    // ...but a hidden native <select> IS the field behind a custom picker:
+    // select2 (Lever's 2,965-school list) marks its own select that way and
+    // takes the value there. Only a hidden text box is the page's own.
+    if (field.getAttribute("aria-hidden") === "true" && field.tagName !== "SELECT") return false;
     const rect = field.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   }
