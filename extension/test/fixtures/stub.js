@@ -15,6 +15,10 @@ const ANSWERS = [
   [/^Education History: Start Date$/, "Sep 2023"], [/^Education History: End Date$/, "May 2027"],
   // Ashby rejects an End Date next to a ticked "Still Student?".
   [/^Education History: Still Student\?$/, "Yes"],
+  // workable.html: Workable names its own Education / Experience groups.
+  [/^Experience: Title$/, "Software Engineer Intern"], [/^Experience: Company$/, "Netflix"],
+  [/^Experience: Start date$/, "May 2026"], [/^Experience: End date$/, "August 2026"],
+  [/^Education: Start date$/, "Sep 2023"],
   // bytedance.html: cards named by section, number and the entry they are for.
   [/^Work Experience 1 \(Intelligible AI\): Company name$/, "Intelligible AI"],
   [/^Work Experience 1 \(Intelligible AI\): Title$/, "Founding Engineer"],

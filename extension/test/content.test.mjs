@@ -855,3 +855,120 @@ test("fill: Eightfold -- the section fills and signs; follow-up and site prefere
     assert.equal(await page.eval("document.getElementById('input-31').value"), "");
     assert.equal(await page.eval("document.getElementById('save-answers').checked"), true, "changed the site's own preference");
   }));
+
+// workable.html: Workable's hosted form. Its <label> wraps the widget as
+// well as the question, it stars a required field before the question, and
+// it names its Education / Experience groups in a <p> of their own.
+test("labels: Workable -- a <label> that wraps the widget is not its text", { skip }, () =>
+  withPage("workable.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    // The phone box's only label is the one it shares with intl-tel-input's
+    // country list, a date box's the one it shares with its react-datepicker.
+    // Education's dates and Experience's share both their name and their
+    // label, so the group each sits in has to say which is which -- and
+    // "Title", required, says nothing at all on its own.
+    // "Telephone country code" is intl-tel-input's own div dropdown, which
+    // only became visible to us with Rippling's div-combobox support.
+    assert.deepEqual(labels.filter((l) => /phone|date|title/i.test(l)).sort(),
+      ["Education: End date", "Education: Start date", "Experience: End date", "Experience: Start date",
+        "Experience: Title", "Phone", "Telephone country code"]);
+    // Starred before the question, not after it.
+    assert.ok(labels.includes("Are you currently able to work in the U.S. without employment visa sponsorship?"),
+      JSON.stringify(labels));
+    assert.ok(!labels.some((l) => l.startsWith("*")), JSON.stringify(labels));
+    // The address autocomplete's own 1px output boxes are Workable's to fill.
+    for (const bad of ["city", "postcode", "country"]) {
+      assert.ok(!labels.includes(bad), `asked about ${bad}: ${JSON.stringify(labels)}`);
+    }
+  }));
+
+test("fill: Workable -- the phone, both date pairs and the bare Title land", { skip }, () =>
+  withPage("workable.html", async (page) => {
+    const summary = await autofill(page);
+    const box = (group, name) =>
+      page.eval(`document.querySelector('[data-ui="${group}"] [name="${name}"]').value`);
+    assert.equal(await page.eval(value('[name="phone"]')), "9082160389");
+    assert.equal(await page.eval(value("#school")), "University of Wisconsin - Madison");
+    assert.equal(await box("education", "start_date"), "09/2023");
+    assert.equal(await box("education", "end_date"), "05/2027");
+    assert.equal(await page.eval(value("#title")), "Software Engineer Intern");
+    assert.equal(await box("experience", "start_date"), "05/2026");
+    assert.equal(await box("experience", "end_date"), "08/2026");
+    // Never ours: the boxes the address autocomplete writes for itself, an
+    // acknowledgement, and an essay the profile has no answer for.
+    for (const id of ["city", "postcode", "country", "QA_12379931"]) {
+      assert.equal(await page.eval(value(`#${id}`)), "", id);
+    }
+    assert.equal(await page.eval("document.getElementById('yes_bg').checked"), false, "acknowledged for me");
+    assert.equal(await page.eval("document.getElementById('no_bg').checked"), false, "acknowledged for me");
+    assert.match(summary, /^filled \d+ in [0-9.]+s, attached 1 file/);
+  }));
+
+// rippling.html: Rippling's own ATS, where every dropdown is a <div
+// role="combobox"> -- no <select>, no <button>, nothing FIELD_SELECTOR or
+// collectWidgets knew. The EEO block and a required sponsorship question
+// were never collected at all.
+test("labels: Rippling -- div dropdowns, named by aria-labelledby or the question above", { skip }, () =>
+  withPage("rippling.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const label of ["First name", "Email", "Phone number", "LinkedIn Link",
+      // Its own aria-label is the placeholder ("Select"); the question is a
+      // paragraph six levels above the combobox.
+      "Do you require sponsorship now or in the future to work in the US",
+      "Gender", "Are you Hispanic/Latino?", "Veteran Status"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${JSON.stringify(labels)}`);
+    }
+    // The placeholder is not a question.
+    for (const bad of [/^select/i, /^U\.S\. Equal Opportunity/i]) {
+      assert.ok(!labels.some((l) => bad.test(l)), `${bad} was asked: ${JSON.stringify(labels)}`);
+    }
+  }));
+
+test("fill: Rippling -- a div dropdown opens, reads its listbox and takes a pick", { skip }, () =>
+  withPage("rippling.html", async (page) => {
+    await autofill(page, 60000);
+    const model = await page.eval("window.__model");
+    const want = {
+      "First name": "Aidan", Email: "aidanobrien5599@gmail.com", "Phone number": "9082160389",
+      Sponsorship: "No", Hispanic: "No", Gender: "I do not wish to answer",
+    };
+    for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model)}`);
+    // Nothing in the stub profile answers Veteran Status: it stays as it was.
+    assert.equal(model.Veteran, undefined);
+    assert.equal(await page.eval(text("#field-59")), "No");
+  }));
+
+// icims.html: an iCIMS careers site, whose form lives in a same-origin
+// iframe the wrapper sizes to its content. The pill was drawn in that frame,
+// where position: fixed pins it below the page rather than to the window.
+const FRAME = "document.getElementById('icims_content_iframe').contentWindow";
+
+test("iCIMS: the pill for a form in an iframe is drawn in the top document", { skip }, () =>
+  withPage("icims.html", async (page) => {
+    const labels = await page.waitFor(`${FRAME}.__messages?.find(m => m.type === 'answer-fields')?.fields.map(f => f.label) ?? null`);
+    for (const label of ["First Name", "Last Name", "Email Address", "Phone Number", "LinkedIn Profile URL",
+      "Will you now or in the future require sponsorship for employment visa status?"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${JSON.stringify(labels)}`);
+    }
+    // The site's own search box is in the top frame, and is nobody's question.
+    assert.equal(await page.eval("window.__messages.length"), 0);
+    const pill = await page.waitFor(BUTTON);
+    assert.match(pill, /^Autofill 6 fields/);
+    // Drawn in the top document, and only once.
+    assert.equal(await page.eval("document.querySelectorAll('.smartpaste-button').length"), 1);
+    assert.equal(await page.eval(`${FRAME}.document.querySelectorAll('.smartpaste-button').length`), 0);
+  }));
+
+test("iCIMS: clicking that pill fills the form inside the frame", { skip }, () =>
+  withPage("icims.html", async (page) => {
+    await autofill(page, 60000);
+    const model = await page.eval(`${FRAME}.__model`);
+    const want = {
+      "First Name": "Aidan", "Last Name": "O'Brien", Email: "aidanobrien5599@gmail.com",
+      Phone: "9082160389", LinkedIn: "https://www.linkedin.com/in/aidanobrien5599",
+      Sponsorship: "No", Resume: "resume.pdf",
+    };
+    for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model)}`);
+    // The employer's own login boxes are in the top frame and stay empty.
+    assert.equal(await page.eval(value("#myarcusername")), "");
+  }));
