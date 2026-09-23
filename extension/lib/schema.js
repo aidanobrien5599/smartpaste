@@ -256,8 +256,9 @@ LABELS.on_visa = "Currently on a student or temporary work visa or permit " +
 LABELS.graduate_degree = "Graduate degree (master's or doctorate), for its GPA or graduation date";
 
 // Offered only with Settings -> "Say yes" on (lib/profile.js); not a form field.
-LABELS.willing_default = "Default answer on any yes/no question about whether " +
-  "I am willing, able or intend to do something the job asks: commit to its " +
-  "hours, dates or length, pursue a certification or license it expects, " +
-  "relocate, travel, accept the pay it states, or complete its checks and " +
-  "assessments";
+LABELS.willing_default = "Default answer on any question asking whether I am " +
+  "willing, able, intend or consent to something the hiring process asks: " +
+  "commit to its hours, dates or length, pursue a certification or license " +
+  "it expects, relocate, travel, accept the pay it states, complete its " +
+  "checks and assessments, or agree to an interview being recorded or " +
+  "transcribed";

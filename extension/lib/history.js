@@ -18,8 +18,15 @@ const PRIOR_EMPLOYMENT = new RegExp(
   "i"
 );
 
+// "Are you currently authorized to work for any employer in the United
+// States?" is about the right to work, not about this employer: it matched
+// "currently ... work for", went out as a question over my work history, and
+// came back "cannot tell which employer is meant" -- so it stayed blank.
+const RIGHT_TO_WORK =
+  /\bauthori[sz](?:ed|ation)\b|\beligible to work\b|\bwork permit\b|\bsponsorship\b|\bvisa\b|\blegally (?:able|allowed|entitled)\b/i;
+
 export function isPriorEmploymentQuestion(label) {
-  return PRIOR_EMPLOYMENT.test(label || "");
+  return PRIOR_EMPLOYMENT.test(label || "") && !RIGHT_TO_WORK.test(label || "");
 }
 
 /** Every job in the profile, as the few facts the question turns on. */

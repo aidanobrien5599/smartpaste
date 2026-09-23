@@ -3,6 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../lib/resolve.js";
 import { placeSaysYes } from "../lib/places.js";
+import { isPriorEmploymentQuestion } from "../lib/history.js";
+import { LABELS } from "../lib/schema.js";
 import { buildOptions, unwrap, extraSnippets, NONE } from "../lib/profile.js";
 
 test("refine: names from an all-caps header", () => {
@@ -154,6 +156,24 @@ test("buildOptions defaults conflict-of-interest answers to No unless set", () =
   assert.equal(o.history_default.value, "No");
   assert.match(o.history_default.field, /ties to the company/);
   assert.equal(buildOptions({ non_compete: "Yes, a 6-month non-compete" }).non_compete.value, "Yes, a 6-month non-compete");
+});
+
+test("isPriorEmploymentQuestion: a right-to-work question is not about this employer", () => {
+  // Rivian/VW (Ashby), live: "currently ... work for" matched, so it went out
+  // as a question over my work history and came back "cannot tell which
+  // employer is meant" -- and the field stayed blank. With it excluded, real
+  // Jev picks the citizen option at 1.00.
+  assert.ok(!isPriorEmploymentQuestion("Are you currently authorized to work for any employer in the United States?"));
+  assert.ok(!isPriorEmploymentQuestion("Are you currently eligible to work for any employer in the US without sponsorship?"));
+  assert.ok(isPriorEmploymentQuestion("Have you previously worked for Rocket Lab?"));
+  assert.ok(isPriorEmploymentQuestion("Are you a former employee of this company?"));
+});
+
+test("Say yes covers consenting, not only doing", () => {
+  // An interview-recording consent sat at 0.30 against the escape option;
+  // naming consent in the catch-all took it to 0.92.
+  assert.match(LABELS.willing_default, /consent/i);
+  assert.match(LABELS.willing_default, /recorded|transcrib/i);
 });
 
 test("buildOptions: Say yes offers a Yes catch-all for willing / able questions, only when on", () => {
