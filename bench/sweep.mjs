@@ -105,6 +105,14 @@ const READOUT = `(() => {
   return out;
 })()`;
 
+// The same readout, plus every same-origin frame's (iCIMS's form is in one).
+const READOUT_ALL = `(() => {
+  const read = (w) => { try { return w.eval(${JSON.stringify(READOUT)}) || []; } catch { return []; } };
+  const out = [...read(window)];
+  for (const f of window.frames) out.push(...read(f));
+  return out;
+})()`;
+
 let template = null;
 function freshProfile() {
   const dir = mkdtempSync(join(tmpdir(), "smartpaste-sweep-"));
@@ -169,15 +177,23 @@ async function runOne(url, n) {
     if (/log-?in|sign-?in|\/auth|\/account/i.test(page.href) || /sign in|log in/i.test(page.title)) {
       result.status = "gated"; result.why = "login"; return result;
     }
+    // A closed posting redirects to the board ("/careers/open-roles",
+    // "jobs/search?notFound=1"). Scoring that as a miss blames the extension
+    // for a job that no longer exists.
+    if (/notFound=1|\/(?:open-roles|search|jobs)\/?$/i.test(page.href) && page.href !== url) {
+      result.status = "dead"; result.why = `redirected to ${page.href.slice(0, 80)}`; return result;
+    }
 
     let pill = null;
     for (let i = 0; i < 40 && !pill; i++) {
-      pill = await evaluate("document.querySelector('.smartpaste-button')?.textContent || null");
+      // iCIMS keeps the form in an iframe; read every same-origin frame.
+      pill = await evaluate(`(() => { const find = (w) => { try { const b = w.document.querySelector(".smartpaste-button"); if (b) return b.textContent;
+        for (const f of w.frames) { const t = find(f); if (t) return t; } } catch {} return null; }; return find(window); })()`);
       if (pill && typeof pill === "object") pill = null;
       if (!pill) await sleep(500);
     }
     result.pill = pill;
-    const before = await evaluate(READOUT);
+    const before = await evaluate(READOUT_ALL);
     if (!pill) {
       result.status = "no-pill";
       result.controls = Array.isArray(before) ? before : [];
@@ -185,7 +201,8 @@ async function runOne(url, n) {
       return result;
     }
     const clickAt = Date.now();
-    await evaluate("document.querySelector('.smartpaste-button').click()");
+    await evaluate(`(() => { const find = (w) => { try { const b = w.document.querySelector(".smartpaste-button"); if (b) return b;
+      for (const f of w.frames) { const t = find(f); if (t) return t; } } catch {} return null; }; find(window)?.click(); })()`);
     let last = "";
     for (let i = 0; i < 90; i++) {
       await sleep(1000);
@@ -198,7 +215,7 @@ async function runOne(url, n) {
     await sleep(2500);
     result.note = last;
     result.fillSeconds = Math.round((Date.now() - clickAt) / 100) / 10;
-    const after = await evaluate(READOUT);
+    const after = await evaluate(READOUT_ALL);
     result.controls = Array.isArray(after) ? after : [];
     result.logs = logs;
     result.status = "filled";

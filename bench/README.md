@@ -29,3 +29,12 @@ Turn it off in the popup when you're not benchmarking. It runs on every page.
 
 `stopwatch.js` is the paste-into-DevTools version. It dies on reload, so it
 can only time a click or a later step of a single-page app.
+
+## Sweeping from a worktree
+
+An unpacked extension's id is a hash of its path, so a worktree's copy gets a
+different id from the main checkout's -- and `bench/.sweep-template`, whose
+stored profile lives under the main checkout's id, does not apply: every page
+comes back `no-pill`. Copy the template's
+`Default/Local Extension Settings/<id>` folder to the worktree's id first, or
+run the sweep from the main checkout.
