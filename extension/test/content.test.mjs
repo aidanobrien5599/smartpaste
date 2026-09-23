@@ -867,9 +867,11 @@ test("labels: Workable -- a <label> that wraps the widget is not its text", { sk
     // Education's dates and Experience's share both their name and their
     // label, so the group each sits in has to say which is which -- and
     // "Title", required, says nothing at all on its own.
+    // "Telephone country code" is intl-tel-input's own div dropdown, which
+    // only became visible to us with Rippling's div-combobox support.
     assert.deepEqual(labels.filter((l) => /phone|date|title/i.test(l)).sort(),
       ["Education: End date", "Education: Start date", "Experience: End date", "Experience: Start date",
-        "Experience: Title", "Phone"]);
+        "Experience: Title", "Phone", "Telephone country code"]);
     // Starred before the question, not after it.
     assert.ok(labels.includes("Are you currently able to work in the U.S. without employment visa sponsorship?"),
       JSON.stringify(labels));
