@@ -65,8 +65,12 @@ const MUTATIONS = [
   ["a wrapping label is not its widget's text", "candidate : labelOnly(candidate, field));", "candidate : shownText(candidate));"],
   ["a required star before the question", "      .replace(/^\\s*[*\\u2731\\u2217]+\\s*/, \"\")\n", ""],
   ["Workable's Education / Experience group names its boxes", "      if (named) return `${named}: `;\n", ""],
+  // b9441a5 added the <select> exemption, so the line moved: a hidden native
+  // select is the field behind a custom picker (Lever's select2 school list).
   ["a box hidden from screen readers is the widget's",
-    "    if (field.getAttribute(\"aria-hidden\") === \"true\") return false;\n", ""],
+    "    if (field.getAttribute(\"aria-hidden\") === \"true\" && field.tagName !== \"SELECT\") return false;\n", ""],
+  ["a hidden <select> is still the field behind a picker",
+    "&& field.tagName !== \"SELECT\") return false;", ") return false;"],
   ["a div is a dropdown too (Rippling)",
     "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"], ' +\n    '[role=\"combobox\"][aria-haspopup=\"listbox\"]:not(input):not(select):not(textarea)';",
     "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"]';"],
