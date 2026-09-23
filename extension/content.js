@@ -97,6 +97,21 @@
     return copy.textContent;
   }
 
+  // A <label> wrapped around a field wraps its whole widget, and a widget can
+  // carry a great deal of text. Workable's phone box shares its label with
+  // intl-tel-input's 244 countries, so the question arrived as "*Phone+1United
+  // States+1United Kingdom+44Canada..."; a date box shares its label with a
+  // react-datepicker ("Start date...Previous Year2026JanFeb..."). The question
+  // is the part of the label the control is not in.
+  function labelOnly(label, field) {
+    if (!label.contains(field)) return shownText(label);
+    const outside = [...label.childNodes].filter((node) => node !== field && !node.contains(field));
+    const text = outside.map((node) => (node.nodeType === 1 ? shownText(node) : node.textContent)).join(" ");
+    // A label holding nothing but the widget (ByteDance's empty ones) says
+    // nothing; let the next candidate speak.
+    return clean(text) ? text : shownText(label);
+  }
+
   function labelFor(field) {
     // Inside a component, the label is the component's own attribute
     // (<spl-input label="First name">), or a <label> in the same shadow root.
@@ -122,7 +137,7 @@
     ];
     for (const candidate of candidates) {
       if (!candidate) continue;
-      const text = clean(typeof candidate === "string" ? candidate : shownText(candidate));
+      const text = clean(typeof candidate === "string" ? candidate : labelOnly(candidate, field));
       if (text) return text;
     }
     // A label whose for= names nothing on the page, just above the field's
@@ -202,6 +217,9 @@
       // "*", and Lever's heavy asterisk "✱"
       .replace(/\s*(?:[*\u2731\u2217]+|\(required\)|\(optional\)|required|optional)\s*$/i, "")
       .replace(/[:*]\s*$/, "")
+      // Workable stars a required field *before* the question, in a <strong>
+      // of its own: "*Phone", "*Are you currently able to work in the U.S.…".
+      .replace(/^\s*[*\u2731\u2217]+\s*/, "")
       .trim()
       .slice(0, 200);
   }
@@ -217,6 +235,11 @@
     // The hidden twin inside a React Select is not a field of its own; it
     // otherwise gets picked up and labelled from the "Select..." placeholder.
     if (field.closest(SELECT_SHELL) && !isCombobox(field)) return false;
+    // A box the page hides from screen readers is the widget's, not the
+    // applicant's: Workable parks city / postcode / country in 1px boxes
+    // beside the address autocomplete and writes them itself from the place
+    // you pick, so asking about them only spent a Jev call on "country".
+    if (field.getAttribute("aria-hidden") === "true") return false;
     const rect = field.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   }
@@ -381,6 +404,14 @@
       if (/\b(education|experience|employment|work) history\b/i.test(section)) {
         return `${section.replace(/\b\w/g, (c) => c.toUpperCase())}: `;
       }
+      // Workable draws Education and Experience as groups it names itself,
+      // headed by a <p> rather than a heading, around boxes that say only
+      // "School", "Title", "Start date". Both groups' date boxes carry the
+      // same name and the same label, so unprefixed the page asks "Start
+      // date" twice and "Title" bare -- and Title is required.
+      const group = element.closest?.('[data-ui="education"], [data-ui="experience"]');
+      const named = group && clean(group.querySelector('p[id$="_label"]')?.textContent || "");
+      if (named) return `${named}: `;
       // A card in a titled section: its number, and the profile entry it is
       // for, since ByteDance's Work Experience 1 is my 2nd most recent role.
       const card = element.closest?.(CARD);

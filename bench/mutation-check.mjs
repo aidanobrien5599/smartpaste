@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(root, "extension", "content.js");
-const TESTS = "C3|ByteDance|Eightfold|year|consent box|search";
+const TESTS = "C3|ByteDance|Eightfold|Workable|year|consent box|search";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -60,6 +60,11 @@ const MUTATIONS = [
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],
   ["long menus shortlisted by shared words", "if (index < 0) index = await chooseAmong(labelFor(field), want, texts);", "if (index < 0) index = await askChoice(labelFor(field), want, texts.slice(0, MAX_MENU));"],
   ["a failed pick clears its search text", "      if (searched) nativeSet(field, \"\");\n", ""],
+  ["a wrapping label is not its widget's text", "candidate : labelOnly(candidate, field));", "candidate : shownText(candidate));"],
+  ["a required star before the question", "      .replace(/^\\s*[*\\u2731\\u2217]+\\s*/, \"\")\n", ""],
+  ["Workable's Education / Experience group names its boxes", "      if (named) return `${named}: `;\n", ""],
+  ["a box hidden from screen readers is the widget's",
+    "    if (field.getAttribute(\"aria-hidden\") === \"true\") return false;\n", ""],
 ];
 
 const filter = process.argv[2] ? new RegExp(process.argv[2], "i") : null;

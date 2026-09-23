@@ -855,3 +855,49 @@ test("fill: Eightfold -- the section fills and signs; follow-up and site prefere
     assert.equal(await page.eval("document.getElementById('input-31').value"), "");
     assert.equal(await page.eval("document.getElementById('save-answers').checked"), true, "changed the site's own preference");
   }));
+
+// workable.html: Workable's hosted form. Its <label> wraps the widget as
+// well as the question, it stars a required field before the question, and
+// it names its Education / Experience groups in a <p> of their own.
+test("labels: Workable -- a <label> that wraps the widget is not its text", { skip }, () =>
+  withPage("workable.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    // The phone box's only label is the one it shares with intl-tel-input's
+    // country list, a date box's the one it shares with its react-datepicker.
+    // Education's dates and Experience's share both their name and their
+    // label, so the group each sits in has to say which is which -- and
+    // "Title", required, says nothing at all on its own.
+    assert.deepEqual(labels.filter((l) => /phone|date|title/i.test(l)).sort(),
+      ["Education: End date", "Education: Start date", "Experience: End date", "Experience: Start date",
+        "Experience: Title", "Phone"]);
+    // Starred before the question, not after it.
+    assert.ok(labels.includes("Are you currently able to work in the U.S. without employment visa sponsorship?"),
+      JSON.stringify(labels));
+    assert.ok(!labels.some((l) => l.startsWith("*")), JSON.stringify(labels));
+    // The address autocomplete's own 1px output boxes are Workable's to fill.
+    for (const bad of ["city", "postcode", "country"]) {
+      assert.ok(!labels.includes(bad), `asked about ${bad}: ${JSON.stringify(labels)}`);
+    }
+  }));
+
+test("fill: Workable -- the phone, both date pairs and the bare Title land", { skip }, () =>
+  withPage("workable.html", async (page) => {
+    const summary = await autofill(page);
+    const box = (group, name) =>
+      page.eval(`document.querySelector('[data-ui="${group}"] [name="${name}"]').value`);
+    assert.equal(await page.eval(value('[name="phone"]')), "9082160389");
+    assert.equal(await page.eval(value("#school")), "University of Wisconsin - Madison");
+    assert.equal(await box("education", "start_date"), "09/2023");
+    assert.equal(await box("education", "end_date"), "05/2027");
+    assert.equal(await page.eval(value("#title")), "Software Engineer Intern");
+    assert.equal(await box("experience", "start_date"), "05/2026");
+    assert.equal(await box("experience", "end_date"), "08/2026");
+    // Never ours: the boxes the address autocomplete writes for itself, an
+    // acknowledgement, and an essay the profile has no answer for.
+    for (const id of ["city", "postcode", "country", "QA_12379931"]) {
+      assert.equal(await page.eval(value(`#${id}`)), "", id);
+    }
+    assert.equal(await page.eval("document.getElementById('yes_bg').checked"), false, "acknowledged for me");
+    assert.equal(await page.eval("document.getElementById('no_bg').checked"), false, "acknowledged for me");
+    assert.match(summary, /^filled \d+ in [0-9.]+s, attached 1 file/);
+  }));

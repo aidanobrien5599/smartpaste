@@ -1,0 +1,226 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Firmware Engineering Co-op - OnLogic - Application</title>
+<style>body{font:14px system-ui;max-width:720px;margin:20px auto}
+label{display:block;margin:10px 0}input,textarea{padding:4px;width:320px}
+fieldset{border:0;padding:0;margin:0;display:flex;gap:8px}
+[data-ui=option]{border:1px solid #999;padding:4px 12px;cursor:pointer}
+[data-ui=option] input{width:0;height:0;position:absolute;opacity:0}
+/* intl-tel-input keeps the whole country list in the DOM, hidden. */
+.iti{position:relative}.iti__country-list{position:absolute;background:#fff;border:1px solid #999;list-style:none;margin:0;padding:0}
+.iti__hide{display:none}
+/* Workable hides the address autocomplete's output boxes at 1px and fills
+   them itself from the place you pick. */
+.hidden-box{position:absolute;width:1px;height:1px;overflow:hidden}
+</style></head>
+<body>
+<!-- Workable's hosted application (apply.workable.com/<company>/j/<id>/apply/),
+     trimmed from the live DOM of the OnLogic, RAVE Aerospace and SmartFlower
+     postings on 2026-09-23. Four things here broke smartpaste:
+       - every box sits inside a <label> that also wraps the widget, and a
+         widget carries text: the phone box's <label> holds intl-tel-input's
+         244 countries, so the question read "*Phone+1United States+1United
+         Kingdom+44Canada…" (244 trimmed to 6 here, the label is the same
+         shape). A date box's <label> holds its react-datepicker.
+       - a required box is starred by a <strong>*</strong> *before* the
+         question, so labels arrive as "*Phone", "*Are you currently able…".
+       - Education and Experience are groups marked data-ui=, headed by a <p>
+         rather than a heading, and their boxes are bare: "Title", "Company",
+         and two pairs of "Start date" / "End date" that share their names.
+       - the address autocomplete writes city / postcode / country into 1px
+         aria-hidden boxes of its own; they are Workable's to fill, not ours.
+     The questions are the real ones; radio options are Workable's YES / NO. -->
+<form data-ui="application-form">
+
+<section data-ui="section">
+  <h2>Personal information</h2>
+  <div data-ui="section-fields">
+    <div><label><span><span><strong>*</strong></span><span><span id="firstname_label"><strong>First name</strong></span></span></span>
+      <div data-role="illustrated-input"><div><input aria-required="true" id="firstname" name="firstname" aria-labelledby="firstname_label" required type="text" dir="auto" value=""></div></div>
+    </label></div>
+
+    <div><label><span><span><strong>*</strong></span><span><span id="lastname_label"><strong>Last name</strong></span></span></span>
+      <div data-role="illustrated-input"><div><input aria-required="true" id="lastname" name="lastname" aria-labelledby="lastname_label" required type="text" dir="auto" value=""></div></div>
+    </label></div>
+
+    <div><label><span><span><strong>*</strong></span><span><span id="email_label"><strong>Email</strong></span></span></span>
+      <div data-role="illustrated-input"><div><input aria-required="true" id="email" name="email" aria-labelledby="email_label" required type="email" dir="auto" value=""></div></div>
+    </label></div>
+
+    <!-- The phone box has no id and no aria-labelledby: its only tie to
+         "Phone" is the <label> it shares with the country picker. -->
+    <div><label><span><span><strong>*</strong></span><span><span id="phone_label"><strong>Phone</strong></span></span></span>
+      <div data-ui="phone" data-ignore-focus="true"><div data-role="illustrated-input"><div>
+        <div class="iti iti--allow-dropdown iti--separate-dial-code iti--show-flags">
+          <div class="iti__flag-container">
+            <div class="iti__selected-flag" role="combobox" aria-haspopup="listbox" aria-controls="iti-0__country-listbox" aria-expanded="false" aria-label="Telephone country code" tabindex="0" title="United States">
+              <div class="iti__flag iti__us"></div><div class="iti__selected-dial-code">+1</div><div class="iti__arrow"></div>
+            </div>
+            <div class="iti__dropdown-content iti__hide">
+              <ul class="iti__country-list" id="iti-0__country-listbox" role="listbox" aria-label="List of countries">
+                <li class="iti__country" tabindex="-1" role="option" data-dial-code="1" data-country-code="us" aria-selected="true"><span class="iti__country-name">United States</span><span class="iti__dial-code">+1</span></li>
+                <li class="iti__country" tabindex="-1" role="option" data-dial-code="44" data-country-code="gb" aria-selected="false"><span class="iti__country-name">United Kingdom</span><span class="iti__dial-code">+44</span></li>
+                <li class="iti__country" tabindex="-1" role="option" data-dial-code="1" data-country-code="ca" aria-selected="false"><span class="iti__country-name">Canada</span><span class="iti__dial-code">+1</span></li>
+                <li class="iti__country" tabindex="-1" role="option" data-dial-code="49" data-country-code="de" aria-selected="false"><span class="iti__country-name">Germany</span><span class="iti__dial-code">+49</span></li>
+                <li class="iti__country" tabindex="-1" role="option" data-dial-code="61" data-country-code="au" aria-selected="false"><span class="iti__country-name">Australia</span><span class="iti__dial-code">+61</span></li>
+                <li class="iti__country" tabindex="-1" role="option" data-dial-code="93" data-country-code="af" aria-selected="false"><span class="iti__country-name">Afghanistan</span><span class="iti__dial-code">+93</span></li>
+              </ul>
+            </div>
+          </div>
+          <input aria-required="true" name="phone" required type="tel" class="iti__tel-input" dir="auto" autocomplete="off" data-intl-tel-input-id="0">
+        </div>
+      </div></div></div>
+    </label></div>
+
+    <div><label><span><span><span id="address_label"><strong>Address</strong></span><span> (Optional)</span></span></span>
+      <div data-role="illustrated-input"><div><input aria-required="false" id="address" data-ui="address" name="address" aria-labelledby="address_label" aria-describedby="address_helper" type="text" dir="auto" value=""></div></div>
+    </label>
+    <div><span id="address_helper">Include your city, region, and country, so that employers can easily manage your application.</span></div></div>
+
+    <div class="hidden-box"><label><div data-role="illustrated-input"><div><input id="city" aria-hidden="true" tabindex="-1" name="city" type="text" dir="auto" value=""></div></div></label></div>
+    <div class="hidden-box"><label><div data-role="illustrated-input"><div><input id="postcode" aria-hidden="true" tabindex="-1" name="postcode" type="text" dir="auto" value=""></div></div></label></div>
+    <div class="hidden-box"><label><div data-role="illustrated-input"><div><input id="country" aria-hidden="true" tabindex="-1" name="country" type="text" dir="auto" value=""></div></div></label></div>
+  </div>
+</section>
+
+<section data-ui="section">
+  <h2>Profile</h2>
+  <div data-ui="section-fields">
+
+    <div data-ui="education">
+      <div><p id="education_label">Education&nbsp;<small>(Optional)</small></p>
+        <button data-ui="add-section" aria-label="Add Education" type="button">+ Add</button></div>
+      <ul><li><div data-ui="editor">
+        <div><label><span><span><strong>*</strong></span><span><span id="school_label"><strong>School</strong></span></span></span>
+          <div data-role="illustrated-input"><div><input aria-required="true" id="school" name="school" aria-labelledby="school_label" required type="text" dir="auto" value=""></div></div>
+        </label></div>
+        <div><label><span><span><span id="field_of_study_label"><strong>Field of study</strong></span><span> (Optional)</span></span></span>
+          <div data-role="illustrated-input"><div><input id="field_of_study" name="field_of_study" aria-labelledby="field_of_study_label" type="text" dir="auto" value=""></div></div>
+        </label></div>
+        <div><label><span><span><span id="degree_label"><strong>Degree</strong></span><span> (Optional)</span></span></span>
+          <div data-role="illustrated-input"><div><input id="degree" name="degree" aria-labelledby="degree_label" type="text" dir="auto" value=""></div></div>
+        </label></div>
+        <!-- No id, no aria-labelledby: the <label> is the only tie, and it
+             holds the calendar too. Experience repeats both names below. -->
+        <div><label><span><span><span id="start_date_label"><strong>Start date</strong></span><span> (Optional)</span></span></span>
+          <div class="react-datepicker-wrapper"><div class="react-datepicker__input-container"><div data-role="illustrated-input"><div>
+            <input type="text" aria-readonly="false" data-lpignore="true" inputmode="tel" name="start_date" placeholder="MM/YYYY" dir="auto" value="">
+            <span data-ui="calendar-icon"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><desc aria-hidden="true"><p>SVGs not supported by this browser.</p></desc></svg></span>
+          </div></div></div></div>
+        </label></div>
+        <div><label><span><span><span id="end_date_label"><strong>End date</strong></span><span> (Optional)</span></span></span>
+          <div class="react-datepicker-wrapper"><div class="react-datepicker__input-container"><div data-role="illustrated-input"><div>
+            <input type="text" aria-readonly="false" data-lpignore="true" inputmode="tel" name="end_date" placeholder="MM/YYYY" dir="auto" value="">
+            <span data-ui="calendar-icon"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><desc aria-hidden="true"><p>SVGs not supported by this browser.</p></desc></svg></span>
+          </div></div></div></div>
+        </label></div>
+        <div><button data-ui="save-section" type="button">Update</button><button data-ui="cancel-section" type="button">Cancel</button></div>
+      </div></li></ul>
+    </div>
+
+    <div data-ui="experience">
+      <div><p id="experience_label">Experience&nbsp;<small>(Optional)</small></p>
+        <button data-ui="add-section" aria-label="Add Experience" type="button">+ Add</button></div>
+      <ul><li><div data-ui="editor">
+        <div><label><span><span><strong>*</strong></span><span><span id="title_label"><strong>Title</strong></span></span></span>
+          <div data-role="illustrated-input"><div><input aria-required="true" id="title" name="title" aria-labelledby="title_label" required type="text" dir="auto" value=""></div></div>
+        </label></div>
+        <div><label><span><span><span id="company_label"><strong>Company</strong></span><span> (Optional)</span></span></span>
+          <div data-role="illustrated-input"><div><input id="company" name="company" aria-labelledby="company_label" type="text" dir="auto" value=""></div></div>
+        </label></div>
+        <div><label><span><span><span id="industry_label"><strong>Industry</strong></span><span> (Optional)</span></span></span>
+          <div data-role="illustrated-input"><div><input id="industry" name="industry" aria-labelledby="industry_label" type="text" dir="auto" value=""></div></div>
+        </label></div>
+        <div><label><span><span><span id="exp_summary_label"><strong>Summary</strong></span><span> (Optional)</span></span></span>
+          <div data-role="illustrated-input"><div><textarea id="exp_summary" name="summary" aria-labelledby="exp_summary_label" rows="5" dir="auto"></textarea></div></div>
+        </label></div>
+        <div><label><span><span><span id="exp_start_date_label"><strong>Start date</strong></span><span> (Optional)</span></span></span>
+          <div class="react-datepicker-wrapper"><div class="react-datepicker__input-container"><div data-role="illustrated-input"><div>
+            <input type="text" aria-readonly="false" data-lpignore="true" inputmode="tel" name="start_date" placeholder="MM/YYYY" dir="auto" value="">
+            <span data-ui="calendar-icon"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><desc aria-hidden="true"><p>SVGs not supported by this browser.</p></desc></svg></span>
+          </div></div></div></div>
+        </label></div>
+        <div><label><span><span><span id="exp_end_date_label"><strong>End date</strong></span><span> (Optional)</span></span></span>
+          <div class="react-datepicker-wrapper"><div class="react-datepicker__input-container"><div data-role="illustrated-input"><div>
+            <input type="text" aria-readonly="false" data-lpignore="true" inputmode="tel" name="end_date" placeholder="MM/YYYY" dir="auto" value="">
+            <span data-ui="calendar-icon"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><desc aria-hidden="true"><p>SVGs not supported by this browser.</p></desc></svg></span>
+          </div></div></div></div>
+        </label></div>
+        <div><button data-ui="save-section" type="button">Update</button><button data-ui="cancel-section" type="button">Cancel</button></div>
+      </div></li></ul>
+    </div>
+
+    <!-- The upload is the one field Workable does NOT wrap in a <label>, and
+         its for= points at the preview icon first, whose text is a hidden
+         <svg>: "Resume" reaches it only through aria-labelledby. -->
+    <div><div><span><span><strong>*</strong></span><span><span id="resume_label"><strong>Resume</strong></span></span></span>
+      <div data-role="dropzone">
+        <div data-role="preview"><label for="input_files"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24"><desc aria-hidden="true"><p>SVGs not supported by this browser.</p></desc></svg></label></div>
+        <div><label tabindex="0" role="button" for="input_files" id="description_input_files" aria-describedby="resume_label">Choose file</label> <span>or drag and drop here</span></div>
+        <input data-ui="resume" tabindex="-1" id="input_files" type="file" aria-labelledby="resume_label description_input_files" accept=".pdf,.doc,.docx,.odt,.rtf" required>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section data-ui="section">
+  <h2>Details</h2>
+  <div data-ui="section-fields">
+    <div><label><span><span><span id="cover_letter_label"><strong>Cover letter</strong></span><span> (Optional)</span></span></span>
+      <div data-role="illustrated-input"><div><textarea id="cover_letter" name="cover_letter" aria-labelledby="cover_letter_label" rows="5" dir="auto"></textarea></div></div>
+    </label></div>
+
+    <div><label><span><span><strong>*</strong></span><span><span id="CA_10917_label"><strong>How did you first learn about OnLogic and this position?</strong></span></span></span>
+      <div data-role="illustrated-input"><div><input aria-required="true" id="CA_10917" name="CA_10917" aria-labelledby="CA_10917_label" required type="text" dir="auto" value=""></div></div>
+    </label></div>
+
+    <div><div><span><span><strong>*</strong></span><span><span id="Gom3Y5oUjJajqYHm_label"><strong>Are you currently able to work in the U.S. without employment visa sponsorship?</strong></span></span></span>
+      <div><fieldset role="radiogroup" data-ui="QA_12379927" aria-labelledby="Gom3Y5oUjJajqYHm_label">
+        <div data-ui="option" aria-labelledby="Gom3Y5oUjJajqYHm_label radio_label_yes_now" id="wrapper_yes_now" role="radio" aria-checked="false" aria-required="true" tabindex="0">
+          <label><input aria-required="true" required id="yes_now" tabindex="-1" aria-hidden="true" type="radio" name="QA_12379927" value="true"><div><div><span id="radio_label_yes_now">YES</span></div></div></label></div>
+        <div data-ui="option" aria-labelledby="Gom3Y5oUjJajqYHm_label radio_label_no_now" id="wrapper_no_now" role="radio" aria-checked="false" aria-required="true" tabindex="-1">
+          <label><input aria-required="true" required id="no_now" tabindex="-1" aria-hidden="true" type="radio" name="QA_12379927" value="false"><div><div><span id="radio_label_no_now">NO</span></div></div></label></div>
+      </fieldset></div>
+    </div></div>
+
+    <div><div><span><span><strong>*</strong></span><span><span id="nBm6mGfMog6MpBQu_label"><strong>Will you now or in the future require employer sponsorship in order to obtain or maintain work authorization?</strong></span></span></span>
+      <div><fieldset role="radiogroup" data-ui="QA_12379928" aria-labelledby="nBm6mGfMog6MpBQu_label">
+        <div data-ui="option" aria-labelledby="nBm6mGfMog6MpBQu_label radio_label_yes_future" id="wrapper_yes_future" role="radio" aria-checked="false" aria-required="true" tabindex="0">
+          <label><input aria-required="true" required id="yes_future" tabindex="-1" aria-hidden="true" type="radio" name="QA_12379928" value="true"><div><div><span id="radio_label_yes_future">YES</span></div></div></label></div>
+        <div data-ui="option" aria-labelledby="nBm6mGfMog6MpBQu_label radio_label_no_future" id="wrapper_no_future" role="radio" aria-checked="false" aria-required="true" tabindex="-1">
+          <label><input aria-required="true" required id="no_future" tabindex="-1" aria-hidden="true" type="radio" name="QA_12379928" value="false"><div><div><span id="radio_label_no_future">NO</span></div></div></label></div>
+      </fieldset></div>
+    </div></div>
+
+    <!-- An acknowledgement asked as YES / NO. Nothing in the profile answers
+         it and it is the applicant's to make, so it stays blank. -->
+    <div><div><span><span><strong>*</strong></span><span><span id="z4CLPyxKTmSUptP7_label"><strong>I understand that this role requires the successful completion of a background check.</strong></span></span></span>
+      <div><fieldset role="radiogroup" data-ui="QA_12379929" aria-labelledby="z4CLPyxKTmSUptP7_label">
+        <div data-ui="option" aria-labelledby="z4CLPyxKTmSUptP7_label radio_label_yes_bg" id="wrapper_yes_bg" role="radio" aria-checked="false" aria-required="true" tabindex="0">
+          <label><input aria-required="true" required id="yes_bg" tabindex="-1" aria-hidden="true" type="radio" name="QA_12379929" value="true"><div><div><span id="radio_label_yes_bg">YES</span></div></div></label></div>
+        <div data-ui="option" aria-labelledby="z4CLPyxKTmSUptP7_label radio_label_no_bg" id="wrapper_no_bg" role="radio" aria-checked="false" aria-required="true" tabindex="-1">
+          <label><input aria-required="true" required id="no_bg" tabindex="-1" aria-hidden="true" type="radio" name="QA_12379929" value="false"><div><div><span id="radio_label_no_bg">NO</span></div></div></label></div>
+      </fieldset></div>
+    </div></div>
+
+    <!-- Free text the profile has no answer for: left for the applicant. -->
+    <div><label><span><span><strong>*</strong></span><span><span id="QA_12379931_label"><strong>What academic year (junior, senior) will you be in January 2027?</strong></span></span></span>
+      <div data-role="illustrated-input"><div><textarea aria-required="true" id="QA_12379931" name="QA_12379931" aria-labelledby="QA_12379931_label" required rows="5" dir="auto"></textarea></div></div>
+    </label></div>
+  </div>
+</section>
+
+<button data-ui="apply-button" type="submit">Submit application</button>
+</form>
+
+<script>
+// The radio wrappers mirror the hidden input's state, as Workable's do.
+for (const option of document.querySelectorAll("[data-ui=option]")) {
+  const radio = option.querySelector("input[type=radio]");
+  radio.addEventListener("change", () => {
+    for (const other of document.querySelectorAll(`[data-ui=option]:has(input[name="${radio.name}"])`)) {
+      other.setAttribute("aria-checked", String(other.querySelector("input").checked));
+    }
+  });
+}
+</script>
+</body></html>
