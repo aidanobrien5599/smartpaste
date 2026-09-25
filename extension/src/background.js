@@ -12,7 +12,7 @@ import {
   assemble, cleanGpa, DEGREES, sectionByVocabulary, readSkills, readListEntries, readProjects,
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
-} from "./lib/draft.js";
+} from "./lib/draft.ts";
 import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.js";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.ts";
 import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.ts";
