@@ -14,7 +14,7 @@ import {
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.js";
 import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.js";
-import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
+import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.ts";
 import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.ts";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";

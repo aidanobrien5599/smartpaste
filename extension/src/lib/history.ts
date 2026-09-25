@@ -5,6 +5,8 @@
  * judgement over every job you list, so Jev makes it from the whole list.
  */
 
+import type { Profile } from "./schema.ts";
+
 // Asks whether you work or worked for someone. The "for / at / by" or
 // "employee" wording is what separates it from "years of work experience".
 const PRIOR_EMPLOYMENT = new RegExp(
@@ -25,12 +27,14 @@ const PRIOR_EMPLOYMENT = new RegExp(
 const RIGHT_TO_WORK =
   /\bauthori[sz](?:ed|ation)\b|\beligible to work\b|\bwork permit\b|\bsponsorship\b|\bvisa\b|\blegally (?:able|allowed|entitled)\b/i;
 
-export function isPriorEmploymentQuestion(label) {
+export function isPriorEmploymentQuestion(label: string | null | undefined): boolean {
   return PRIOR_EMPLOYMENT.test(label || "") && !RIGHT_TO_WORK.test(label || "");
 }
 
 /** Every job in the profile, as the few facts the question turns on. */
-export function workHistory(profile) {
+export function workHistory(
+  profile: Profile | null | undefined
+): { company: string; title: string; dates: string }[] {
   const jobs = Array.isArray(profile?.experience) ? profile.experience : [];
   return jobs
     .filter((job) => job && (job.company || "").trim())
