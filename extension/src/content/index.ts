@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Cmd-V, made to know what box it is in.
  *

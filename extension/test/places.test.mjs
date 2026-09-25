@@ -1,8 +1,8 @@
 // Where you would work. Run: node --test extension/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizePlaces, placesOptions } from "../lib/places.js";
-import { buildOptions } from "../lib/profile.js";
+import { normalizePlaces, placesOptions } from "../src/lib/places.js";
+import { buildOptions } from "../src/lib/profile.js";
 
 test("normalizePlaces trims, drops blanks and case-insensitive repeats, keeps rank", () => {
   assert.deepEqual(

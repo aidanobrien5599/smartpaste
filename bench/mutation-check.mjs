@@ -2,25 +2,28 @@
 //
 //   node bench/mutation-check.mjs [name-filter]
 //
-// For each entry below: undo one fix in extension/content.js, run the
+// For each entry below: undo one fix in whichever file under
+// extension/src/content/ holds it, bundle the mutant with esbuild, run the
 // content tests that should guard it, and report CAUGHT (some test failed
-// or hung) or MISSED (everything still passed -- the fix is unguarded).
-// Each mutant is a temp copy the tests load via SMARTPASTE_CONTENT; the real
-// content.js is only read. (Rewriting it in place once erased another
-// session's commit that landed mid-run.)
+// or hung) or MISSED (everything still passed -- the fix is unguarded). A
+// fix that no longer matches any file is STALE, one that matches more than
+// one is AMBIGUOUS, and a mutant that fails to bundle is BROKEN -- all three
+// mean the entry needs updating, not the code. Each mutant is a temp copy of
+// src/, edited and rebundled; the real source is only read. (Rewriting it in
+// place once erased another session's commit that landed mid-run.)
 //
 // Add an entry whenever a live bug gets a fix and a test: the entry is the
 // proof the test can see the bug. A MISSED entry means the fixture is kinder
 // than the site (bytedance.html's menus once closed each other, which the
 // real page never does, and hid the stale-menu bug).
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { join, dirname } from "node:path";
+import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SRC = join(root, "extension", "content.js");
 const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent box|search";
 
 // [name, the fixed code, the code before the fix]
@@ -101,20 +104,44 @@ const MUTATIONS = [
     "      items = await searchSuggestions(field, cityOf(value));", "      items = [];"],
 ];
 
+const SRC = join(root, "extension", "src");
+const CONTENT = join(SRC, "content");
+const sources = [];
+(function walk(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) walk(path);
+    else if (/\.[jt]s$/.test(entry.name)) sources.push({ path, text: readFileSync(path, "utf8") });
+  }
+})(CONTENT);
+
 const filter = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
-const original = readFileSync(SRC, "utf8");
 const scratch = mkdtempSync(join(tmpdir(), "smartpaste-mutant-"));
 const MUTANT = join(scratch, "content.js");
 let missed = 0;
 try {
   for (const [name, fixed, before] of MUTATIONS) {
     if (filter && !filter.test(name)) continue;
-    if (!original.includes(fixed)) {
-      console.log(`STALE   ${name} -- the fixed code is no longer there; update this entry`);
+    // Each fix lives in exactly one file. None means it was lost or edited;
+    // several means the entry no longer says which one it guards.
+    const hits = sources.filter((s) => s.text.includes(fixed));
+    if (hits.length !== 1) {
+      const where = hits.map((h) => relative(SRC, h.path)).join(", ");
+      console.log(`${hits.length ? "AMBIGUOUS" : "STALE  "} ${name} -- ${hits.length ? `in ${where}` : "the fixed code is no longer there"}; update this entry`);
       missed++;
       continue;
     }
-    writeFileSync(MUTANT, original.replace(fixed, before));
+    const copy = join(scratch, "src");
+    rmSync(copy, { recursive: true, force: true });
+    cpSync(SRC, copy, { recursive: true });
+    writeFileSync(join(copy, relative(SRC, hits[0].path)), hits[0].text.replace(fixed, before));
+    try {
+      writeFileSync(MUTANT, await bundleContent(copy));
+    } catch (error) {
+      console.log(`BROKEN  ${name} -- the mutant does not build: ${error.message.split("\n")[0]}`);
+      missed++;
+      continue;
+    }
     const run = spawnSync("node", ["--test", `--test-name-pattern=${TESTS}`, "extension/test/content.test.mjs"],
       { cwd: root, encoding: "utf8", timeout: 240_000, env: { ...process.env, SMARTPASTE_CONTENT: MUTANT } });
     const failed = [...new Set([...(run.stdout || "").matchAll(/^✖ (.+?) \(\d/gm)].map((m) => m[1]))];

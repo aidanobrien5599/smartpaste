@@ -26,6 +26,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { build } from "../extension/build.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EXT = join(here, "..", "extension");
@@ -260,6 +261,7 @@ async function worker() {
     console.log(`[${n + 1}/${urls.length}] ${r.status.padEnd(8)} ${String(r.filled ?? "-").padStart(3)}/${String(r.nControls ?? "-").padEnd(3)} req-blank ${String(r.requiredBlank ?? "-").padEnd(3)} ${r.host} ${r.why || r.error || ""}`);
   }
 }
+await build();
 await Promise.all(Array.from({ length: Math.min(parallel, urls.length) }, worker));
 results.sort((a, b) => a.n - b.n);
 writeFileSync(join(outDir, "summary.json"), JSON.stringify(results.map(({ controls, logs, ...rest }) => rest), null, 1));

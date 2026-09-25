@@ -1,20 +1,24 @@
 // A headless Chrome for the content-script tests, driven over the DevTools
 // protocol with Node's built-in WebSocket -- no Playwright, no npm install.
 // Fixtures are served over http so the page has a real origin, and every
-// page gets stub.js (standing in for chrome.*) and then content.js injected
-// before its own scripts, as the extension would.
+// page gets stub.js (standing in for chrome.*) and then content.js bundled
+// fresh from src/ injected before its own scripts, as the extension would.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bundleContent } from "../build.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(here, "fixtures");
-// bench/mutation-check.mjs points this at a mutated copy, so the real
-// content.js is never rewritten under anyone else editing it.
-const CONTENT = process.env.SMARTPASTE_CONTENT || join(here, "..", "content.js");
+// bench/mutation-check.mjs points this at a bundled mutant; otherwise the
+// current source is bundled fresh, so a stale dist/ is never what is tested.
+export async function contentSource() {
+  const mutant = process.env.SMARTPASTE_CONTENT;
+  return mutant ? readFileSync(mutant, "utf8") : bundleContent();
+}
 
 const CANDIDATES = [
   process.env.CHROME,
@@ -70,7 +74,7 @@ export async function launch() {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const stub = readFileSync(join(FIXTURES, "stub.js"), "utf8");
-  const content = readFileSync(CONTENT, "utf8");
+  const content = await contentSource();
 
   /** `scripts`: extra sources to inject before the page, after the stub. */
   async function open(fixture, { scripts = [], smartpaste = true } = {}) {

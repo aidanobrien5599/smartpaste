@@ -40,7 +40,7 @@ globalThis.fetch = async (...args) => {
   return response;
 };
 
-await import("../extension/background.js");
+await import("../extension/src/background.js");
 const fields = Q.map(([label, options, multi]) =>
   (options && options.length ? { label, options, multi: Boolean(multi) } : { label }));
 const reply = await new Promise((resolve) =>

@@ -13,3 +13,7 @@ bench/.real-profile/
 bench/.sweep-template/
 bench/sweeps/
 .claude/
+
+node_modules/
+extension/dist/
+.superpowers/

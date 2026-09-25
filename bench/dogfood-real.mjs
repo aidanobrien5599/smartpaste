@@ -23,6 +23,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { build } from "../extension/build.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EXT = join(here, "..", "extension");
@@ -47,6 +48,7 @@ rmSync(join(profile, "DevToolsActivePort"), { force: true });
 // module it imports (lib/profile.js) did not reach a run while background.js
 // itself was unchanged: the run tested yesterday's code. Start clean.
 rmSync(join(profile, "Default", "Service Worker"), { recursive: true, force: true });
+await build();
 const chrome = spawn(binary, [
   "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run",
   "--no-default-browser-check", "--window-size=1280,1400",

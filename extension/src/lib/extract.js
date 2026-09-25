@@ -221,7 +221,7 @@ export function linesFromItems(items, isIcon = () => false) {
 let pdfjs = null;
 async function library() {
   if (pdfjs) return pdfjs;
-  pdfjs = await import("../vendor/pdf.mjs");
+  pdfjs = await import(chrome.runtime.getURL("vendor/pdf.mjs"));
   pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("vendor/pdf.worker.mjs");
   return pdfjs;
 }
