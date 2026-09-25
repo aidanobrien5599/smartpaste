@@ -12,6 +12,21 @@
  */
 
 import { fromBase64 } from "./documents.ts";
+import type { StoredDocument } from "./documents.ts";
+
+/** A pdf.js text-content item, typed for only what this file reads from it. */
+export type Item = {
+  str?: string;
+  transform: number[];
+  width?: number;
+  height?: number;
+  fontName?: string;
+};
+
+/** A line fragment built out of one or more items on the same baseline. */
+type Segment = { text: string; x0: number; x1: number; h: number; y: number };
+/** A segment while still being assembled: not yet placed on its row's y. */
+type OpenSegment = Omit<Segment, "y">;
 
 // Icon fonts map their glyphs onto ordinary codepoints -- FontAwesome's phone
 // and envelope arrive as "Ó" and "R" -- so no character test can catch them.
@@ -21,7 +36,7 @@ export const ICON_FONT = /fontawesome|icons?\b|glyph|dingbat|wingding|material|f
 // Anything wider than this between two fragments on one line is a column
 // break, not a word space. A space here is ~3pt; a right-aligned date sits
 // 250pt away.
-const COLUMN_GAP = (height) => Math.max(15, 1.5 * height);
+const COLUMN_GAP = (height: number): number => Math.max(15, 1.5 * height);
 
 const MONTHS =
   "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|" +
@@ -35,15 +50,15 @@ const PRIVATE_USE = /[\ue000-\uf8ff]+/g;
 // the vector cm-super fonts embeds bitmap fonts with no Unicode map, so pdf.js
 // hands back the raw slot: "Aug 2022 \u0015 May 2026", "\u001daky-test".
 // Control characters are never real text, so mapping them back is safe.
-const CORK = {
+const CORK: Record<string, string> = {
   "\u000d": "‚", "\u0010": "“", "\u0011": "”", "\u0012": "„",
   "\u0015": "–", "\u0016": "—", "\u001b": "ff", "\u001c": "fi", "\u001d": "fl",
   "\u001e": "ffi", "\u001f": "ffl", "\u0088": "•",
 };
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g;
-const decodeCork = (text) => text.replace(CONTROL, (c) => CORK[c] ?? "");
+const decodeCork = (text: string): string => text.replace(CONTROL, (c) => CORK[c] ?? "");
 
-function repair(line) {
+function repair(line: string): string {
   return decodeCork(line)
     .normalize("NFKC")
     .replace(PRIVATE_USE, " ")
@@ -61,7 +76,7 @@ const SECTION_WORD =
 // Only a section word counts here: a name set in capitals ("FIRSTNAME
 // LASTNAME") is not a heading, and treating it as one let a centred header
 // pass for a sidebar.
-const headingish = (text) => SECTION_WORD.test(text.trim().replace(/:$/, ""));
+const headingish = (text: string): boolean => SECTION_WORD.test(text.trim().replace(/:$/, ""));
 
 /**
  * Segments in reading order: top to bottom, except that a real second column
@@ -75,7 +90,7 @@ const headingish = (text) => SECTION_WORD.test(text.trim().replace(/:$/, ""));
  *    a common x) -- but only one side has section headings. A sidebar has
  *    headings in both columns.
  */
-export function readingOrder(segments) {
+export function readingOrder(segments: Segment[]): Segment[] {
   if (segments.length < 8) return segments;
   // Where lines start. A second column is a large cluster of starts well to
   // the right of the page margin. Columns rarely share baselines -- their line
@@ -112,10 +127,10 @@ const BULLET_MARK = /^\s*[\u2022\u00b7\u25aa\u25cf\u2023\u25e6\u2043*-]\s*/;
  * bullet's text; the next entry starts back at the margin. Text alone cannot
  * tell those apart -- most bullets have no full stop, and a Word entry line
  * ("Teaching Assistant, Department of Computer and Information Science,
- * Towson, MD") is as long as any sentence -- but position can.
+ * Towson, MD") is as long as a sentence -- but position can.
  */
-export function joinContinuations(segments) {
-  const out = [];
+export function joinContinuations(segments: Segment[]): Segment[] {
+  const out: Segment[] = [];
   for (const seg of segments) {
     const prev = out[out.length - 1];
     const text = seg.text.trim();
@@ -135,15 +150,16 @@ export function joinContinuations(segments) {
     // A word hyphenated across the line break: "Busi-" + "ness".
     const hyphenated = /[a-z]-\s*$/.test(prev?.text || "") && /^[a-z]/.test(text);
     if (adjacent && hyphenated) {
-      prev.text = prev.text.trimEnd().replace(/-$/, "") + text;
-      prev.y = seg.y;
-      prev.x1 = Math.max(prev.x1, seg.x1);
+      // adjacent is truthy only when prev is defined (adjacent = prev && …).
+      prev!.text = prev!.text.trimEnd().replace(/-$/, "") + text;
+      prev!.y = seg.y;
+      prev!.x1 = Math.max(prev!.x1, seg.x1);
       continue;
     }
     if (adjacent && !BULLET_MARK.test(decodeCork(seg.text)) && (underBullet || midSentence || dangling || wrappedRange)) {
-      prev.text = `${prev.text.trimEnd()} ${text}`;
-      prev.y = seg.y;
-      prev.x1 = Math.max(prev.x1, seg.x1);
+      prev!.text = `${prev!.text.trimEnd()} ${text}`;
+      prev!.y = seg.y;
+      prev!.x1 = Math.max(prev!.x1, seg.x1);
       continue;
     }
     out.push({ ...seg });
@@ -156,12 +172,15 @@ export function joinContinuations(segments) {
  *
  * `isIcon(item)` says whether an item is set in an icon font.
  */
-export function linesFromItems(items, isIcon = () => false) {
-  const visible = items.filter((item) => item.str !== undefined);
+export function linesFromItems(
+  items: Item[],
+  isIcon: (item: Item & { str: string }) => boolean = () => false
+): string[] {
+  const visible = items.filter((item): item is Item & { str: string } => item.str !== undefined);
 
   // Rows: fragments within a small tolerance of the same baseline. Exact
   // matching splits a small-caps heading ("A" + "IDAN") into two lines.
-  const rows = [];
+  const rows: { y: number; items: (Item & { str: string })[] }[] = [];
   for (const item of [...visible].sort((a, b) => b.transform[5] - a.transform[5])) {
     const y = item.transform[5];
     const tolerance = Math.max(2, 0.3 * (item.height || 10));
@@ -170,11 +189,11 @@ export function linesFromItems(items, isIcon = () => false) {
     else rows.push({ y, items: [item] });
   }
 
-  const segments = [];
+  const segments: Segment[] = [];
   for (const row of rows) {
     const cells = row.items.sort((a, b) => a.transform[4] - b.transform[4]);
-    let segment = null;
-    let end = null; // right edge of the last visible fragment
+    let segment: OpenSegment | null = null;
+    let end: number | null = null; // right edge of the last visible fragment
     let height = 10;
     const close = () => {
       if (segment && segment.text.trim()) segments.push({ ...segment, y: row.y });
@@ -195,7 +214,7 @@ export function linesFromItems(items, isIcon = () => false) {
       if (item.height) height = item.height;
       if (blank) {
         // A whitespace item as wide as a column gap is the gap itself.
-        if (item.width > COLUMN_GAP(height) && segment && segment.text.trim()) close();
+        if ((item.width || 0) > COLUMN_GAP(height) && segment && segment.text.trim()) close();
         else if (segment && !segment.text.endsWith(" ")) segment.text += " ";
         continue;
       }
@@ -218,7 +237,21 @@ export function linesFromItems(items, isIcon = () => false) {
   return lines.map(repair).filter((line) => line && !PAGE_NUMBER.test(line));
 }
 
-let pdfjs = null;
+/**
+ * A pdf.js Page, Document and library module, typed only for what this file
+ * reads from them; the vendored pdf.js ships no types of its own.
+ */
+type PdfPage = {
+  getOperatorList(): Promise<unknown>;
+  commonObjs: { get(name?: string): { name?: string } | undefined };
+  getAnnotations(): Promise<{ url?: string; unsafeUrl?: string }[]>;
+  getTextContent(): Promise<{ items: Item[] }>;
+  view: number[];
+};
+type PdfDocument = { numPages: number; getPage(n: number): Promise<PdfPage> };
+type PdfLib = { getDocument(options: { data: Uint8Array }): { promise: Promise<PdfDocument> } };
+
+let pdfjs: any = null; // vendored pdf.js ships no types
 async function library() {
   if (pdfjs) return pdfjs;
   pdfjs = await import(chrome.runtime.getURL("vendor/pdf.mjs"));
@@ -227,9 +260,9 @@ async function library() {
 }
 
 /** Real font names ("VOXUTP+FontAwesome") live on the page's loaded fonts. */
-export async function iconTester(page) {
+export async function iconTester(page: PdfPage): Promise<(item: Item) => boolean> {
   await page.getOperatorList(); // loads the fonts into commonObjs
-  const cache = new Map();
+  const cache = new Map<string | undefined, boolean>();
   return (item) => {
     if (!cache.has(item.fontName)) {
       let name = "";
@@ -240,7 +273,7 @@ export async function iconTester(page) {
       }
       cache.set(item.fontName, ICON_FONT.test(name));
     }
-    return cache.get(item.fontName);
+    return cache.get(item.fontName) ?? false;
   };
 }
 
@@ -251,7 +284,7 @@ export async function iconTester(page) {
  * bottom margin of every page, and the top margin of every page after the
  * first, are dropped; page 1's top is where the name is, so it stays.
  */
-export function inBody(item, height, pageNumber) {
+export function inBody(item: Pick<Item, "transform">, height: number, pageNumber: number): boolean {
   const y = item.transform[5];
   if (y < 0.04 * height) return false;
   if (pageNumber > 1 && y > 0.94 * height) return false;
@@ -259,8 +292,8 @@ export function inBody(item, height, pageNumber) {
 }
 
 /** Hyperlinks live in annotations and never in the text layer. */
-async function pageLinks(page) {
-  const found = [];
+async function pageLinks(page: PdfPage): Promise<string[]> {
+  const found: string[] = [];
   for (const annotation of await page.getAnnotations()) {
     const url = annotation.url || annotation.unsafeUrl;
     if (url && !url.startsWith("mailto:")) found.push(url);
@@ -268,11 +301,11 @@ async function pageLinks(page) {
   return found;
 }
 
-export async function textFromPdfBytes(bytes, lib) {
+export async function textFromPdfBytes(bytes: Uint8Array, lib: PdfLib): Promise<string> {
   const { getDocument } = lib;
   const pdf = await getDocument({ data: bytes }).promise;
-  const lines = [];
-  const links = new Set();
+  const lines: string[] = [];
+  const links = new Set<string>();
   for (let n = 1; n <= pdf.numPages; n++) {
     const page = await pdf.getPage(n);
     const { items } = await page.getTextContent();
@@ -283,6 +316,6 @@ export async function textFromPdfBytes(bytes, lib) {
   return [...lines, ...links].join("\n");
 }
 
-export async function textFromStoredPdf(stored) {
+export async function textFromStoredPdf(stored: StoredDocument): Promise<string> {
   return textFromPdfBytes(fromBase64(stored.data), await library());
 }

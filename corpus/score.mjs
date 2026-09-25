@@ -33,7 +33,7 @@ globalThis.chrome = {
 };
 const pdfjs = await import(path.join(ROOT, "extension/vendor/pdf.mjs"));
 pdfjs.GlobalWorkerOptions.workerSrc = path.join(ROOT, "extension/vendor/pdf.worker.mjs");
-const { textFromPdfBytes } = await import(path.join(ROOT, "extension/src/lib/extract.js"));
+const { textFromPdfBytes } = await import(path.join(ROOT, "extension/src/lib/extract.ts"));
 await import(path.join(ROOT, "extension/src/background.js"));
 // ENGINE=lines (the original search drafter) or segments (classification).
 const ENGINE = process.env.ENGINE || "segments";

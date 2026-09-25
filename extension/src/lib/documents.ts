@@ -8,6 +8,9 @@
 
 import { DOCUMENTS } from "./schema.ts";
 
+/** One file kept in chrome.storage.local's `documents`, base64-encoded. */
+export type StoredDocument = { name: string; type: string; size: number; data: string };
+
 export const MAX_BYTES = 3 * 1024 * 1024;
 
 export function toBase64(buffer: ArrayBufferLike): string {
