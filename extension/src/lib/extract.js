@@ -11,7 +11,7 @@
  * by the font they are set in rather than by what the characters look like.
  */
 
-import { fromBase64 } from "./documents.js";
+import { fromBase64 } from "./documents.ts";
 
 // Icon fonts map their glyphs onto ordinary codepoints -- FontAwesome's phone
 // and envelope arrive as "Ó" and "R" -- so no character test can catch them.
