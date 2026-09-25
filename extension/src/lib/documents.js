@@ -6,7 +6,7 @@
  * inside the 10MB local quota even with a transcript and cover letter.
  */
 
-import { DOCUMENTS } from "./schema.js";
+import { DOCUMENTS } from "./schema.ts";
 
 export const MAX_BYTES = 3 * 1024 * 1024;
 

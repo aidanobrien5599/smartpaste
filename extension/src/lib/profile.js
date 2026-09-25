@@ -7,7 +7,7 @@
  * the regex layer to extract a substring. Structured wins wherever it exists.
  */
 
-import { LABELS, ORDINALS, REPEATABLE } from "./schema.js";
+import { LABELS, ORDINALS, REPEATABLE } from "./schema.ts";
 import { placesOptions } from "./places.js";
 import { answerOptions } from "./answers.js";
 

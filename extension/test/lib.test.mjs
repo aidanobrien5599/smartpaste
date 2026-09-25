@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.js";
 import { placeSaysYes } from "../src/lib/places.js";
 import { isPriorEmploymentQuestion } from "../src/lib/history.js";
-import { LABELS } from "../src/lib/schema.js";
+import { LABELS } from "../src/lib/schema.ts";
 import { buildOptions, unwrap, extraSnippets, NONE } from "../src/lib/profile.js";
 
 test("refine: names from an all-caps header", () => {

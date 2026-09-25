@@ -7,7 +7,7 @@
  */
 
 import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.js";
-import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.js";
+import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.ts";
 import {
   assemble, cleanGpa, DEGREES, sectionByVocabulary, readSkills, readListEntries, readProjects,
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
