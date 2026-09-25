@@ -5,7 +5,7 @@ import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } fr
 import { placeSaysYes } from "../src/lib/places.ts";
 import { isPriorEmploymentQuestion } from "../src/lib/history.ts";
 import { LABELS } from "../src/lib/schema.ts";
-import { buildOptions, unwrap, extraSnippets, NONE } from "../src/lib/profile.js";
+import { buildOptions, unwrap, extraSnippets, NONE } from "../src/lib/profile.ts";
 
 test("refine: names from an all-caps header", () => {
   assert.equal(refine("First name", "AIDAN O'BRIEN"), "Aidan");

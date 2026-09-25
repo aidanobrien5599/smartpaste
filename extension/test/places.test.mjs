@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { normalizePlaces, placesOptions } from "../src/lib/places.ts";
-import { buildOptions } from "../src/lib/profile.js";
+import { buildOptions } from "../src/lib/profile.ts";
 
 test("normalizePlaces trims, drops blanks and case-insensitive repeats, keeps rank", () => {
   assert.deepEqual(

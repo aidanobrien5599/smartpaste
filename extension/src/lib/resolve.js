@@ -7,7 +7,7 @@
  * not hallucinate. Jev locates; this file transcribes.
  */
 
-import { NONE, isStructured, valueOf } from "./profile.js";
+import { NONE, isStructured, valueOf } from "./profile.ts";
 import { placeSaysYes } from "./places.ts";
 
 // Above AUTO, Cmd-V pastes silently. Below MENU we offer nothing at all and

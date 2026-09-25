@@ -407,7 +407,7 @@ async function save() {
   state.profile = profile;
   renderPlaces(); // show the lists as saved: blanks and duplicates gone
   renderAnswers();
-  const { buildOptions } = await import("./lib/profile.js");
+  const { buildOptions } = await import("./lib/profile.ts");
   const count = Object.keys(buildOptions(profile, extraText)).length;
   const docs = Object.keys(state.documents).length;
   say(

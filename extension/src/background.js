@@ -6,7 +6,7 @@
  * hand that page's context your API key. The key never leaves here.
  */
 
-import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.js";
+import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.ts";
 import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.ts";
 import {
   assemble, cleanGpa, DEGREES, sectionByVocabulary, readSkills, readListEntries, readProjects,

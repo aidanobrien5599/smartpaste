@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { answerOptions, fillPlaceholders, hasPlaceholders, normalizeAnswers, pageCandidates } from "../src/lib/answers.ts";
-import { buildOptions } from "../src/lib/profile.js";
+import { buildOptions } from "../src/lib/profile.ts";
 
 test("normalizeAnswers keeps complete question/answer pairs only", () => {
   assert.deepEqual(
