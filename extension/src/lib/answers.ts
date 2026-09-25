@@ -6,28 +6,33 @@
  * {company} and {role} filled in from the page you are applying on.
  */
 
+import type { Options } from "./schema.ts";
+
 export const PLACEHOLDER = /\{(company|role)\}/gi;
 
+/** One raw stored answer entry, before normalizeAnswers cleans it. */
+export type RawAnswer = { question?: unknown; answer?: unknown };
+
 /** Stored shape, cleaned: [{ question, answer }], both non-empty. */
-export function normalizeAnswers(list) {
-  return (Array.isArray(list) ? list : [])
+export function normalizeAnswers(list: unknown): { question: string; answer: string }[] {
+  return ((Array.isArray(list) ? list : []) as RawAnswer[])
     .map((e) => ({ question: String(e?.question || "").trim(), answer: String(e?.answer || "").trim() }))
     .filter((e) => e.question && e.answer);
 }
 
 /** Profile options: each question is the label a form field is matched on. */
-export function answerOptions(list) {
-  const options = {};
+export function answerOptions(list: unknown): Options {
+  const options: Options = {};
   normalizeAnswers(list).forEach((e, i) => {
     options[`custom${i + 1}`] = { field: e.question, value: e.answer };
   });
   return options;
 }
 
-export const hasPlaceholders = (text) => new RegExp(PLACEHOLDER.source, "i").test(String(text || ""));
+export const hasPlaceholders = (text: unknown): boolean => new RegExp(PLACEHOLDER.source, "i").test(String(text || ""));
 
 /** Fill {company} / {role}; null if one is needed but unknown. */
-export function fillPlaceholders(text, known) {
+export function fillPlaceholders(text: string, known: Record<string, string> | undefined | null): string | null {
   let missing = false;
   const out = String(text).replace(PLACEHOLDER, (whole, name) => {
     const value = known?.[name.toLowerCase()];
@@ -41,7 +46,7 @@ export function fillPlaceholders(text, known) {
 const NOISE = /^(?:jobs?|careers?|apply|application|applyManually|recruiting|en-us|en|us|job-boards|embed|postings?|details?|view|wday|cxs|external|gh_jid|login)$/i;
 
 /** "WellsFargoJobs" -> "Wells Fargo Jobs", "ellipsis-labs" -> "Ellipsis Labs". */
-function deslug(segment) {
+function deslug(segment: string): string {
   const words = decodeURIComponent(segment)
     .replace(/[_+-]+/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -54,9 +59,11 @@ function deslug(segment) {
  * (split at " at ", " - ", " | ", "@"), the page heading, and readable URL
  * path segments. Code only cuts them out; Jev decides which is which.
  */
-export function pageCandidates({ url = "", title = "", heading = "" } = {}) {
-  const out = [];
-  const add = (text) => {
+export function pageCandidates(
+  { url = "", title = "", heading = "" }: { url?: string; title?: string; heading?: string } = {}
+): string[] {
+  const out: string[] = [];
+  const add = (text: unknown) => {
     const t = String(text || "").replace(/\s+/g, " ").trim();
     if (t.length < 2 || t.length > 90) return;
     if (!out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);

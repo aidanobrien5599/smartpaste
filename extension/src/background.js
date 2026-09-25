@@ -15,7 +15,7 @@ import {
 } from "./lib/draft.js";
 import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.js";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
-import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.js";
+import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.ts";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const MODEL = "jev-latest";

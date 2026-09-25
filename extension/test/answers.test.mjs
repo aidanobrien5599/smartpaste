@@ -1,7 +1,7 @@
 // Your own answers, and test scores. Run: node --test extension/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { answerOptions, fillPlaceholders, hasPlaceholders, normalizeAnswers, pageCandidates } from "../src/lib/answers.js";
+import { answerOptions, fillPlaceholders, hasPlaceholders, normalizeAnswers, pageCandidates } from "../src/lib/answers.ts";
 import { buildOptions } from "../src/lib/profile.js";
 
 test("normalizeAnswers keeps complete question/answer pairs only", () => {

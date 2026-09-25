@@ -9,7 +9,7 @@
 
 import { LABELS, ORDINALS, REPEATABLE } from "./schema.ts";
 import { placesOptions } from "./places.ts";
-import { answerOptions } from "./answers.js";
+import { answerOptions } from "./answers.ts";
 
 export const NONE = "__none__";
 export const MAX_OPTIONS = 254;
