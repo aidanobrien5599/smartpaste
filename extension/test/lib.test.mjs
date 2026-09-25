@@ -1,7 +1,7 @@
 // Unit tests for extension/lib. Run: node --test extension/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.js";
+import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
 import { placeSaysYes } from "../src/lib/places.ts";
 import { isPriorEmploymentQuestion } from "../src/lib/history.ts";
 import { LABELS } from "../src/lib/schema.ts";

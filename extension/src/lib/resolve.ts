@@ -9,6 +9,7 @@
 
 import { NONE, isStructured, valueOf } from "./profile.ts";
 import { placeSaysYes } from "./places.ts";
+import type { Option, Options } from "./schema.ts";
 
 // Above AUTO, Cmd-V pastes silently. Below MENU we offer nothing at all and
 // let the keystroke fall through to an ordinary paste.
@@ -47,9 +48,9 @@ const PLACE = /^(?:[A-Z][A-Za-z.'-]*(?:\s+[A-Z][A-Za-z.'-]*)*,\s*[A-Z]{2}|Remote
 const MAX_PLACE_WORDS = 4;
 
 /** Every way the line could end in a place, longest first. */
-function placeSplits(text) {
+function placeSplits(text: string): { place: string; rest: string }[] {
   const tokens = text.trim().split(/\s+/);
-  const splits = [];
+  const splits: { place: string; rest: string }[] = [];
   for (let i = Math.max(0, tokens.length - MAX_PLACE_WORDS); i < tokens.length; i++) {
     const place = tokens.slice(i).join(" ");
     if (PLACE.test(place)) splits.push({ place, rest: tokens.slice(0, i).join(" ") });
@@ -68,13 +69,13 @@ const END_DATE_WORDS = [
 ];
 const NAME_SUFFIX = new Set(["jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "phd"]);
 
-function looksLikeName(s) {
+function looksLikeName(s: string): boolean {
   if (/\d/.test(s) || s.includes("@")) return false;
   const n = s.trim().split(/\s+/).length;
   return n > 1 && n <= 5;
 }
 
-function nameParts(s) {
+function nameParts(s: string): string[] {
   let parts = s
     .trim()
     .split(/\s+/)
@@ -91,8 +92,8 @@ function nameParts(s) {
   return parts;
 }
 
-function matcher(pattern, minDigits = 0) {
-  return (snippet, label) => {
+function matcher(pattern: RegExp, minDigits = 0): Extractor {
+  return (snippet: string, label: string): string | null => {
     const found = [...snippet.matchAll(pattern)]
       .map((m) => m[0].trim().replace(/[.,;]+$/, ""))
       .filter(
@@ -111,9 +112,11 @@ function matcher(pattern, minDigits = 0) {
 // all -- distinct from null, which means "no narrower value, keep the line".
 export const DROP = Symbol("drop");
 
+type Extractor = (snippet: string, label: string) => string | null | typeof DROP;
+
 // Label keyword -> extractor. Order matters: "first name" before the generic
 // full-name rule, or every name field returns the whole header.
-const EXTRACTORS = [
+const EXTRACTORS: [string[], Extractor][] = [
   [["first name", "given name", "forename", "preferred name"],
     (s) => (looksLikeName(s) ? nameParts(s)[0] : null)],
   [["last name", "surname", "family name"],
@@ -169,7 +172,7 @@ const EXTRACTORS = [
  * every regex can spoil one. Extraction applies only to unlabelled resume
  * lines, where the option is a whole sentence containing the answer.
  */
-export function refine(label, option) {
+export function refine(label: string, option: Option): string | null {
   if (isStructured(option)) return valueOf(option);
   const snippet = option;
   const low = label.toLowerCase();
@@ -184,11 +187,23 @@ export function refine(label, option) {
   return snippet;
 }
 
+/** One answer from Jev: which option, and how sure. */
+export type Answer = { choice: string; confidence?: number; probabilities?: Record<string, number> };
+
+/** What Cmd-V does with a resolved answer. */
+export type Resolution = {
+  label: string;
+  status: "none" | "auto" | "pick";
+  value: string | null;
+  confidence: number;
+  alternatives: { value: string | null; p: number }[];
+};
+
 /**
  * One Jev answer -> what Cmd-V should do. `alternatives` lets a second Cmd-V
  * cycle to the next most likely snippet instead of needing any menu.
  */
-export function resolve(label, answer, options) {
+export function resolve(label: string, answer: Answer, options: Options): Resolution {
   const probabilities = answer.probabilities || {};
   const ranked = Object.entries(probabilities)
     .filter(([k]) => k !== NONE && k in options)
@@ -221,7 +236,7 @@ export function resolve(label, answer, options) {
 }
 
 /** "Select 1-3", "choose up to 3", "pick 2": the most boxes to tick. */
-export function maxTicks(label) {
+export function maxTicks(label: string): number {
   // "Please check one of the boxes below", "select one", "choose only one"
   if (/\b(?:select|choose|pick|check|tick)\s+(?:only\s+)?one\b/i.test(String(label))) return 1;
   const m = String(label).match(/\b(?:select|choose|pick|check|tick)\s+(?:up to\s+|at most\s+|\d+\s*(?:-|–|to)\s*)?(\d+)\b/i) ||
@@ -245,14 +260,17 @@ export function maxTicks(label) {
  * any location" -- both Yes, neither alone over the bar. Jev's confidence
  * discounts the pooled share as it discounts its own pick.
  */
-export function yesNoFromEntry(fieldOptions, answer, options) {
+export function yesNoFromEntry(fieldOptions: string[], answer: Answer, options: Options): number {
   const { said, certainty } = yesNoCertainty(answer, options);
   if (!said || certainty < AUTO) return -1;
   return fieldOptions.findIndex((text) => String(text).trim().toLowerCase() === said);
 }
 
 /** The Yes or No the profile entries lean to, and how surely. */
-export function yesNoCertainty(answer, options) {
+export function yesNoCertainty(
+  answer: Answer | null | undefined,
+  options: Options
+): { said: "yes" | "no" | null; certainty: number } {
   if (!answer || answer.choice === NONE) return { said: null, certainty: 0 };
   const probabilities = answer.probabilities || {};
   const pooled = { yes: 0, no: 0 };
@@ -267,16 +285,16 @@ export function yesNoCertainty(answer, options) {
 }
 
 /** Which of Yes / No a profile entry says, if either. */
-function yesNoOf(key, options) {
+function yesNoOf(key: string, options: Options): "yes" | "no" | null {
   const option = options[key];
   if (!isStructured(option)) return null;
   const said = String(valueOf(option)).trim().match(/^(yes|no)\b/i);
-  if (said) return said[1].toLowerCase();
+  if (said) return said[1].toLowerCase() as "yes" | "no";
   return placeSaysYes(key, options) ? "yes" : null;
 }
 
 /** Whether a dropdown's choices include both a plain "Yes" and a plain "No". */
-export function isYesNo(fieldOptions) {
+export function isYesNo(fieldOptions: string[] | null | undefined): boolean {
   const set = new Set((fieldOptions || []).map((t) => String(t).trim().toLowerCase()));
   return set.has("yes") && set.has("no");
 }
