@@ -8,7 +8,7 @@
  */
 
 import { NONE, isStructured, valueOf } from "./profile.js";
-import { placeSaysYes } from "./places.js";
+import { placeSaysYes } from "./places.ts";
 
 // Above AUTO, Cmd-V pastes silently. Below MENU we offer nothing at all and
 // let the keystroke fall through to an ordinary paste.

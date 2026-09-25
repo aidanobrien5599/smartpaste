@@ -8,7 +8,7 @@
  */
 
 import { LABELS, ORDINALS, REPEATABLE } from "./schema.ts";
-import { placesOptions } from "./places.js";
+import { placesOptions } from "./places.ts";
 import { answerOptions } from "./answers.js";
 
 export const NONE = "__none__";

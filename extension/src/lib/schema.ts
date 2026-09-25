@@ -299,3 +299,11 @@ export type Profile = { [key: string]: string | ProfileEntry[] | undefined };
 
 /** Settings -> chrome.storage.local, read in lib/profile.js and extension/src/options.js. */
 export type Settings = { acknowledge?: boolean; say_yes?: boolean; [key: string]: unknown };
+
+/**
+ * One entry in Jev's option set: a labelled profile field (structured, answers
+ * verbatim) or a bare resume line (needs lib/resolve.js's extraction). See
+ * lib/profile.js's isStructured / valueOf.
+ */
+export type Option = string | { field: string; value: string };
+export type Options = Record<string, Option>;

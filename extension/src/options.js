@@ -1,6 +1,6 @@
 import { DOCUMENTS, GROUPS, ORDINALS, REPEATABLE } from "./lib/schema.ts";
 import { humanSize, MAX_BYTES, toBase64 } from "./lib/documents.js";
-import { normalizePlaces } from "./lib/places.js";
+import { normalizePlaces } from "./lib/places.ts";
 import { normalizeAnswers } from "./lib/answers.js";
 import { textFromStoredPdf } from "./lib/extract.js";
 
