@@ -314,17 +314,19 @@ export function assemble(pieces: Piece[], kind: string): AssembledEntry[] {
     ? new Set(["school", "degree", "degree_field"])
     : new Set(["company", "title"]);
   const entries: AssembledEntry[] = [];
-  let entry: AssembledEntry | null = null;
-  // Opening a new entry is inlined at both call sites below rather than
-  // through a shared closure: with entry reassigned inside a nested function,
-  // tsc stopped narrowing plain `entry &&` checks later in this loop and
-  // inferred `never` there; inlining is what clears it, with no weakening
-  // of the null checks themselves via casts.
+  // A cast on the initializer, not a `: AssembledEntry | null` annotation:
+  // with the latter, tsc's narrowing of `entry &&` checks later in this loop
+  // collapses to `never` once entry is reassigned inside open()'s closure.
+  let entry = null as AssembledEntry | null;
+  const open = () => {
+    entry = { description: [] };
+    entries.push(entry);
+  };
   let last: { field: string; line: number | undefined } | null = null; // the previous labelled piece: { field, line }
   for (const { text, label, bullet, index } of pieces) {
     if (bullet || label === "description" || label === "detail") {
-      if (!entry) { entry = { description: [] }; entries.push(entry); }
-      if (label !== "detail") entry.description.push(text);
+      if (!entry) open();
+      if (label !== "detail") entry!.description.push(text);
       last = null;
       continue;
     }
@@ -338,22 +340,19 @@ export function assemble(pieces: Piece[], kind: string): AssembledEntry[] {
     // that held a comma: "Senior Director" + "International Business
     // Development". Without this the second opened a phantom entry.
     if (entry && last && last.field === field && index !== undefined && last.line === index) {
-      entry[field] = `${entry[field]}, ${text}`;
+      entry![field] = `${entry![field]}, ${text}`;
       continue;
     }
     last = { field, line: index };
-    const repeated = entry && entry[field] !== undefined;
-    const afterWork = entry && HEAD.has(label as string) && entry.description.length > 0;
+    const repeated = entry && entry![field] !== undefined;
+    const afterWork = entry && HEAD.has(label as string) && entry!.description.length > 0;
     // An entry with no dates and no description yet is not finished, so a
     // repeated title there replaces the first rather than opening a phantom
     // entry: "Sony Interactive Entertainment — EMEA Liaison" (split into a
     // company and a title) followed by the real title two lines later.
-    const unfinished = entry && !entry.dates && entry.description.length === 0;
-    if (!entry || afterWork || (repeated && !(unfinished && HEAD.has(label as string)))) {
-      entry = { description: [] };
-      entries.push(entry);
-    }
-    entry[field] = text;
+    const unfinished = entry && !entry!.dates && entry!.description.length === 0;
+    if (!entry || afterWork || (repeated && !(unfinished && HEAD.has(label as string)))) open();
+    entry![field] = text;
   }
   return entries.filter((e) => Object.keys(e).length > 1 || e.description.length);
 }
