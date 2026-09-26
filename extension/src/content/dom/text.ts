@@ -2,6 +2,12 @@
  * Reading and normalizing the text a page shows: labels, option text, and
  * the loose formatting a label carries that a comparison should ignore.
  *
+ * ATS quirks: `shownText` strips aria-hidden text because Vercel's labels
+ * hold decorative aria-hidden content alongside the real text. `clean`
+ * drops Vercel's leading zero-width spaces, Workday's "current value is
+ * MM/YYYY" screen-reader text, Lever's heavy asterisk ("✱"), and Workable's
+ * star that comes *before* a required question instead of after it.
+ *
  * Depends on nothing else in content/.
  */
 

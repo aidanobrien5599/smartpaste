@@ -2,6 +2,11 @@
  * Low-level DOM plumbing: finding elements (including inside shadow roots),
  * synthetic input events, and the small timing helpers a fill waits on.
  *
+ * ATS quirks: `deepAll` looks inside open shadow roots because
+ * SmartRecruiters draws every control as a web component with one, which
+ * `querySelectorAll` never enters on its own. `click` fires pointer events
+ * before the mouse events because Workday's pickers act on pointerdown.
+ *
  * Depends on nothing else in content/; every other module builds on this one.
  */
 

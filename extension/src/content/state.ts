@@ -4,6 +4,8 @@
  * Every other module is stateless; anything that must survive between one
  * scan and the next lives here. The reassigned values sit on `state`
  * because an ES module cannot reassign another module's `let`.
+ *
+ * Depends on: lib/schema.ts, for the `Profile` type of `state.profileCache`.
  */
 import type { Profile } from "../lib/schema.ts";
 

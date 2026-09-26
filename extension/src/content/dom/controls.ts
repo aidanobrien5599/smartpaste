@@ -2,6 +2,15 @@
  * What kind of control an element is, and whether it is there for the
  * applicant to see and use right now.
  *
+ * ATS quirks: React Select renders a real combobox input plus a second,
+ * empty one for form submission (COMBO_SELECTOR / isCombobox find only the
+ * first). `visible` treats a read-only combobox as a live dropdown, since
+ * that is how ByteDance's Degree field opens on click; it hides an
+ * aria-hidden box unless it is a native <select>, since Workable parks
+ * hidden city/postcode/country boxes beside its address autocomplete while
+ * Lever's select2 (a 2,965-school list) keeps the real value on a hidden
+ * native select.
+ *
  * Depends on nothing else in content/.
  */
 
