@@ -13,12 +13,13 @@
  * alone and you get an ordinary paste.
  */
 
+import { state, answers, asked, cycle, staleMenus, dateWrappers } from "./state.ts";
+import { deepAll, sleep, fire, frames, press, scroller, click } from "./dom/query.ts";
+import { shownText, clean, normalize, optionText } from "./dom/text.ts";
+import { COMBO_SELECTOR, SELECT_SHELL, isCombobox, visible, nodeVisible } from "./dom/controls.ts";
+
 (() => {
   const FILE_SELECTOR = 'input[type="file"]';
-  // React Select renders a text input with role=combobox plus a second, empty
-  // input for form submission. Only the first is a field; the second is noise.
-  const COMBO_SELECTOR = 'input[role="combobox"], input.select__input';
-  const SELECT_SHELL = '[class*="select__control"], [class*="select-shell"]';
   const JUNK_LABELS = /^(?:select\.{0,3}|choose\.{0,3}|please select|search|--)$/i;
   // Yes/No rendered as buttons over a hidden checkbox, as Ashby does it.
   const TOGGLE_SELECTOR =
@@ -44,7 +45,6 @@
   // aria-label of Month / Day / Year (its My Experience step).
   const DATE_PART = '[data-automation-id^="dateSection"], input[aria-label="Month"], ' +
     'input[aria-label="Day"], input[aria-label="Year"]';
-  const dateWrappers = new WeakSet();
   // What a dropdown shows while it holds nothing. Rippling's placeholder is
   // "Select...", so the ellipsis is part of the emptiness, not of an answer.
   const EMPTY_BUTTON = /^(?:select one|select(?:\.{3}|…)?|choose one|choose(?:\.{3}|…)?|--)?$/i;
@@ -63,21 +63,6 @@
     'input[type="date"], textarea, select';
   const MIN_FIELDS = 2;
 
-  // SmartRecruiters draws every control as a web component with an open
-  // shadow root, and document.querySelectorAll never looks inside one: its
-  // one-click form read as a page with no fields at all.
-  function deepAll(selector, root = document) {
-    const out = [...root.querySelectorAll(selector)];
-    for (const el of root.querySelectorAll("*")) if (el.shadowRoot) out.push(...deepAll(selector, el.shadowRoot));
-    return out;
-  }
-  const answers = new WeakMap(); // field element -> resolved answer
-  const asked = new WeakSet(); // fields sent to Jev, answered or not
-  const cycle = new WeakMap(); // field element -> index into alternatives
-  let known = []; // [{element, result}] for the autofill button
-  let scanning = false;
-  let lastSignature = "";
-
   /* ---------------------------------------------------------------- labels */
 
   function questionText(field) {
@@ -94,15 +79,6 @@
   function labelledBy(field) {
     const ids = (field.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
     return ids.map((id) => document.getElementById(id)?.textContent || "").join(" ").trim();
-  }
-
-  // A label's text without what it hides from screen readers: Vercel's
-  // "LinkedIn" label also holds the box's decorative "linkedin.com/in/".
-  function shownText(node) {
-    if (!node.querySelector('[aria-hidden="true"]')) return node.textContent;
-    const copy = node.cloneNode(true);
-    copy.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
-    return copy.textContent;
   }
 
   // A <label> wrapped around a field wraps its whole widget, and a widget can
@@ -214,47 +190,6 @@
   const pageChrome = (element) => element.closest(PAGE_CHROME) !== null ||
     SEARCH_ACTION.test(element.closest("form")?.getAttribute("action") || "");
 
-  function clean(text) {
-    if (!text) return "";
-    return text
-      // Zero-width spaces: Vercel starts every radio option with one.
-      .replace(/[\u200b-\u200d\ufeff]/g, "")
-      .replace(/\s+/g, " ")
-      // Screen-reader text inside a label: Workday's "current value is MM/YYYY".
-      .replace(/\s*current value is\b.*$/i, "")
-      // "*", and Lever's heavy asterisk "✱"
-      .replace(/\s*(?:[*\u2731\u2217]+|\(required\)|\(optional\)|required|optional)\s*$/i, "")
-      .replace(/[:*]\s*$/, "")
-      // Workable stars a required field *before* the question, in a <strong>
-      // of its own: "*Phone", "*Are you currently able to work in the U.S.…".
-      .replace(/^\s*[*\u2731\u2217]+\s*/, "")
-      .trim()
-      .slice(0, 200);
-  }
-
-  function isCombobox(field) {
-    return field.matches(COMBO_SELECTOR);
-  }
-
-  function visible(field) {
-    // A read-only combobox is a select-only dropdown (ByteDance's Degree):
-    // it opens on click and takes a value from its menu.
-    if (field.disabled || (field.readOnly && !isCombobox(field))) return false;
-    // The hidden twin inside a React Select is not a field of its own; it
-    // otherwise gets picked up and labelled from the "Select..." placeholder.
-    if (field.closest(SELECT_SHELL) && !isCombobox(field)) return false;
-    // A box the page hides from screen readers is the widget's, not the
-    // applicant's: Workable parks city / postcode / country in 1px boxes
-    // beside the address autocomplete and writes them itself from the place
-    // you pick, so asking about them only spent a Jev call on "country".
-    // ...but a hidden native <select> IS the field behind a custom picker:
-    // select2 (Lever's 2,965-school list) marks its own select that way and
-    // takes the value there. Only a hidden text box is the page's own.
-    if (field.getAttribute("aria-hidden") === "true" && field.tagName !== "SELECT") return false;
-    const rect = field.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  }
-
   // What a question may carry with it. Past this a dropdown is a directory,
   // not a set of answers: Lever's school picker holds 2,965 universities,
   // alphabetical by country, and the sixty that used to be sent were
@@ -272,11 +207,6 @@
       .map((o) => o.textContent.trim())
       .filter((t) => t && !/^(?:select|choose|please select|--)/i.test(t)))];
     return texts.length > MAX_SENT_OPTIONS ? null : texts;
-  }
-
-  function nodeVisible(node) {
-    const rect = node.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
   }
 
   /**
@@ -439,7 +369,7 @@
       if (titled) {
         const n = [...titled.root.querySelectorAll(CARD)].indexOf(card) + 1;
         const kind = ENTRY_SECTIONS.find((k) => k.test.test(titled.name));
-        const entry = kind?.entries(profileCache, splitsInternships())[n - 1];
+        const entry = kind?.entries(state.profileCache, splitsInternships())[n - 1];
         const subject = entry && kind.summary ? String(entry[kind.summary] || "").trim() : "";
         return `${titled.name} ${n}${subject ? ` (${subject})` : ""}: `;
       }
@@ -834,13 +764,10 @@
   }
 
   function forget() {
-    known = [];
-    lastSignature = "";
+    state.known = [];
+    state.lastSignature = "";
     ourPill()?.remove();
   }
-
-  let filling = false;
-  let lastSummary = "";
 
   const detached = (entry) =>
     !entry.element.isConnected || (entry.buttons || []).some((b) => !b.isConnected);
@@ -853,45 +780,45 @@
    * so rebinding needs no new Jev call.
    */
   function rebind() {
-    if (!known.some(detached)) return false;
-    const byLabel = new Map(known.map((k) => [k.label, k.result]));
-    known = collectFields()
+    if (!state.known.some(detached)) return false;
+    const byLabel = new Map(state.known.map((k) => [k.label, k.result]));
+    state.known = collectFields()
       .filter((f) => byLabel.has(f.label))
       .map((f) => ({ ...f, result: byLabel.get(f.label) }));
-    for (const k of known) answers.set(k.element, k.result);
+    for (const k of state.known) answers.set(k.element, k.result);
     return true;
   }
 
   async function scan() {
     // A fill opens menus and types into search boxes; scanning that churn
     // would re-ask Jev about a half-open page.
-    if (scanning || filling) return;
+    if (state.scanning || state.filling) return;
     const fields = collectFields();
     // Workday's My Experience starts as empty sections with Add buttons: few
     // or no fields, but a whole resume's worth of entries to add.
     const entries = fields.length < MIN_FIELDS || !looksLikeApplication(fields) ? await entriesToAdd() : 0;
     if ((fields.length < MIN_FIELDS || !looksLikeApplication(fields)) && !entries) {
-      if (known.length) forget();
+      if (state.known.length) forget();
       return;
     }
     const signature = fields.map((f) => f.label).join("|") + (entries ? `|+${entries}` : "");
-    if (signature === lastSignature) {
+    if (signature === state.lastSignature) {
       // Same questions, maybe new elements: keep hold of the live ones.
       if (rebind()) fields.forEach((f) => asked.add(f.element));
       return;
     }
 
-    scanning = true;
-    lastSignature = signature;
+    state.scanning = true;
+    state.lastSignature = signature;
     try {
       const answered = fields.length ? await answer(fields) : [];
       if (!answered) return;
-      known = answered;
-      showButton(known.length);
+      state.known = answered;
+      showButton(state.known.length);
     } catch (error) {
       // An extension reload orphans this script; staying quiet is correct.
     } finally {
-      scanning = false;
+      state.scanning = false;
     }
   }
 
@@ -1113,15 +1040,6 @@
     return true;
   }
 
-  /* ------------------------------------------------------------- comboboxes */
-
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const fire = (node, type) =>
-    node.dispatchEvent(
-      new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
-    );
-  const normalize = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
-
   function nativeSet(field, value) {
     const prototype =
       field instanceof HTMLTextAreaElement
@@ -1175,7 +1093,6 @@
     return { nodes: leaves.map(([n]) => n), texts: leaves.map(([, t]) => t) };
   }
 
-  const staleMenus = new WeakMap(); // field -> menus already open when it opened
   const udLists = () => [...new Set([...document.querySelectorAll(UD_OPTION)].filter(nodeVisible)
     .map((n) => n.closest(".ud__select__list") || n.parentElement))];
 
@@ -1419,25 +1336,6 @@
     return Boolean(currentValue(field));
   }
 
-  /* ------------------------------------------------------- workday widgets */
-
-  const frames = (n) => new Promise((resolve) => {
-    const step = () => (--n > 0 ? requestAnimationFrame(step) : resolve());
-    requestAnimationFrame(step);
-  });
-
-  const optionText = (node) =>
-    (node.getAttribute("data-automation-label") || node.textContent).trim();
-
-  function press(field, key, keyCode) {
-    for (const type of ["keydown", "keypress", "keyup"]) {
-      const event = new KeyboardEvent(type, { key, bubbles: true, cancelable: true });
-      Object.defineProperty(event, "keyCode", { get: () => keyCode });
-      Object.defineProperty(event, "which", { get: () => keyCode });
-      field.dispatchEvent(event);
-    }
-  }
-
   /**
    * Options showing in whatever menu just opened for `anchor`. The menu is
    * portalled to the end of <body>, so it is found by position, not nesting:
@@ -1484,13 +1382,6 @@
       await sleep(40);
     }
     return [];
-  }
-
-  function scroller(node) {
-    for (let el = node.parentElement; el && el !== document.body; el = el.parentElement) {
-      if (el.scrollHeight > el.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(el).overflowY)) return el;
-    }
-    return null;
   }
 
   /**
@@ -1624,18 +1515,6 @@
     const reply = await chrome.runtime.sendMessage({ type: "choose-option", label, want, options: unique });
     if (!reply || !reply.ok || reply.index < 0) return -1;
     return texts.indexOf(unique[reply.index]);
-  }
-
-  /** A whole click, pointer events included: Workday's pickers act on pointerdown. */
-  function click(node) {
-    const pointer = (type) => node.dispatchEvent(new PointerEvent(type, {
-      bubbles: true, cancelable: true, view: window, pointerType: "mouse", isPrimary: true, button: 0,
-    }));
-    pointer("pointerdown");
-    fire(node, "mousedown");
-    pointer("pointerup");
-    fire(node, "mouseup");
-    fire(node, "click");
   }
 
   const ACTIVE_POPUP =
@@ -2191,7 +2070,6 @@
     { test: /website/i, stems: ["websitePanelSet", "webAddress"],
       entries: (p) => LINK_KEYS.filter((k) => String(p[k] || "").trim()) },
   ];
-  let profileCache = {};
   const splitsInternships = () => [...document.querySelectorAll(SECTION_TITLE)].some((t) => /intern/i.test(t.textContent));
 
   // A repeated entry drawn as a card (ByteDance), under a section title
@@ -2249,7 +2127,7 @@
     if (!found.length) return [];
     let profile = {};
     try { ({ profile = {} } = await chrome.storage.local.get("profile")); } catch { return []; }
-    profileCache = profile;
+    state.profileCache = profile;
     const split = splitsInternships();
     const plan = [];
     const taken = new Set();
@@ -2290,10 +2168,10 @@
   async function fillPage() {
     // The fill command reaches every frame; one with no form (a reCAPTCHA or
     // proxy iframe) has nothing to do and nothing to report.
-    if (!known.length && !document.querySelector(FILE_SELECTOR) &&
+    if (!state.known.length && !document.querySelector(FILE_SELECTOR) &&
         !document.querySelector('[role="group"][aria-labelledby$="-section"]')) return;
-    if (filling) return;
-    filling = true;
+    if (state.filling) return;
+    state.filling = true;
     try {
       const started = performance.now();
       // New entries first: their fields need answers before anything fills.
@@ -2302,23 +2180,23 @@
         const fields = collectFields();
         const answered = await answer(fields);
         if (answered) {
-          known = answered;
-          lastSignature = fields.map((f) => f.label).join("|");
+          state.known = answered;
+          state.lastSignature = fields.map((f) => f.label).join("|");
         }
       }
       const attached = await attachDocuments();
       await fillFields(started, attached);
       const acknowledged = await acknowledge();
       if (acknowledged) {
-        lastSummary += `, ${acknowledged} acknowledged`;
-        note(lastSummary);
+        state.lastSummary += `, ${acknowledged} acknowledged`;
+        note(state.lastSummary);
       }
       // Newly revealed questions first -- they are the user's to see now --
       // then keep watch for a resume re-parse, over those fields too.
       await fillRevealed();
       if (attached) await refillIfReparsed();
     } finally {
-      filling = false;
+      state.filling = false;
       setTimeout(scan, 300);
     }
   }
@@ -2330,17 +2208,17 @@
    * answer and fill whatever is new, a few rounds deep.
    */
   async function fillRevealed() {
-    const seen = new Set(lastSignature.split("|"));
+    const seen = new Set(state.lastSignature.split("|"));
     for (let round = 0; round < 3; round++) {
       await sleep(250); // let the page reveal what the last answers unlock
       const fields = collectFields();
       const fresh = fields.filter((f) => !seen.has(f.label));
-      lastSignature = fields.map((f) => f.label).join("|");
+      state.lastSignature = fields.map((f) => f.label).join("|");
       if (!fresh.length) return;
       fresh.forEach((f) => seen.add(f.label));
       const answered = await answer(fresh);
       if (!answered || !answered.length) continue;
-      known = known.concat(answered);
+      state.known = state.known.concat(answered);
       await fillFields(performance.now(), 0, "then new questions: ",
         new Set(answered.map((k) => k.label)));
     }
@@ -2356,7 +2234,7 @@
    * re-renders. Now: fill at once, then watch; refill only if it happened.
    */
   async function refillIfReparsed() {
-    const filledNow = known.filter((k) => k.result.status === "auto" && isFilled(k));
+    const filledNow = state.known.filter((k) => k.result.status === "auto" && isFilled(k));
     if (!filledNow.length) return;
     const deadline = Date.now() + REPARSE_WINDOW;
     while (Date.now() < deadline) {
@@ -2380,7 +2258,7 @@
   function dropEndDatesOfOngoing(todo) {
     // From every known box, not just those still to tick: a second pass
     // (after a resume upload rebuilds the form) finds the box already ticked.
-    const ongoing = known.filter((e) => e.single && ONGOING.test(e.label) &&
+    const ongoing = state.known.filter((e) => e.single && ONGOING.test(e.label) &&
       (e.element.checked || (e.result.status === "auto" && /^y/i.test(e.result.value))));
     for (const box of ongoing) {
       const ends = todo.filter((e) => END_DATE.test(e.label.split(": ").pop()));
@@ -2399,7 +2277,7 @@
     let filled = 0;
     let skipped = 0;
     const count = (ok) => (ok ? filled++ : skipped++);
-    const todo = known.filter((entry) => {
+    const todo = state.known.filter((entry) => {
       if (only && !only.has(entry.label)) return false;
       const due = entry.result.status === "auto" && !isFilled(entry);
       if (!due) skipped++;
@@ -2416,7 +2294,7 @@
     const live = (entry) => {
       if (!detached(entry)) return entry;
       rebind();
-      const fresh = known.find((k) => k.label === entry.label);
+      const fresh = state.known.find((k) => k.label === entry.label);
       if (fresh) Object.assign(entry, { element: fresh.element, buttons: fresh.buttons });
       return entry;
     };
@@ -2535,8 +2413,8 @@
     const why = slow.map((t) => `${t.field.slice(0, 28)} ${(t.ms / 1000).toFixed(1)}s${t.ok ? "" : " ✗"}`);
     const summary = parts.join(", ") + (why.length ? ` · slowest: ${why.join(", ")}` : "");
     // A follow-up round adds to the fill's summary rather than replacing it.
-    lastSummary = only && lastSummary ? `${lastSummary} · ${summary}` : summary;
-    note(lastSummary, false, why.length || only ? 12000 : 4000);
+    state.lastSummary = only && state.lastSummary ? `${state.lastSummary} · ${summary}` : summary;
+    note(state.lastSummary, false, why.length || only ? 12000 : 4000);
   }
 
   /**
@@ -2545,7 +2423,7 @@
    * for each dropdown that failed, what it wanted and every option offered.
    */
   function reportGaps(menus = []) {
-    const handled = [...known.map((k) => k.element), ...collectFields().map((f) => f.element)];
+    const handled = [...state.known.map((k) => k.element), ...collectFields().map((f) => f.element)];
     const gaps = [];
     for (const box of document.querySelectorAll('[data-automation-id^="formField"], .application-question, fieldset')) {
       if (!nodeVisible(box) || box.querySelector('[data-automation-id^="formField"], input[type="file"]')) continue;
@@ -2715,7 +2593,7 @@
     // iCIMS navigates its iframe at every step of an application.
     addEventListener("pagehide", () => ourPill()?.remove());
     try {
-      chrome.storage.local.get("profile").then(({ profile = {} } = {}) => { profileCache = profile; }, () => {});
+      chrome.storage.local.get("profile").then(({ profile = {} } = {}) => { state.profileCache = profile; }, () => {});
     } catch { /* not in the extension */ }
     // Touch nothing until the page's own app has taken over. On Greenhouse,
     // scanning at DOMContentLoaded put our marks and button into the page
