@@ -60,7 +60,7 @@ function titleLike(line: string): boolean {
   const words = line.split(/\s+/);
   return words.length <= 6 && words.every((w) => /^[A-Z0-9&(]/.test(w) || /^(?:of|and|the|in|at|for|&|-|–|—)$/.test(w));
 }
-// The PDF extractor joins wrapped lines by position (lib/extract.js); text
+// The PDF extractor joins wrapped lines by position (lib/extract.ts); text
 // alone is only trusted for a line that plainly starts mid-sentence. A "long
 // line running on" rule swallowed whole Word entry lines into the bullet
 // above them.
