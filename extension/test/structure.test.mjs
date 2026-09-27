@@ -9,8 +9,9 @@ import { join, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
-// Files still being split. Task 7 of the TS-split plan empties this.
-const EXEMPT = new Set(["content/index.ts"]);
+// Files allowed past MAX_LINES. Empty since the split finished; a file added
+// here needs a reason written beside it.
+const EXEMPT = new Set();
 const MAX_LINES = 400;
 
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
