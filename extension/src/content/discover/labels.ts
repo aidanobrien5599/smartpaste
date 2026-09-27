@@ -160,7 +160,7 @@ export function ownerLabel(field: Element): string {
 // questions asked as "First Name". A label holding or naming some other
 // control is that control's; the text block just before the options is ours.
 export function questionFor(inputs: Element[]): string {
-  const own = (node: Element) => inputs.some((i) => node.contains(i) || (Boolean((i as HTMLInputElement).id) && (node as HTMLLabelElement).htmlFor === (i as HTMLInputElement).id));
+  const own = (node: Element) => inputs.some((i) => node.contains(i) || ((i as HTMLInputElement).id && (node as HTMLLabelElement).htmlFor === (i as HTMLInputElement).id));
   // A label for= the group's own container is the group's question:
   // Eightfold's <label for="…_94552_1"> names the div[role=radiogroup].
   // One whose for= names nothing on the page is no other control's either:
@@ -172,7 +172,7 @@ export function questionFor(inputs: Element[]): string {
     if ([...node.querySelectorAll(ANY_CONTROL)].some((c) => !inputs.includes(c))) return true;
     if (!node.htmlFor || inputs.some((i) => (i as HTMLInputElement).id === node.htmlFor)) return false;
     const target = document.getElementById(node.htmlFor);
-    return target !== null && !target.contains(inputs[0]);
+    return Boolean(target) && !(target as Element).contains(inputs[0]);
   };
   let node = inputs[0].parentElement;
   for (let depth = 0; node && depth < 6; depth++, node = node.parentElement) {
@@ -212,7 +212,7 @@ function questionAbove(widget: Element): string {
 /** A listbox button's question. Its aria-label also holds its current value. */
 export function listboxLabel(button: Element): string {
   const byFor =
-    (button as HTMLElement).id ? document.querySelector(`label[for="${CSS.escape((button as HTMLElement).id)}"]`) : null;
+    ((button as HTMLElement).id && document.querySelector(`label[for="${CSS.escape((button as HTMLElement).id)}"]`)) as Element | null;
   const entry = button.closest(FIELD_ENTRY);
   const inEntry = entry && entry.querySelectorAll("label, legend").length === 1
     ? entry.querySelector("label, legend") : null;

@@ -36,7 +36,7 @@ import type { Field } from "../../../shared/types.ts";
 // ByteDance labels its phone box just "Mobile", and Jev took that for the
 // phone *type* in my profile and typed "Mobile" into it. On a box you type
 // into, a bare Mobile / Cell is the number.
-const bareMobile = (element: Element, label: string): string =>
+const bareMobile: (element: Element, label: string) => string = (element, label) =>
   element.tagName === "INPUT" && /^(?:mobile|cell)$/i.test(label) ? `${label} phone number` : label;
 
 // An electronic signature is my full legal name, typed: my choice, made
@@ -44,7 +44,7 @@ const bareMobile = (element: Element, label: string): string =>
 // Life's bare "Applicant Electronic Signature" as nothing in my profile and
 // left it blank, so the question says what a signature is.
 const SIGNATURE = /\b(?:e-?signature|electronic signature|signature|sign your name|type your (?:full )?name to sign)\b/i;
-const signatureLabel = (element: Element, label: string): string =>
+const signatureLabel: (element: Element, label: string) => string = (element, label) =>
   element.tagName === "INPUT" && SIGNATURE.test(label) ? `${label} (type your full legal name)` : label;
 
 // "If yes, please provide the name of the relative" explains a Yes. The

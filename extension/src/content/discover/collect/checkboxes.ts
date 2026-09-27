@@ -33,6 +33,12 @@ type CheckboxGroup = HTMLInputElement[] & { name: string; field: Element | null 
 const CHOICE_FIELD = '[data-automation-id^="formField"], .input-row--radiogroup, ' + QUESTION_BOX;
 
 /**
+ * Which checkboxes form one question: same name AND same form field.
+ * Workday names every job's "I currently work here" box currentlyWorkHere,
+ * so by name alone two jobs' boxes looked like one check-all-that-apply
+ * question with no text, and neither was ever answered.
+ */
+/**
  * Checkboxes in one form field are one question, whatever their names:
  * Workday's Self Identify asks "Please check one of the boxes below" over
  * three boxes with names of their own. Outside any field, a name groups
@@ -41,19 +47,23 @@ const CHOICE_FIELD = '[data-automation-id^="formField"], .input-row--radiogroup,
 export function groupCheckboxes(): CheckboxGroup[] {
   const groups: CheckboxGroup[] = [];
   for (const box of document.querySelectorAll('input[type="checkbox"]')) {
-    const b = box as HTMLInputElement;
-    if (b.disabled) continue;
-    const field = b.closest(CHOICE_FIELD);
-    const name = b.name || b.id;
+    if ((box as HTMLInputElement).disabled) continue;
+    const field = box.closest(CHOICE_FIELD);
+    const name = (box as HTMLInputElement).name || box.id;
     const group = field
       ? groups.find((g) => g.field === field)
       : name && groups.find((g) => !g.field && g.name === name);
-    if (group) group.push(b);
-    else groups.push(Object.assign([b], { name, field }));
+    if (group) group.push(box as HTMLInputElement);
+    else groups.push(Object.assign([box as HTMLInputElement], { name, field }));
   }
   return groups;
 }
 
+/**
+ * "Check all that apply": native checkboxes sharing a name, under one
+ * question (Lever's language and office questions). Several may be right,
+ * so the answer is a list of options, not one.
+ */
 export function collectCheckboxGroups(): Field[] {
   const groups = new Map(groupCheckboxes().filter((g) => g.length > 1).map((g, i): [number, CheckboxGroup] => [i, g]));
   const fields: Field[] = [];

@@ -101,10 +101,9 @@ export function toggleAnswered(field: Field): boolean {
 export function collectRadioGroups(): Field[] {
   const groups = new Map<string, HTMLInputElement[]>();
   for (const radio of document.querySelectorAll('input[type="radio"]')) {
-    const r = radio as HTMLInputElement;
-    if (!r.name || r.disabled) continue;
-    if (!groups.has(r.name)) groups.set(r.name, []);
-    groups.get(r.name)!.push(r);
+    if (!(radio as HTMLInputElement).name || (radio as HTMLInputElement).disabled) continue;
+    if (!groups.has((radio as HTMLInputElement).name)) groups.set((radio as HTMLInputElement).name, []);
+    groups.get((radio as HTMLInputElement).name)!.push(radio as HTMLInputElement);
   }
   const fields: Field[] = [];
   for (const radios of groups.values()) {

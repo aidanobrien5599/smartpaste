@@ -131,7 +131,7 @@ const ENTRY_NAMES: Record<string, string> = { workExperience: "Work Experience",
 const LINK_KEYS = ["linkedin", "github", "portfolio", "other_link"];
 // ByteDance splits roles into Work and Internship sections: a role whose
 // title says intern goes under Internship, and then only there.
-const isIntern = (role: ProfileEntry) => /\bintern(?:ship)?\b/i.test(role.title || "");
+const isIntern: (role: ProfileEntry) => boolean = (role) => /\bintern(?:ship)?\b/i.test(role.title || "");
 // Most specific first: "Internship Experience" and "Project Experience"
 // would otherwise count as work experience.
 export const ENTRY_SECTIONS: {
@@ -150,7 +150,7 @@ export const ENTRY_SECTIONS: {
   { test: /website/i, stems: ["websitePanelSet", "webAddress"],
     entries: (p) => LINK_KEYS.filter((k) => String(p[k] || "").trim()) },
 ];
-export const splitsInternships = (): boolean => [...document.querySelectorAll(SECTION_TITLE)].some((t) => /intern/i.test(t.textContent || ""));
+export const splitsInternships: () => boolean = () => [...document.querySelectorAll(SECTION_TITLE)].some((t) => /intern/i.test(t.textContent!));
 
 // A repeated entry drawn as a card (ByteDance), under a section title
 // rather than a labelled group.

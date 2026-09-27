@@ -26,17 +26,16 @@ const DATE_WRAPPER = '[data-automation-id="dateInputWrapper"]';
 // number box whose placeholder says Year (C3's Greenhouse-API form).
 const YEAR_BOX = 'input[placeholder="Year" i]';
 export function monthYearWrapper(select: Element): Element | null {
-  const sel = select as HTMLSelectElement;
-  if (sel.tagName !== "SELECT" || !/^month/i.test(sel.options[0]?.textContent!.trim() || "")) return null;
-  const isMonth = (s: HTMLSelectElement) => /^month/i.test(s.options[0]?.textContent!.trim() || "");
-  const hasYear = (node: Element) => node.querySelector(YEAR_BOX) ||
+  if (select.tagName !== "SELECT" || !/^month/i.test((select as HTMLSelectElement).options[0]?.textContent!.trim() || "")) return null;
+  const isMonth: (s: HTMLSelectElement) => boolean = (s) => /^month/i.test(s.options[0]?.textContent!.trim() || "");
+  const hasYear: (node: Element) => Element | boolean = (node) => node.querySelector(YEAR_BOX) ||
     [...node.querySelectorAll("select")].some((s) => /^year/i.test(s.options[0]?.textContent!.trim() || ""));
   // One date only: the nearest id'd wrapper (Ashby, whose label points at
   // it) unless that holds a second date too -- C3's is the whole page.
   const onlyDate = (node: Element | null | undefined) => node && [...node.querySelectorAll("select")].filter(isMonth).length === 1 && hasYear(node);
-  const byId = sel.parentElement?.closest("[id]");
+  const byId = (select as HTMLSelectElement).parentElement?.closest("[id]");
   if (onlyDate(byId)) return byId!;
-  let node = sel.parentElement;
+  let node = (select as HTMLSelectElement).parentElement;
   for (let depth = 0; node && depth < 3; depth++, node = node.parentElement) {
     if (onlyDate(node)) return node;
     if ([...node.querySelectorAll("select")].filter(isMonth).length > 1) break;

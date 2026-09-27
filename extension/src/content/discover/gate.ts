@@ -34,7 +34,7 @@ export const PAGE_CHROME = '[role="search"], ' +
 // "/hyannisportresearch/jobs/…", and a substring match made its whole
 // application page chrome: no fields, no button.
 const SEARCH_ACTION = /(?:^|[/?&=._-])search(?:$|[/?&=.#_-])/i;
-export const pageChrome = (element: Element): boolean => element.closest(PAGE_CHROME) !== null ||
+export const pageChrome: (element: Element) => boolean = (element) => element.closest(PAGE_CHROME) !== null ||
   SEARCH_ACTION.test(element.closest("form")?.getAttribute("action") || "");
 
 // The script runs on every site, like any autofill tool -- but it only talks
@@ -45,7 +45,7 @@ const APPLICATION_TERMS: [string, RegExp][] = [
   ["name", /\b(?:first|last|full|legal|preferred|given|family)\s*name\b|^name$/i],
   ["email", /\be-?mail\b/i],
   ["phone", /\b(?:phone|mobile|telephone|cell)\b/i],
-  ["resume", /\b(?:resume|résumé|cv|curriculum vitae|cover letter)\b/i],
+  ["resume", /\b(?:resume|r\u00e9sum\u00e9|cv|curriculum vitae|cover letter)\b/i],
   ["links", /\b(?:linkedin|github|portfolio|personal website)\b/i],
   ["authorization", /\b(?:authori[sz]ed to work|work authori[sz]ation|sponsorship|visa|right to work|legally (?:eligible|authori[sz]ed))\b/i],
   ["eeo", /\b(?:veteran|disability|gender|race|ethnicity|hispanic|latino|pronouns)\b/i],

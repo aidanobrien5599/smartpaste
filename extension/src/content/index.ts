@@ -30,7 +30,6 @@ import { groupCheckboxes } from "./discover/collect/checkboxes.ts";
 import { collectFields } from "./discover/collect/fields.ts";
 
 (() => {
-  const DATE_WRAPPER = '[data-automation-id="dateInputWrapper"]';
   const OPTION = '[role="option"], [data-automation-id*="promptOption"]';
   // A Workday result row: a radio circle plus a promptOption label. The row
   // takes the click; the label inside it does not.
