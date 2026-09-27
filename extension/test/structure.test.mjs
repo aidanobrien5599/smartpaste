@@ -82,3 +82,9 @@ test(`no source file over ${MAX_LINES} lines`, () => {
     .filter(([, n]) => n > MAX_LINES);
   assert.deepEqual(long, []);
 });
+
+test("src/README.md maps every content module", () => {
+  const map = readFileSync(join(SRC, "README.md"), "utf8");
+  const missing = content.map(rel).map((r) => r.replace(/^content\//, "")).filter((r) => !map.includes(r));
+  assert.deepEqual(missing, []);
+});

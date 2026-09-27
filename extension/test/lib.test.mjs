@@ -1,4 +1,4 @@
-// Unit tests for extension/lib. Run: node --test extension/test/
+// Unit tests for extension/src/lib. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
