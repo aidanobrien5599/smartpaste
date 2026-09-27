@@ -128,6 +128,19 @@ test("localMatch: exact, or the one option that starts with the answer", { skip 
     assert.deepEqual(degrees, ["B.S.", "B.S.", "B.A.", "M.S.", "Bachelor's Degree", -1]);
   }));
 
+test("collectFields reads Greenhouse's fields with the same labels after the split", { skip }, () =>
+  withPage("form.html", async (page) => {
+    const labels = await page.eval(() => window.__smartpasteTest.collectFields().map((f) => f.label));
+    assert.deepEqual(labels, [
+      "First Name", "Last Name", "Email", "Phone", "LinkedIn Profile", "Personal website",
+      "Expected graduation date", "Current GPA",
+      "Will you now or in the future require sponsorship for employment visa status?",
+      "Why do you want to work here?", "Are you legally authorized to work in the United States?",
+      "Will you now or in the future require sponsorship for employment visa status?",
+      "Veteran status", "Are you Hispanic/Latino?", "Date", "Available start date", "City",
+    ]);
+  }));
+
 /* ------------------------------------------------------ application gate */
 
 // workday-questions.html: a step of only questions (age, salary,

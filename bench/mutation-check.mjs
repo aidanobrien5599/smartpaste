@@ -28,17 +28,17 @@ const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
-  ["ownership label", "return ownerLabel(field) || clean(field.placeholder)", "return clean(field.placeholder)"],
+  ["ownership label", "return ownerLabel(field) || clean((field as HTMLInputElement).placeholder)", "return clean((field as HTMLInputElement).placeholder)"],
   ["consent: the question around a lone box", "|| CONSENT.test(ownerLabel(box))) continue;", ") continue;"],
   ["consent: a bare 'I Accept'", "agree|accept|consent", "agree|consent"],
   ["page chrome (site search, cookie banner)",
-    "const pageChrome = (element) => element.closest(PAGE_CHROME) !== null ||\n    SEARCH_ACTION.test(element.closest(\"form\")?.getAttribute(\"action\") || \"\");",
-    "const pageChrome = () => false;"],
+    "export const pageChrome = (element: Element): boolean => element.closest(PAGE_CHROME) !== null ||\n  SEARCH_ACTION.test(element.closest(\"form\")?.getAttribute(\"action\") || \"\");",
+    "export const pageChrome = (element: Element): boolean => false;"],
   ["'search' inside a word is not a search form", "const SEARCH_ACTION = /(?:^|[/?&=._-])search(?:$|[/?&=.#_-])/i;", "const SEARCH_ACTION = /search/i;"],
   ["a 'No options' tick before a search is not its answer",
     "if (settled !== null && Date.now() - settled >= NOTICE_HOLDS) return [];", "if (settled !== null) return [];"],
-  ["month dropdown + Year box", "const hasYear = (node) => node.querySelector(YEAR_BOX) ||", "const hasYear = (node) =>"],
-  ["smallest date wrapper", "if (onlyDate(byId)) return byId;", "if (byId && hasYear(byId)) return byId;"],
+  ["month dropdown + Year box", "const hasYear = (node: Element) => node.querySelector(YEAR_BOX) ||", "const hasYear = (node: Element) =>"],
+  ["smallest date wrapper", "if (onlyDate(byId)) return byId!;", "if (byId && hasYear(byId)) return byId!;"],
   ["read-only combobox is a dropdown", "(el.readOnly && !isCombobox(field))", "el.readOnly"],
   ["ByteDance menu is the whole list", '.map((n) => n.closest(".ud__select__list") || n.parentElement))];', ".map((n) => n.parentElement))];"],
   // Three defences, any one enough on its own: undo all of them.
@@ -52,14 +52,14 @@ const MUTATIONS = [
   ["bare 'Mobile' is the number", "? `${label} phone number` : label;", "? label : label;"],
   ["resume dropzone text", "input.closest(\"[class*='upload' i]\")?.textContent?.slice(0, 140) || \"\"]", "\"\"]"],
   ["bare Add found by section title", "if (section && !found.some((f) => f.root === section.root)) found.push({ ...section, prefix: \"\", button });", ""],
-  ["roles split intern / work", "(p.experience || []).filter((role) => !split || !isIntern(role))", "(p.experience || [])"],
+  ["roles split intern / work", "((p.experience as ProfileEntry[] | undefined) || []).filter((role) => !split || !isIntern(role))", "((p.experience as ProfileEntry[] | undefined) || [])"],
   ["card label names its entry", 'return `${titled.name} ${n}${subject ? ` (${subject})` : ""}: `;', "return `${titled.name} ${n}: `;"],
   ["a section-wide fieldset is not a write-in", "return [...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length <= 1;", "return true;"],
   ["a section's legend is no field's label", "if ([...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length > 1) return null;", ""],
-  ["aria-labelledby outranks the legend", "      labelledBy(field),\n      questionText(field),", "      questionText(field),\n      labelledBy(field),"],
+  ["aria-labelledby outranks the legend", "    labelledBy(field),\n    questionText(field),", "    questionText(field),\n    labelledBy(field),"],
   // Rewritten by e49ddca (an Ashby title's for= names nothing on the page):
   // the mutant is now the line that decides whether that target counts.
-  ["label for= a group's container", "return Boolean(target) && !target.contains(inputs[0]);", "return true;"],
+  ["label for= a group's container", "return target !== null && !target.contains(inputs[0]);", "return true;"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],
@@ -67,7 +67,7 @@ const MUTATIONS = [
   ["a failed pick clears its search text", "      if (searched) nativeSet(field, \"\");\n", ""],
   ["a wrapping label is not its widget's text", "candidate : labelOnly(candidate, field));", "candidate : shownText(candidate));"],
   ["a required star before the question", "    .replace(/^\\s*[*\\u2731\\u2217]+\\s*/, \"\")\n", ""],
-  ["Workable's Education / Experience group names its boxes", "      if (named) return `${named}: `;\n", ""],
+  ["Workable's Education / Experience group names its boxes", "    if (named) return `${named}: `;\n", ""],
   // b9441a5 added the <select> exemption, so the line moved: a hidden native
   // select is the field behind a custom picker (Lever's select2 school list).
   ["a box hidden from screen readers is the widget's",
@@ -75,21 +75,21 @@ const MUTATIONS = [
   ["a hidden <select> is still the field behind a picker",
     "&& field.tagName !== \"SELECT\") return false;", ") return false;"],
   ["a div is a dropdown too (Rippling)",
-    "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"], ' +\n    '[role=\"combobox\"][aria-haspopup=\"listbox\"]:not(input):not(select):not(textarea)';",
-    "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"]';"],
+    "export const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"], ' +\n  '[role=\"combobox\"][aria-haspopup=\"listbox\"]:not(input):not(select):not(textarea)';",
+    "export const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"]';"],
   // Rippling's EEO dropdowns are named twice over -- by aria-labelledby and
   // by the block above them -- so either path alone still labels them: undo
   // both. Its sponsorship question has only the block above.
   ["a dropdown's own name, then the question above it",
-    "    const text = clean(byFor?.textContent || \"\") || clean(labelledBy(button)) || clean(inEntry?.textContent || \"\");\n" +
-    "    if (text) return text;\n    const own = clean(\n" +
-    "      (button.getAttribute(\"aria-label\") || \"\")\n        .replace(button.textContent.trim(), \"\")\n" +
-    "        .replace(/\\b(?:select one|required)\\b/gi, \"\")\n    );\n" +
-    "    return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);",
-    "    const text = clean((byFor || inEntry)?.textContent || \"\");\n" +
-    "    if (text) return text;\n    return clean(\n" +
-    "      (button.getAttribute(\"aria-label\") || \"\")\n        .replace(button.textContent.trim(), \"\")\n" +
-    "        .replace(/\\b(?:select one|required)\\b/gi, \"\")\n    );"],
+    "  const text = clean(byFor?.textContent || \"\") || clean(labelledBy(button)) || clean(inEntry?.textContent || \"\");\n" +
+    "  if (text) return text;\n  const own = clean(\n" +
+    "    (button.getAttribute(\"aria-label\") || \"\")\n      .replace(button.textContent!.trim(), \"\")\n" +
+    "      .replace(/\\b(?:select one|required)\\b/gi, \"\")\n  );\n" +
+    "  return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);",
+    "  const text = clean((byFor || inEntry)?.textContent || \"\");\n" +
+    "  if (text) return text;\n  return clean(\n" +
+    "    (button.getAttribute(\"aria-label\") || \"\")\n      .replace(button.textContent!.trim(), \"\")\n" +
+    "      .replace(/\\b(?:select one|required)\\b/gi, \"\")\n  );"],
   ["the question above a dropdown that names nothing",
     "return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);", "return own;"],
   ["'Select...' is an empty dropdown",

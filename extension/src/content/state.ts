@@ -5,12 +5,11 @@
  * scan and the next lives here. The reassigned values sit on `state`
  * because an ES module cannot reassign another module's `let`.
  *
- * Depends on: lib/schema.ts, for the `Profile` type of `state.profileCache`.
+ * Depends on: lib/schema.ts, for the `Profile` type of `state.profileCache`;
+ * shared/types.ts, for `KnownField` and `Result`.
  */
 import type { Profile } from "../lib/schema.ts";
-
-type KnownField = any; // replaced by shared/types in Task 4
-type Result = any; // replaced by shared/types in Task 4
+import type { KnownField, Result } from "../shared/types.ts";
 
 export const dateWrappers = new WeakSet<Element>();
 export const answers = new WeakMap<Element, Result>(); // field element -> resolved answer
