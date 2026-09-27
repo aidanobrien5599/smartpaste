@@ -40,11 +40,11 @@ const MUTATIONS = [
   ["month dropdown + Year box", "const hasYear: (node: Element) => Element | boolean = (node) => node.querySelector(YEAR_BOX) ||", "const hasYear: (node: Element) => Element | boolean = (node) =>"],
   ["smallest date wrapper", "if (onlyDate(byId)) return byId!;", "if (byId && hasYear(byId)) return byId!;"],
   ["read-only combobox is a dropdown", "(el.readOnly && !isCombobox(field))", "el.readOnly"],
-  ["ByteDance menu is the whole list", '.map((n) => n.closest(".ud__select__list") || n.parentElement))];', ".map((n) => n.parentElement))];"],
+  ["ByteDance menu is the whole list", '.map((n) => n.closest(".ud__select__list") || n.parentElement))] as Element[];', ".map((n) => n.parentElement))] as Element[];"],
   // Three defences, any one enough on its own: undo all of them.
   ["stale menus (close before, skip stale, close after)",
-    "      await closeUdMenus();\n      staleMenus.set(field, new Set(udLists()));\n      try { return await pickCombobox(field, want); } finally { await closeUdMenus(); }",
-    "      return pickCombobox(field, want);"],
+    "    await closeUdMenus();\n    staleMenus.set(field, new Set(udLists()));\n    try { return await pickCombobox(field, want); } finally { await closeUdMenus(); }",
+    "    return pickCombobox(field, want);"],
   ["a lone option counts only after a search", "texts.length === 1 && searched) index = 0;", "texts.length === 1) index = 0;"],
   ["tree: leaves named by path", "if (!tree.length) return", "if (true) return"],
   ["calendar picker takes YYYY-MM", "if (picker && parts?.month)", "if (false)"],
@@ -64,7 +64,7 @@ const MUTATIONS = [
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],
   ["long menus shortlisted by shared words", "if (index < 0) index = await chooseAmong(labelFor(field), want, texts);", "if (index < 0) index = await askChoice(labelFor(field), want, texts.slice(0, MAX_MENU));"],
-  ["a failed pick clears its search text", "      if (searched) nativeSet(field, \"\");\n", ""],
+  ["a failed pick clears its search text", "    if (searched) nativeSet(field, \"\");\n", ""],
   ["a wrapping label is not its widget's text", "candidate : labelOnly(candidate, field));", "candidate : shownText(candidate));"],
   ["a required star before the question", "    .replace(/^\\s*[*\\u2731\\u2217]+\\s*/, \"\")\n", ""],
   ["Workable's Education / Experience group names its boxes", "    if (named) return `${named}: `;\n", ""],
@@ -101,7 +101,7 @@ const MUTATIONS = [
   ["a card names its \"Select One\" question",
     "sectionPrefix(f.element) + cardQuestion(f.element, f.label)", "sectionPrefix(f.element) + f.label"],
   ["a location search that found nothing is run again",
-    "      items = await searchSuggestions(field, cityOf(value));", "      items = [];"],
+    "    items = await searchSuggestions(field, cityOf(value));", "    items = [];"],
 ];
 
 const SRC = join(root, "extension", "src");
