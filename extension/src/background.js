@@ -474,7 +474,7 @@ async function profileFromResume(text) {
 }
 
 /* ------------------------------------------------------------------------
- * Drafting by classification ("segments" engine). See lib/draft.js for why.
+ * Drafting by classification ("segments" engine). See lib/draft.ts for why.
  * ---------------------------------------------------------------------- */
 
 const choice = (instructions, criteria) => ({ type: "choice", instructions, criteria });

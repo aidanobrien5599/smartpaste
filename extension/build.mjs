@@ -25,7 +25,13 @@ const entries = (src) => [
   { in: join(src, "options.js"), out: "options", format: "esm" },
   { in: join(src, "popup.js"), out: "popup", format: "iife" },
 ];
-const common = { bundle: true, target: "chrome120", logLevel: "warning", legalComments: "none" };
+// Every bundle reads the repo's tsconfig by path, not by searching upward
+// from its source: the mutation check bundles a copy of src/ under /tmp,
+// where no tsconfig would be found and the mutant would build differently
+// (sloppy, not "use strict") from what ships. Strict is intended: the source
+// is ES modules, which are strict anyway.
+const TSCONFIG = join(here, "..", "tsconfig.json");
+const common = { bundle: true, target: "chrome120", logLevel: "warning", legalComments: "none", tsconfig: TSCONFIG };
 const options = (entry, dist, extra = {}) => ({
   ...common, entryPoints: [entry.in], outfile: join(dist, `${entry.out}.js`), format: entry.format, ...extra,
 });

@@ -2,7 +2,7 @@
 //
 //   node corpus/score.mjs [label]
 //
-// Runs the extension's real code -- lib/extract.js for the PDF, then
+// Runs the extension's real code -- lib/extract.ts for the PDF, then
 // background.js's profileFromResume against the live Jev API -- on every PDF
 // in corpus/pdf, and grades each field against corpus/truth. Formatting
 // differences are not errors: 05/2025 = May 2025, August = Aug, straight vs

@@ -12,5 +12,8 @@
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "@types/chrome": "^0.3.0"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

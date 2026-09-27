@@ -16,7 +16,8 @@
  * - Name, email and phone alone are a contact form, not an application
  *   (IDENTITY, in looksLikeApplication).
  *
- * Depends on: dom/query.ts, dom/controls.ts, discover/selectors.ts, discover/files.ts.
+ * Depends on: dom/query.ts, dom/controls.ts, discover/selectors.ts, discover/files.ts,
+ * shared/types.ts.
  */
 import { deepAll } from "../dom/query.ts";
 import { nodeVisible } from "../dom/controls.ts";

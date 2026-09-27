@@ -4,11 +4,12 @@
 // Chrome refuses to load, tests that run yesterday's bundle.
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
-import { build, bundleContent, DIST } from "../build.mjs";
+import { build, bundleContent, DIST, SRC } from "../build.mjs";
 import { contentSource } from "./browser.mjs";
 
 const EXT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -65,4 +66,18 @@ test("extension/ stays loadable unpacked: no node_modules, no names starting wit
 
 test("tests inject the current source, not whatever dist/ holds", { skip: process.env.SMARTPASTE_CONTENT && "mutant run" }, async () => {
   assert.equal(await contentSource(), await bundleContent());
+});
+
+// bench/mutation-check.mjs bundles a copy of src/ under /tmp. That copy must
+// build the same program as the real one, or a mutant is tested as a
+// different script (it once came out sloppy while the real one was strict).
+test("a copy of src/ elsewhere bundles to the same script", async () => {
+  const copy = join(mkdtempSync(join(tmpdir(), "smartpaste-build-")), "src");
+  try {
+    cpSync(SRC, copy, { recursive: true });
+    const paths = (code) => code.replace(/^\s*\/\/ .*\.ts$/gm, "");
+    assert.equal(paths(await bundleContent(copy)), paths(await bundleContent()));
+  } finally {
+    rmSync(dirname(copy), { recursive: true, force: true });
+  }
 });

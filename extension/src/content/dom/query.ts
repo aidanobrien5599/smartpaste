@@ -22,11 +22,10 @@ export function deepAll(selector: string, root: ParentNode = document): Element[
 /* ------------------------------------------------------------- comboboxes */
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-export const fire = (node: Element, type: string): void => {
+export const fire: (node: Element, type: string) => boolean = (node, type) =>
   node.dispatchEvent(
     new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
   );
-};
 
 /* ------------------------------------------------------- workday widgets */
 

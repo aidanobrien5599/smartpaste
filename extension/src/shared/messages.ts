@@ -1,10 +1,12 @@
 /**
- * Every message between the content script and the background worker.
+ * Every message the background worker answers: the content script's, and
+ * the settings page's "profile-from-resume".
  *
  * The background (background.js, still JavaScript) is the only thing that
- * talks to Jev; the content script asks it through these. A new message type
- * goes in MESSAGE_TYPES and the ContentMessage union, and test/messages.test.mjs
- * checks background.js handles exactly this list.
+ * talks to Jev; the content script asks it through these (ContentMessage).
+ * A new message type goes in MESSAGE_TYPES (and in ContentMessage if the
+ * content script sends it); test/messages.test.mjs checks background.js
+ * handles exactly this list.
  *
  * Depends on: shared/types.ts, for the Result each answered field comes back as.
  */

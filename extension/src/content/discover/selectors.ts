@@ -6,8 +6,8 @@
  *
  * ATS quirks (see each constant's own comment for the full story):
  * - Workday builds its forms from widgets rather than form controls
- *   (LISTBOX_BUTTON, PROMPT_INPUT, DATE_PART), unlike Rippling's plain
- *   role="combobox" divs.
+ *   (LISTBOX_BUTTON, PROMPT_INPUT, DATE_PART). LISTBOX_BUTTON also covers
+ *   Rippling, which draws the same dropdown as a <div role="combobox">.
  * - Rippling's empty-dropdown placeholder is "Select...", so the ellipsis
  *   is part of the emptiness (EMPTY_BUTTON), not of an answer.
  * - Lever wraps inputs in a <label> that also holds status text, and its
