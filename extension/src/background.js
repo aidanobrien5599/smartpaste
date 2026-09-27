@@ -5,6 +5,7 @@
  * cross-origin request from whatever company you are applying to -- and would
  * hand that page's context your API key. The key never leaves here.
  */
+/** @typedef {import("./shared/messages.ts").ContentMessage} ContentMessage -- the messages this worker answers. */
 
 import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.ts";
 import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.ts";
