@@ -60,8 +60,18 @@ const GUARD = `(() => {
   addEventListener("submit", (e) => { e.preventDefault(); e.stopImmediatePropagation(); block("a submit event"); }, true);
 })();`;
 
-// What the page shows, per visible control: its label, its value, whether
-// it is required. Radios and checkboxes are one line per group.
+// What the page shows, per visible control: the text THIS FILE can find for
+// it, its value, whether it is required. Radios and checkboxes are one line
+// per group.
+//
+// `pageLabel` is not the question the extension asks. The content script runs
+// in an isolated world, so its labelFor() is unreachable from here, and this
+// is a cruder rule (aria-labelledby, label[for], a wrapping label, aria-label,
+// placeholder, name). Where they differ the extension is usually right: a
+// brief written from this column sent an agent after three bugs that did not
+// exist -- Lever's "Type your response", Ashby's UUIDs and Lever's
+// "cards[...][field0]" are all read correctly by the extension. Use it to spot
+// which FIELD is blank, never to conclude what the extension asked about it.
 const READOUT = `(() => {
   const readDoc = (document) => {
   const clean = (t) => (t || "").replace(/[\\u200b]/g, "").replace(/\\s+/g, " ").trim();
@@ -91,20 +101,20 @@ const READOUT = `(() => {
       : el.type === "checkbox" || el.type === "radio" ? (el.checked ? "[ticked]" : "")
       : el.tagName === "SELECT" ? (el.value ? clean(el.selectedOptions[0]?.textContent) : "") : el.value;
     out.push({ kind: el.type === "file" ? "file" : el.tagName === "SELECT" ? "select" : el.getAttribute("role") === "combobox" ? "combobox" : el.type || el.tagName.toLowerCase(),
-      label: labelOf(el), value: clean(value).slice(0, 100), required: required(el),
+      pageLabel: labelOf(el), value: clean(value).slice(0, 100), required: required(el),
       marked: el.getAttribute("data-smartpaste") || null });
   }
   for (const g of groups.values()) {
     const box = g.el.closest("fieldset, [role=radiogroup], [role=group]");
     const q = clean(box?.querySelector("legend, label")?.textContent || box?.getAttribute("aria-label") || g.el.name).slice(0, 100);
-    out.push({ kind: g.kind + "-group", label: q, value: g.picked.join(" | ").slice(0, 100), required: g.el.required, options: g.n });
+    out.push({ kind: g.kind + "-group", pageLabel: q, value: g.picked.join(" | ").slice(0, 100), required: g.el.required, options: g.n });
   }
   // Toggle / pill buttons (Ashby, Oracle): a group is answered when one is pressed.
   for (const group of document.querySelectorAll('[role="radiogroup"]')) {
     const buttons = group.querySelectorAll('button[role="radio"], [role="radio"]:not(input)');
     if (!buttons.length) continue;
     const picked = [...buttons].filter((b) => b.getAttribute("aria-checked") === "true").map((b) => clean(b.textContent));
-    out.push({ kind: "pills", label: clean(group.getAttribute("aria-label") || ""), value: picked.join(" | "), required: false, options: buttons.length });
+    out.push({ kind: "pills", pageLabel: clean(group.getAttribute("aria-label") || ""), value: picked.join(" | "), required: false, options: buttons.length });
   }
   return out;
   };
@@ -113,6 +123,7 @@ const READOUT = `(() => {
   for (let i = 0; i < window.frames.length; i++) { try { if (window.frames[i].document) docs.push(window.frames[i].document); } catch {} }
   return docs.flatMap(readDoc);
 })()`;
+
 
 // Chrome derives an unpacked extension's id from its path (sha256, hex as
 // a-p), so a worktree's copy has a different id from the main checkout's --
@@ -247,7 +258,7 @@ async function runOne(url, n) {
 
 function score(r) {
   const c = r.controls || [];
-  const real = c.filter((x) => x.label && !/^(search|captcha|g-recaptcha)/i.test(x.label));
+  const real = c.filter((x) => x.pageLabel && !/^(search|captcha|g-recaptcha)/i.test(x.pageLabel));
   const filled = real.filter((x) => x.value).length;
   const requiredBlank = real.filter((x) => x.required && !x.value).length;
   return { nControls: real.length, filled, blank: real.length - filled, requiredBlank };
