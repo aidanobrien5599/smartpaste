@@ -108,10 +108,13 @@ on, and which ATS quirks live in it.
 | A menu opens but its options are misread or the click misses | `widgets/menus.ts` |
 | The order or timing of a fill | `fill/` |
 | A new message to the background | `shared/messages.ts` and `background.js` (the drift test checks both) |
+| A field is collected and driven right but answered wrong | how it is asked, in `background.js`; what the answer means, in `lib/resolve.ts` |
 
 A live bug is fixed when it has a test and a mutation entry. The test
-reproduces it in a fixture (`extension/test/fixtures/`). The entry in
-`bench/mutation-check.mjs` undoes the fix and checks that the test goes red.
+reproduces it in a fixture (`extension/test/fixtures/`), or, for a fix in
+`lib/` or `background.js`, against a fake Jev (`test/background.test.mjs`).
+The entry in `bench/mutation-check.mjs` undoes the fix and checks that the
+test goes red.
 
 ## Building and testing
 

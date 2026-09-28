@@ -44,11 +44,16 @@ profile to whatever id its own path gives, so a worktree run works as-is.
 each live-found fix has a test that sees it. Every entry names the fixed code
 and the code before the fix. For each entry the check:
 
-1. finds the one file under `extension/src/content/` that holds the fixed
-   code;
+1. finds the one file under `extension/src/` that holds the fixed code;
 2. undoes the fix in a temporary copy of `src/`;
 3. bundles that copy;
 4. runs the content tests against the bundle.
+
+An entry whose fourth element is `"lib"` guards a fix outside `content/` --
+in `lib/` or `background.js`, which decide *what* to fill in rather than
+*how*. Nothing to bundle there, so the check copies `extension/test/` beside
+the mutant `src/` (every `../src/...` import then lands in the mutant) and
+runs the suites that import `src/` directly, `content.test.mjs` aside.
 
 It reports each entry as one of:
 

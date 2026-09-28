@@ -14,7 +14,7 @@ import {
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.ts";
-import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.ts";
+import { AUTO, isYesNo, resolve, ticks, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.ts";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.ts";
 import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.ts";
 
@@ -136,6 +136,11 @@ async function askBatched(apiKey, state, questions) {
  * "Check all that apply": each box is its own yes/no question. One pick-one
  * question over all of them would split its probability across every right
  * answer (English and Spanish both), so none would clear the bar.
+ *
+ * The group is also asked the pick-one question, exactly as ASK_SELECT asks
+ * a dropdown, because the two asks fail in opposite places: see ticks() in
+ * lib/resolve.ts. That answer is only the fallback, for when no box clears
+ * the bar on its own.
  */
 const ASK_MULTI =
   "This application question lets the applicant tick several options. Going " +
@@ -157,30 +162,6 @@ const TICK = { yes: "Yes, tick it", no: "No, leave it unticked" };
  */
 const YES_NO = { yes: "Yes", no: "No" };
 
-/** The boxes to tick, most certain first, capped by what the question allows. */
-function ticked(field, i, answers) {
-  const yes = field.options
-    .map((text, j) => {
-      const a = answers[`f${i}_m${j}`];
-      const p = a && a.choice === "yes"
-        ? Math.min(Number(a.probabilities?.yes ?? 0), Number(a.confidence ?? 0)) : 0;
-      return { value: text, p };
-    })
-    .filter((o) => o.p >= MENU)
-    .sort((a, b) => b.p - a.p)
-    .slice(0, maxTicks(field.label));
-  if (!yes.length) return { label: field.label, status: "none", value: null, confidence: 0, alternatives: [] };
-  const confidence = Math.min(...yes.map((o) => o.p));
-  return {
-    label: field.label,
-    status: yes.some((o) => o.p >= AUTO) ? "auto" : "pick",
-    value: yes.filter((o) => o.p >= AUTO).map((o) => o.value),
-    confidence,
-    multi: true,
-    alternatives: yes,
-  };
-}
-
 async function answerFields(fields, page = {}) {
   const { apiKey, profile, options } = await loadOptions();
   const history = workHistory(profile);
@@ -200,6 +181,14 @@ async function answerFields(fields, page = {}) {
           criteria: { ...TICK, [NONE]: "The profile does not say" },
         };
       });
+      // ... and the same group asked the other way, for ticks()'s fallback.
+      const one = { [NONE]: "The profile does not say" };
+      field.options.forEach((text, j) => { one[`o${j}`] = text; });
+      questions[`f${i}_pick`] = {
+        type: "choice",
+        instructions: { field: field.label, ask: ASK_SELECT },
+        criteria: one,
+      };
       return;
     }
     // "Have you worked for us before?" is a judgement over the whole work
@@ -272,7 +261,10 @@ async function answerFields(fields, page = {}) {
   return fields.map((field, i) => withPlaceholders(answerFor(field, i), known));
 
   function answerFor(field, i) {
-    if (field.multi) return ticked(field, i, answers);
+    if (field.multi) {
+      return ticks(field.label, field.options,
+        field.options.map((_, j) => answers[`f${i}_m${j}`]), answers[`f${i}_pick`]);
+    }
     const answer = answers[`f${i}`];
     if (!answer) {
       return { label: field.label, status: "none", value: null, confidence: 0, alternatives: [] };

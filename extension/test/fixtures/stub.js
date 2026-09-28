@@ -110,6 +110,9 @@ window.chrome = {
               : /check one of the boxes/i.test(f.label) ? ["No, I do not have a disability and have not had one in the past"]
               : /language/i.test(f.label) ? ["English (ENG)"]
               : /office/i.test(f.label) ? ["New York, NY", "Washington, DC", "Seattle, WA"]
+              // greenhouse-checkbox-pick-one.html: the profile's May 2027 is
+              // not on the list, so ticks()'s pick-one fallback says Other.
+              : /expected Month and Date of graduation/i.test(f.label) ? ["Other"]
               : /communities do you belong to/i.test(f.label) ? ["None of the above"] : []; // ashby-checkboxes.html
             const value = f.options.filter((o) => pick.includes(o));
             return value.length

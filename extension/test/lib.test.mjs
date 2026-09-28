@@ -1,7 +1,7 @@
 // Unit tests for extension/src/lib. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
+import { isYesNo, maxTicks, refine, resolve, ticks, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
 import { placeSaysYes } from "../src/lib/places.ts";
 import { isPriorEmploymentQuestion } from "../src/lib/history.ts";
 import { LABELS } from "../src/lib/schema.ts";
@@ -147,6 +147,73 @@ test("maxTicks: how many boxes a question allows", () => {
   assert.equal(maxTicks("Select only one"), 1);
   assert.equal(maxTicks("Language Skill(s) (Check all that apply)"), Infinity);
   assert.equal(maxTicks("Which offices? (select all)"), Infinity);
+});
+
+/* ------------------------------- check all that apply: ticks() ---------- */
+
+// Jev's per-option reply. `p` is both the yes probability and the confidence,
+// which is what the two are minimised to.
+const box = (choice, p) => ({ choice, confidence: p, probabilities: { [choice]: p, [choice === "yes" ? "no" : "yes"]: 1 - p } });
+// Jev's reply to the one pick-one question the same group is also asked.
+const pick = (index, p) => index === null
+  ? { choice: NONE, confidence: p, probabilities: { [NONE]: p } }
+  : { choice: `o${index}`, confidence: p, probabilities: { [`o${index}`]: p } };
+
+test("ticks: every option the profile supports, most certain first", () => {
+  // DoorDash, live: three of five locations at 0.8+.
+  const options = ["San Francisco", "Sunnyvale", "Seattle", "New York", "Los Angeles"];
+  const r = ticks("Select all locations you would be open to being placed", options,
+    [box("yes", 0.82), box("no", 0.9), box("yes", 0.88), box("yes", 0.95), box("no", 0.8)]);
+  assert.equal(r.status, "auto");
+  assert.deepEqual(r.value, ["New York", "Seattle", "San Francisco"]);
+  assert.equal(r.multi, true);
+});
+
+test("ticks: no more boxes than the question allows", () => {
+  const options = ["A", "B", "C", "D"];
+  const r = ticks("Which teams? Select up to 2 preferences.", options,
+    [box("yes", 0.9), box("yes", 0.8), box("yes", 0.7), box("yes", 0.95)]);
+  assert.deepEqual(r.value, ["D", "A"]);
+});
+
+// Relay Pro (job-boards.greenhouse.io/relaypro/jobs/8176774) and CTC, live.
+// Asked one option at a time -- "should THIS one be ticked?" -- Jev says no
+// to every box on a pick-one question whose real answer is the catch-all:
+// the profile graduates May 2027, which is not on Relay's list, and its
+// "Other" came back yes=0.21. Asked the pick-one question instead ("which of
+// these should be selected?") the same profile and options give Other at
+// 0.74/conf 0.69. So the group is asked both ways and the pick-one answer is
+// the fallback when no box clears the bar.
+test("ticks: nothing ticked falls back to the pick-one answer", () => {
+  const options = ["December 2027", "May 2028", "Summer 2028", "December 2028", "Other"];
+  const none = [box("no", 0.97), box("no", 0.99), box("no", 0.98), box("no", 0.99), box("no", 0.77)];
+  const r = ticks("What is your expected Month and Date of graduation from your undergrad or graduate degree?",
+    options, none, pick(4, 0.69));
+  assert.equal(r.status, "auto");
+  assert.deepEqual(r.value, ["Other"]);
+  assert.equal(r.multi, true);
+});
+
+test("ticks: the fallback never outranks a box that cleared the bar", () => {
+  // Rocket Lab's clearances, live: "Not Applicable" at 0.91 from the boxes,
+  // while the pick-one ask was unsure (__none__ 0.67). The boxes win.
+  const options = ["Top Secret", "Secret", "Other", "Not Applicable"];
+  const r = ticks("Active Security Clearance(s)", options,
+    [box("no", 0.98), box("no", 0.97), box("no", 0.94), box("yes", 0.91)], pick(2, 0.8));
+  assert.deepEqual(r.value, ["Not Applicable"]);
+});
+
+test("ticks: an unsure fallback is offered, not filled; a blank one is nothing", () => {
+  const options = ["Yes", "No"];
+  const no = [box("no", 0.9), box("no", 0.9)];
+  const offered = ticks("Q", options, no, pick(1, 0.5));
+  assert.equal(offered.status, "pick");
+  assert.deepEqual(offered.value, []);
+  assert.deepEqual(offered.alternatives, [{ value: "No", p: 0.5 }]);
+  // Rocket Lab's fellowships, live: the pick-one ask returns the escape
+  // option at 0.84, so the question stays the applicant's.
+  assert.equal(ticks("Q", options, no, pick(null, 0.84)).status, "none");
+  assert.equal(ticks("Q", options, no).status, "none");
 });
 
 test("buildOptions defaults conflict-of-interest answers to No unless set", () => {

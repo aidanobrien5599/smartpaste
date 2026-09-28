@@ -244,6 +244,77 @@ export function maxTicks(label: string): number {
   return m ? Number(m[1]) : Infinity;
 }
 
+/** What a check-all-that-apply group resolves to: the boxes to tick. */
+export type Ticks = Omit<Resolution, "value"> & { value: string[] | null; multi?: true };
+
+/** How sure Jev is of its own pick: its probability, discounted by its confidence. */
+const certainty = (answer: Answer, choice: string): number =>
+  Math.min(Number(answer.probabilities?.[choice] ?? 0), Number(answer.confidence ?? 0));
+
+/**
+ * "Check all that apply": which boxes to tick.
+ *
+ * `boxes[j]` is Jev's yes/no on option j asked on its own -- one pick-one
+ * question over all of them would split its probability across every right
+ * answer (English and Spanish both), so none would clear the bar. `pick` is
+ * the same group asked the other way, "which ONE of these?", and is the
+ * fallback when no box clears the bar.
+ *
+ * Both asks are needed because each fails where the other works:
+ * - Only the boxes answer a question with several right answers. DoorDash's
+ *   five placement cities came back yes at 0.82-0.95 each; the pick-one ask
+ *   named New York alone.
+ * - Only the pick-one ask answers a pick-one question whose right answer is
+ *   the catch-all. Relay Pro's graduation question offers December 2027,
+ *   May 2028, Summer 2028, December 2028 and Other; the profile graduates
+ *   May 2027, so the answer is Other. Asked "should Other be ticked?" Jev
+ *   says no (yes=0.21): it has a real answer, and the ask tells it not to
+ *   reach for Other when it does. Asked "which of these?" the same profile
+ *   gives Other at 0.74. CTC's 31-option "How did you hear about CTC?" is
+ *   the same shape: 0.15 from the boxes, 0.94 from the pick-one ask.
+ */
+export function ticks(
+  label: string,
+  options: string[],
+  boxes: (Answer | undefined)[],
+  pick?: Answer
+): Ticks {
+  const yes = options
+    .map((value, j) => {
+      const a = boxes[j];
+      return { value, p: a && a.choice === "yes" ? certainty(a, "yes") : 0 };
+    })
+    .filter((o) => o.p >= MENU)
+    .sort((a, b) => b.p - a.p)
+    .slice(0, maxTicks(label));
+  if (!yes.length) return theOne(label, options, pick);
+  return {
+    label,
+    status: yes.some((o) => o.p >= AUTO) ? "auto" : "pick",
+    value: yes.filter((o) => o.p >= AUTO).map((o) => o.value),
+    confidence: Math.min(...yes.map((o) => o.p)),
+    multi: true,
+    alternatives: yes,
+  };
+}
+
+/** The one box the pick-one ask named, when no box was ticked on its own. */
+function theOne(label: string, options: string[], answer?: Answer): Ticks {
+  const blank = { label, status: "none" as const, value: null, confidence: 0, alternatives: [] };
+  if (!answer) return blank;
+  const p = certainty(answer, answer.choice);
+  const picked = options[Number(String(answer.choice).replace("o", ""))];
+  if (answer.choice === NONE || picked === undefined || p < MENU) return { ...blank, confidence: p };
+  return {
+    label,
+    status: p >= AUTO ? "auto" : "pick",
+    value: p >= AUTO ? [picked] : [],
+    confidence: p,
+    multi: true,
+    alternatives: [{ value: picked, p }],
+  };
+}
+
 /**
  * A Yes/No dropdown answered through the profile's own labels.
  *

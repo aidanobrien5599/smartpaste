@@ -3,9 +3,12 @@
 //   node bench/mutation-check.mjs [name-filter]
 //
 // For each entry below: undo one fix in whichever file under
-// extension/src/content/ holds it, bundle the mutant with esbuild, run the
-// content tests that should guard it, and report CAUGHT (some test failed
-// or hung) or MISSED (everything still passed -- the fix is unguarded). A
+// extension/src/ holds it, bundle the mutant with esbuild, run the content
+// tests that should guard it, and report CAUGHT (some test failed
+// or hung) or MISSED (everything still passed -- the fix is unguarded). An
+// entry whose fourth element is "lib" lives outside content/ -- in lib/ or
+// background.js, which decide what to fill in rather than how -- and is run
+// against the suites that import src/ directly instead. A
 // fix that no longer matches any file is STALE, one that matches more than
 // one is AMBIGUOUS, and a mutant that fails to bundle is BROKEN -- all three
 // mean the entry needs updating, not the code. Each mutant is a temp copy of
@@ -24,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent box|search";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent box|search|Greenhouse's checkbox";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -102,10 +105,27 @@ const MUTATIONS = [
     "sectionPrefix(f.element) + cardQuestion(f.element, f.label)", "sectionPrefix(f.element) + f.label"],
   ["a location search that found nothing is run again",
     "    items = await searchSuggestions(field, cityOf(value));", "    items = [];"],
+  // Relay Pro and CTC, live: a "check all that apply" whose real answer is
+  // the catch-all stayed blank, because each box asked on its own is told
+  // not to reach for "other". The group is asked the pick-one question too.
+  ["a checkbox group's pick-one fallback",
+    "  if (!yes.length) return theOne(label, options, pick);", "  if (!yes.length) return theOne(label, options, undefined);", "lib"],
+  ["a checkbox group is asked the pick-one question too",
+    "      questions[`f${i}_pick`] = {", "      questions[`unasked${i}`] = {", "lib"],
+  // Greenhouse's newer React form: the box's text is in a <label for=> that
+  // is the input's sibling, not its parent, so without the id lookup every
+  // option read as its posted number ("750161080").
+  ["a checkbox's text through its label for=",
+    "          (b.id && document.querySelector(`label[for=\"${CSS.escape(b.id)}\"]`)?.textContent) ||\n", ""],
 ];
 
 const SRC = join(root, "extension", "src");
-const CONTENT = join(SRC, "content");
+const TEST = join(root, "extension", "test");
+// The whole of src/, not only content/: a fix in lib/ or background.js
+// (which decide what to fill in, not how) is a live-found fix like any
+// other and needs the same proof. Those are the "lib" entries: they run the
+// suites that import src/ directly, against the mutant copy, instead of
+// bundling the content script.
 const sources = [];
 (function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -113,14 +133,19 @@ const sources = [];
     if (entry.isDirectory()) walk(path);
     else if (/\.[jt]s$/.test(entry.name)) sources.push({ path, text: readFileSync(path, "utf8") });
   }
-})(CONTENT);
+})(SRC);
+// Every test file that reaches src/ through a plain relative import, so a
+// copy of test/ beside the mutant src/ tests the mutant. content.test.mjs is
+// not one: it bundles and drives Chrome.
+const LIB_TESTS = ["lib.test.mjs", "answers.test.mjs", "background.test.mjs", "draft.test.mjs",
+  "extract.test.mjs", "history.test.mjs", "messages.test.mjs", "places.test.mjs", "structure.test.mjs"];
 
 const filter = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
 const scratch = mkdtempSync(join(tmpdir(), "smartpaste-mutant-"));
 const MUTANT = join(scratch, "content.js");
 let missed = 0;
 try {
-  for (const [name, fixed, before] of MUTATIONS) {
+  for (const [name, fixed, before, kind] of MUTATIONS) {
     if (filter && !filter.test(name)) continue;
     // Each fix lives in exactly one file. None means it was lost or edited;
     // several means the entry no longer says which one it guards.
@@ -135,15 +160,25 @@ try {
     rmSync(copy, { recursive: true, force: true });
     cpSync(SRC, copy, { recursive: true });
     writeFileSync(join(copy, relative(SRC, hits[0].path)), hits[0].text.replace(fixed, before));
-    try {
-      writeFileSync(MUTANT, await bundleContent(copy));
-    } catch (error) {
-      console.log(`BROKEN  ${name} -- the mutant does not build: ${error.message.split("\n")[0]}`);
-      missed++;
-      continue;
+    let run;
+    if (kind === "lib") {
+      // test/ beside the mutant src/: every ../src/... import lands in it.
+      const tests = join(scratch, "test");
+      rmSync(tests, { recursive: true, force: true });
+      cpSync(TEST, tests, { recursive: true });
+      run = spawnSync("node", ["--test", ...LIB_TESTS.map((t) => join(tests, t))],
+        { cwd: root, encoding: "utf8", timeout: 240_000 });
+    } else {
+      try {
+        writeFileSync(MUTANT, await bundleContent(copy));
+      } catch (error) {
+        console.log(`BROKEN  ${name} -- the mutant does not build: ${error.message.split("\n")[0]}`);
+        missed++;
+        continue;
+      }
+      run = spawnSync("node", ["--test", `--test-name-pattern=${TESTS}`, "extension/test/content.test.mjs"],
+        { cwd: root, encoding: "utf8", timeout: 240_000, env: { ...process.env, SMARTPASTE_CONTENT: MUTANT } });
     }
-    const run = spawnSync("node", ["--test", `--test-name-pattern=${TESTS}`, "extension/test/content.test.mjs"],
-      { cwd: root, encoding: "utf8", timeout: 240_000, env: { ...process.env, SMARTPASTE_CONTENT: MUTANT } });
     const failed = [...new Set([...(run.stdout || "").matchAll(/^✖ (.+?) \(\d/gm)].map((m) => m[1]))];
     const hung = run.error?.code === "ETIMEDOUT";
     if (hung) spawnSync("pkill", ["-f", "smartpaste-chrome-"]);

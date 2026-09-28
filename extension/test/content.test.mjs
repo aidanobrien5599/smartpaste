@@ -508,6 +508,25 @@ test("fill: Ashby choice questions -- titles whose for= names nothing, one multi
     assert.equal(await page.eval("document.querySelector('#consent input').checked"), false);
   }));
 
+// Relay Pro, live: the group stayed blank after Autofill. Greenhouse's newer
+// React form puts each box's text in a <label for=> SIBLING of the input, and
+// the id carries the [] of the posted name, so the options have to be read
+// through the id -- and the question itself is the fieldset's <legend>.
+test("fill: Greenhouse's checkbox fieldset -- options from label for=, question from the legend", { skip }, () =>
+  withPage("greenhouse-checkbox-pick-one.html", async (page) => {
+    const fields = await page.eval(() => window.__smartpasteTest.collectFields()
+      .filter((f) => f.multi).map((f) => ({ label: f.label, options: f.options, boxes: f.buttons.length })));
+    assert.deepEqual(fields, [{
+      label: "What is your expected Month and Date of graduation from your undergrad or graduate degree?",
+      options: ["December 2027", "May 2028", "Summer 2028", "December 2028", "Other"],
+      boxes: 5,
+    }]);
+    await autofill(page);
+    assert.deepEqual(
+      await page.eval("[...document.querySelectorAll('#application-form input:checked')].map(b => document.querySelector(`label[for=\"${CSS.escape(b.id)}\"]`).textContent)"),
+      ["Other"]);
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);
