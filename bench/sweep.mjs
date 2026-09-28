@@ -69,7 +69,7 @@ const READOUT = `(() => {
   const labelOf = (el) => { const root = el.getRootNode(); const host = root.host;
     return clean((el.getAttribute("aria-labelledby") || "").split(/\\s+/).map((id) => root.getElementById?.(id)?.textContent || document.getElementById(id)?.textContent || "").join(" ") ||
       (el.id && root.querySelector?.('label[for="' + CSS.escape(el.id) + '"]')?.textContent) || el.closest("label")?.textContent ||
-      el.getAttribute("aria-label") || host?.getAttribute("label") || el.placeholder || el.name || "").slice(0, 100); };
+      el.getAttribute("aria-label") || host?.getAttribute("label") || el.placeholder || el.name || "").slice(0, 200); };
   const required = (el) => el.required || el.getAttribute("aria-required") === "true" ||
     /\\*\\s*$/.test(labelOf(el)) || Boolean(el.closest("[class*=required i]"));
   const out = []; const groups = new Map();
