@@ -1,13 +1,20 @@
 // Summarise a sweep: per page, then every blank field grouped by widget kind.
 //
-//   node bench/sweep-report.mjs [bench/sweeps/<dir>]   (default: the newest)
+//   node bench/sweep-report.mjs [bench/sweeps/<dir>] [--values]
+//
+// (default: the newest sweep). --values lists what was filled in, per page,
+// instead of what was left blank: a blank is a miss the score already counts,
+// but a WRONG answer scores as a success, so the only way to catch one is to
+// read the values. ("Which city will you be working from?" -> "New York
+// City", a yes/no question -> "May 2027".)
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "sweeps");
-const dir = process.argv[2] || join(root, readdirSync(root).sort().pop());
+const named = process.argv.slice(2).find((a) => !a.startsWith("--"));
+const dir = named || join(root, readdirSync(root).sort().pop());
 const pages = readdirSync(dir).filter((f) => /^\d+-.*\.json$/.test(f)).map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")));
 const ats = (host) => /greenhouse/.test(host) ? "greenhouse" : /ashbyhq/.test(host) ? "ashby" : /lever\.co/.test(host) ? "lever"
   : /workable/.test(host) ? "workable" : /rippling/.test(host) ? "rippling" : /icims/.test(host) ? "icims" : host;
@@ -47,5 +54,18 @@ for (const [kind, list] of Object.entries(blanks).sort((a, b) => b[1].length - a
   console.log(`\n  ${kind} (${list.length})`);
   for (const x of list.sort((a, b) => b.required - a.required).slice(0, 25)) {
     console.log(`    ${x.required ? "*" : " "} ${x.label.slice(0, 80).padEnd(82)} ${x.page}${x.options ? ` [${x.options} options]` : ""}`);
+  }
+}
+
+// --values: what went into each field, for judging answers rather than counts.
+if (process.argv.includes("--values")) {
+  console.log("\nFILLED VALUES BY PAGE");
+  for (const p of pages.sort((a, b) => a.n - b.n)) {
+    const filled = (p.controls || []).filter((x) => x.label && x.value && !IGNORE.test(x.label));
+    if (!filled.length) continue;
+    console.log(`\n  ${ats(p.host)}:${p.url.split("/")[3]} (${p.url})`);
+    for (const x of filled) {
+      console.log(`    ${x.required ? "*" : " "} ${x.label.slice(0, 70).padEnd(72)} => ${String(x.value).slice(0, 60)}`);
+    }
   }
 }
