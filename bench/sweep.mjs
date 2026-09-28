@@ -196,7 +196,10 @@ async function runOne(url, n) {
     }
 
     let pill = null;
-    for (let i = 0; i < 40 && !pill; i++) {
+    // 45s: a page loading beside two others can take half a minute to render
+    // its form, and a short wait scored Exa's Ashby form as "no button" three
+    // sweeps running -- on its own it offers "Autofill 10 fields + 1 file".
+    for (let i = 0; i < 90 && !pill; i++) {
       // iCIMS keeps the form in an iframe; read every same-origin frame.
       pill = await evaluate(`(() => { const find = (w) => { try { const b = w.document.querySelector(".smartpaste-button"); if (b) return b.textContent;
         for (let i = 0; i < w.frames.length; i++) { const t = find(w.frames[i]); if (t) return t; } } catch {} return null; }; return find(window); })()`);
@@ -264,6 +267,22 @@ async function worker() {
 }
 await build();
 await Promise.all(Array.from({ length: Math.min(parallel, urls.length) }, worker));
+
+// Anything that found no button, or failed outright, gets one more go on its
+// own. Running several browsers at once makes a slow site (Greenhouse, Ashby)
+// look broken, and a flaky zero is worse than a slow sweep: it sends someone
+// after a bug that is not there.
+const shaky = results.filter((r) => r.status === "no-pill" || r.status === "error" || r.status === "readout-failed");
+if (shaky.length) {
+  console.log(`\nretrying ${shaky.length} one at a time (parallel load makes a slow page look empty)`);
+  for (const old of shaky) {
+    const again = await runOne(old.url, old.n);
+    Object.assign(again, score(again), { retried: true, firstStatus: old.status });
+    results[results.indexOf(old)] = again;
+    writeFileSync(join(outDir, `${String(again.n).padStart(2, "0")}-${again.host}.json`), JSON.stringify(again, null, 1));
+    console.log(`[retry ${again.n}] ${old.status} -> ${again.status}  ${String(again.filled ?? "-")}/${String(again.nControls ?? "-")}  ${again.host}`);
+  }
+}
 results.sort((a, b) => a.n - b.n);
 writeFileSync(join(outDir, "summary.json"), JSON.stringify(results.map(({ controls, logs, ...rest }) => rest), null, 1));
 const count = (s) => results.filter((r) => r.status === s).length;
