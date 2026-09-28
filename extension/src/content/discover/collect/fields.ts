@@ -24,7 +24,7 @@
  */
 import { deepAll } from "../../dom/query.ts";
 import { visible, nodeVisible, isCombobox } from "../../dom/controls.ts";
-import { FIELD_SELECTOR, DATE_PART, PROMPT_INPUT, JUNK_LABELS, QUESTION_BOX } from "../selectors.ts";
+import { FIELD_SELECTOR, DATE_PART, PROMPT_INPUT, junkLabel, QUESTION_BOX } from "../selectors.ts";
 import { labelFor } from "../labels.ts";
 import { pageChrome } from "../gate.ts";
 import { sectionPrefix, cardQuestion } from "../sections.ts";
@@ -73,7 +73,7 @@ export function collectFields(): Field[] {
       widget: element.matches(PROMPT_INPUT) ? "prompt" : null,
     }))
     .concat(collectWidgets())
-    .filter((f) => f.label.length >= 2 && !JUNK_LABELS.test(f.label) && !FOLLOW_UP.test(f.label))
+    .filter((f) => f.label.length >= 2 && !junkLabel(f.label) && !FOLLOW_UP.test(f.label))
     .concat(collectToggleGroups())
     .concat(collectRadioGroups())
     .concat(collectCheckboxGroups())

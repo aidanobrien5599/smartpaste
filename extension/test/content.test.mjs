@@ -995,6 +995,29 @@ test("labels: Rippling -- div dropdowns, named by aria-labelledby or the questio
     }
   }));
 
+test("labels: Rippling -- a box whose only name is a generated id is asked by the question above it", { skip }, () =>
+  withPage("rippling.html", async (page) => {
+    // Live (2026-09-28): a required custom question with no label of any
+    // kind. Rippling names every box afresh on each load, so the only text
+    // the field carried was name="6u6RxcGTFfn"; Jev was asked that, nothing
+    // answers it, and a required box was left blank.
+    const labels = await page.waitFor(asked);
+    assert.ok(labels.some((l) => /^What school or university are you currently attending/.test(l)),
+      `the question above the box was not asked: ${JSON.stringify(labels)}`);
+    // A name, an id or a placeholder is never a question, wherever it came
+    // from: no label here may be one.
+    for (const label of labels) {
+      assert.ok(!/^[\w$.[\]-]+$/.test(label) || /^[A-Za-z][a-z]+$/.test(label),
+        `asked a name or an id: ${JSON.stringify(label)} of ${JSON.stringify(labels)}`);
+    }
+  }));
+
+test("fill: Rippling -- the question above a nameless box is answered into it", { skip }, () =>
+  withPage("rippling.html", async (page) => {
+    await autofill(page, 60000);
+    assert.equal(await page.eval("window.__model['School question']"), "University of Wisconsin - Madison");
+  }));
+
 test("fill: Rippling -- a div dropdown opens, reads its listbox and takes a pick", { skip }, () =>
   withPage("rippling.html", async (page) => {
     await autofill(page, 60000);

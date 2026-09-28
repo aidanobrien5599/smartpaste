@@ -18,7 +18,12 @@ input{padding:4px;width:300px;display:block}
      keeps its question in a paragraph above the field's block.
 
      The text boxes are <input> with no type= at all, labelled the same way;
-     those already worked and are here so the page reads as an application. -->
+     those already worked and are here so the page reads as an application.
+
+     Added 2026-09-28 from ats.rippling.com's "Data Science Intern - Summer
+     2027" form: a required custom question drawn as a text box with no
+     label of any kind, whose only text was its per-load name. See the
+     comment on that block. -->
 <form>
 <div class="css-fc738i e1c985fr0">
   <div class="css-fuqajr eun831x1" data-testid="field">
@@ -58,6 +63,24 @@ input{padding:4px;width:300px;display:block}
           <div id="field-59" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-label="Select" aria-required="true" aria-invalid="false" aria-disabled="false" tabindex="0" class="css-hyyaj0 etc2niq5" data-list="field-59-list" data-key="Sponsorship"><p class="css-1lilszh">Select</p></div>
         </div></div>
       </div></div>
+    </div></div>
+  </div>
+
+  <!-- A custom question drawn as a text box, from ats.rippling.com's own
+       "Data Science Intern - Summer 2027" form (2026-09-28). It has no
+       <label>, no aria-label and no aria-labelledby, and Rippling names
+       every box afresh on each load -- so the only text this field carried
+       was name="6u6RxcGTFfn", and a required question was asked as a random
+       id and left blank. The question is the <p> above the field's block. -->
+  <div class="marginY--36">
+    <div class="paddingX--16"><div class="marginBottom--4">
+      <p class="css-i4dt0z edalr1o0">What school or university are you currently attending or from which you recently graduated? Please use your university's full name.<div class="css-18yxg8r"></div></p>
+    </div></div>
+    <div class="css-fuqajr eun831x1" data-testid="field"><div class="css-1fttcpj eun831x6">
+      <div data-testid="customQuestions.6ab35afe5a2a8fc0581af94e.8c66b335" class="css-1mlcsw efnm4lm1">
+        <input data-input="customQuestions.6ab35afe5a2a8fc0581af94e.8c66b335" id="field-71" aria-required="true" autocomplete="off" class="css-d76fs efnm4lm5" value="" name="6u6RxcGTFfn" data-key="School question">
+      </div>
+      <div data-testid="screen-reader-only" id="form-field-tip-70" class="css-yrqkhi em1iw9y0"></div>
     </div></div>
   </div>
 </div>

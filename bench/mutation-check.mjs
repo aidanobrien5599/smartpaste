@@ -31,7 +31,8 @@ const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
-  ["ownership label", "return ownerLabel(field) || clean((field as HTMLInputElement).placeholder)", "return clean((field as HTMLInputElement).placeholder)"],
+  ["ownership label", "for (const candidate of [ownerLabel(field), (field as HTMLInputElement).placeholder,",
+    "for (const candidate of [(field as HTMLInputElement).placeholder,"],
   ["consent: the question around a lone box", "|| CONSENT.test(ownerLabel(box))) continue;", ") continue;"],
   ["consent: a bare 'I Accept'", "agree|accept|consent", "agree|consent"],
   ["page chrome (site search, cookie banner)",
@@ -88,13 +89,13 @@ const MUTATIONS = [
     "  if (text) return text;\n  const own = clean(\n" +
     "    (button.getAttribute(\"aria-label\") || \"\")\n      .replace(button.textContent!.trim(), \"\")\n" +
     "      .replace(/\\b(?:select one|required)\\b/gi, \"\")\n  );\n" +
-    "  return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);",
+    "  return own && !junkLabel(own) ? own : questionAbove(button);",
     "  const text = clean((byFor || inEntry)?.textContent || \"\");\n" +
     "  if (text) return text;\n  return clean(\n" +
     "    (button.getAttribute(\"aria-label\") || \"\")\n      .replace(button.textContent!.trim(), \"\")\n" +
     "      .replace(/\\b(?:select one|required)\\b/gi, \"\")\n  );"],
   ["the question above a dropdown that names nothing",
-    "return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);", "return own;"],
+    "return own && !junkLabel(own) ? own : questionAbove(button);", "return own;"],
   ["'Select...' is an empty dropdown",
     "/^(?:select one|select(?:\\.{3}|…)?|choose one|choose(?:\\.{3}|…)?|--)?$/i",
     "/^(?:select one|select|choose one|choose|--)?$/i"],
@@ -103,6 +104,19 @@ const MUTATIONS = [
     "return texts.length > MAX_SENT_OPTIONS ? null : texts;", "return texts.slice(0, MAX_SENT_OPTIONS);"],
   ["a card names its \"Select One\" question",
     "sectionPrefix(f.element) + cardQuestion(f.element, f.label)", "sectionPrefix(f.element) + f.label"],
+  // Rippling names every box afresh on each load, so a required question
+  // with no label of its own was asked as "6u6RxcGTFfn" and left blank.
+  // Two guards, and the text above the field answers on its own, so
+  // refusing the name only tells once the walk has nowhere else to go:
+  // undo the whole tail for the first entry, questionAbove for the second.
+  ["a name that says nothing is no question",
+    "  for (const candidate of [ownerLabel(field), (field as HTMLInputElement).placeholder,\n" +
+    "    questionAbove(field), (field as HTMLInputElement).name]) {\n" +
+    "    const text = clean(candidate);\n    if (text && !junkLabel(text)) return text;\n  }\n  return \"\";",
+    "  return ownerLabel(field) || clean((field as HTMLInputElement).placeholder)" +
+    " || clean((field as HTMLInputElement).name) || \"\";"],
+  ["the question above a box that names nothing",
+    "questionAbove(field), (field as HTMLInputElement).name]", "(field as HTMLInputElement).name]"],
   ["a location search that found nothing is run again",
     "    items = await searchSuggestions(field, cityOf(value));", "    items = [];"],
   // Relay Pro and CTC, live: a "check all that apply" whose real answer is

@@ -15,12 +15,51 @@
  * - ByteDance's own select ("Universe Design") renders its menu away from
  *   the control with no aria-controls (UD_SELECT), and its location picker
  *   is a tree of checkbox rows (UD_TREE_NODE).
+ * - Rippling names each box afresh on every load ("6u6RxcGTFfn"), and Lever
+ *   names one after the card it is in ("cards[d2bd48…][field0]"); taken for
+ *   a question, Jev is asked a random id (junkLabel).
  *
  * Depends on nothing else in content/.
  */
 
 export const FILE_SELECTOR = 'input[type="file"]';
-export const JUNK_LABELS = /^(?:select\.{0,3}|choose\.{0,3}|please select|search|--)$/i;
+const JUNK_LABELS = /^(?:select\.{0,3}|choose\.{0,3}|please select|search|--)$/i;
+// A placeholder that tells you how to answer but never says what is asked:
+// Lever's "Type your response", Ashby's "Start typing...". A verb and a
+// generic object and nothing else -- "Enter your email" says what it wants
+// and is kept, "Select all that apply" names the options and is kept too.
+const PROMPT_ONLY =
+  /^(?:(?:start|begin)\s+typing|type|enter|write|input|search|select|choose|pick)(?:\s+(?:your|an?|the|one|some))?(?:\s+(?:answer|response|option|value|text|name|here|below))?\s*(?:\.{2,}|…)?$/i;
+// A name or an id is not a question. Three shapes, all of them seen live:
+// a bare UUID (Ashby), a form field's own name (Lever's
+// "cards[d2bd48ea-…][field0]", Rippling's "customQuestions.<id>.<id>",
+// Greenhouse's "eeo[race]", a plain "sms_opt_in"), and a generated token
+// (Rippling's "6u6RxcGTFfn", "RKGxbnAylmH", a fresh one on every load).
+// Each separator here is outside the run it follows, so no two parts of a
+// pattern can match the same character: one long word_of_underscores would
+// otherwise take a minute to be refused (catastrophic backtracking).
+const UUID_LABEL = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PATH_NAME = /^[\w$-]+(?:\[[^\]]*\]|\.[\w$-]+)+$/;
+const SNAKE_NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/i;
+const ONE_TOKEN = /^[\w$-]{6,}$/;
+// A word is lower case ("email"), an acronym ("GPA"), or capitals each
+// carrying their own lower-case tail ("LinkedIn", "opportunityLocationId").
+// A base62 token is none of those: "RKGxbnAylmH" has capitals side by side
+// and single letters between them, and no way to read as words.
+const WORD = /^(?:[a-z]+(?:[A-Z][a-z]+)*|(?:[A-Z][a-z]+)+|[A-Z]+)$/;
+const generatedId: (text: string) => boolean = (text) => ONE_TOKEN.test(text) &&
+  !text.replace(/\d+/g, "").split(/[\s._-]+/).filter(Boolean).every((part) => WORD.test(part));
+
+/**
+ * Is this text something other than a question? A placeholder, a form
+ * field's name or a generated id all read as one, and asking Jev "what is
+ * your 6u6RxcGTFfn?" leaves a required box blank. The walk keeps looking.
+ */
+export function junkLabel(text: string): boolean {
+  return JUNK_LABELS.test(text) || PROMPT_ONLY.test(text) ||
+    UUID_LABEL.test(text) || PATH_NAME.test(text) || SNAKE_NAME.test(text) || generatedId(text);
+}
+
 export const FIELD_ENTRY =
   '[class*="fieldEntry"], [class*="field-entry"], [class*="formField"], ' +
   '[data-automation-id^="formField"], .application-question, fieldset';

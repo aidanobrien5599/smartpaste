@@ -26,12 +26,16 @@
  *   from the combobox they belong to (questionAbove).
  * - A Workday split date is labelled by its form field, not by each part's
  *   own hidden "Month" / "Year" label (dateLabel).
+ * - Rippling names each box afresh on every load, so a required question
+ *   with no label of its own came out as "6u6RxcGTFfn" -- the box's name --
+ *   and was left blank. A placeholder or a name that is no question at all
+ *   is skipped (junkLabel) and the walk goes on to questionAbove.
  *
  * Depends on: dom/text.ts, dom/controls.ts, discover/selectors.ts.
  */
 import { shownText, clean } from "../dom/text.ts";
 import { nodeVisible } from "../dom/controls.ts";
-import { QUESTION_BOX, FIELD_SELECTOR, FIELD_ENTRY, DATE_PART, JUNK_LABELS, ANY_CONTROL, LISTBOX_BUTTON } from "./selectors.ts";
+import { QUESTION_BOX, FIELD_SELECTOR, FIELD_ENTRY, DATE_PART, junkLabel, ANY_CONTROL, LISTBOX_BUTTON } from "./selectors.ts";
 
 const QUESTION_TEXT = '.application-label, legend, [class*="question-label"]';
 
@@ -113,7 +117,17 @@ export function labelFor(field: Element): string {
     const text = clean(node.textContent);
     if (text) return text;
   }
-  return ownerLabel(field) || clean((field as HTMLInputElement).placeholder) || clean((field as HTMLInputElement).name) || "";
+  // Last resorts, in the order they are worth having. The text above the
+  // field's block outranks the field's own name, and a placeholder or a name
+  // is only worth taking when it says something: Rippling names every box
+  // afresh on each load, so a required question with nothing above it either
+  // came out as "6u6RxcGTFfn" and was left blank.
+  for (const candidate of [ownerLabel(field), (field as HTMLInputElement).placeholder,
+    questionAbove(field), (field as HTMLInputElement).name]) {
+    const text = clean(candidate);
+    if (text && !junkLabel(text)) return text;
+  }
+  return "";
 }
 
 const LABEL_LIKE = 'label, legend, [class*="item-label"], [class*="field-label"], [class*="form__label"]';
@@ -226,7 +240,7 @@ export function listboxLabel(button: Element): string {
       .replace(button.textContent!.trim(), "")
       .replace(/\b(?:select one|required)\b/gi, "")
   );
-  return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);
+  return own && !junkLabel(own) ? own : questionAbove(button);
 }
 
 /** A date split into boxes is one question, labelled by its form field. */
