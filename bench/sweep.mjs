@@ -32,8 +32,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const EXT = join(here, "..", "extension");
 const TEMPLATE = join(here, ".sweep-template");
 const pw = join(homedir(), "Library/Caches/ms-playwright");
-const build = readdirSync(pw).filter((d) => /^chromium-\d+$/.test(d)).sort().pop();
-const binary = join(pw, build, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
+// Not "build": that name is the esbuild run imported above.
+const chromium = readdirSync(pw).filter((d) => /^chromium-\d+$/.test(d)).sort().pop();
+const binary = join(pw, chromium, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : fallback; };
 const list = process.argv[2];
 if (!list || !existsSync(list) || !existsSync(binary) || !existsSync(TEMPLATE)) {
