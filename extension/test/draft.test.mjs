@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { splitPieces, parseDates, assemble, splitDegreeField, cleanGpa, headingCandidates } from "../lib/draft.js";
+import { splitPieces, parseDates, assemble, splitDegreeField, cleanGpa, headingCandidates } from "../src/lib/draft.ts";
 
 test("splitPieces: the standard student format is four fields", () => {
   assert.deepEqual(
@@ -79,7 +79,7 @@ test("headingCandidates: a company or a job title is not a heading", () => {
 });
 
 test("creative headings still map by their section word", async () => {
-  const { sectionByVocabulary } = await import("../lib/draft.js");
+  const { sectionByVocabulary } = await import("../src/lib/draft.ts");
   assert.equal(sectionByVocabulary("Career Journey"), "experience");
   assert.equal(sectionByVocabulary("Academic Credentials"), "education");
   assert.equal(sectionByVocabulary("Michigan Hackers"), null);
@@ -176,7 +176,7 @@ test("assemble: a table's header row is not a job", () => {
 });
 
 test("readSkills: categories and lists", async () => {
-  const { readSkills } = await import("../lib/draft.js");
+  const { readSkills } = await import("../src/lib/draft.ts");
   assert.deepEqual(readSkills(["Languages: Go, Python, Ruby", "• Frameworks: React, Rails (Ruby, API mode)"]), [
     { category: "Languages", skills: ["Go", "Python", "Ruby"] },
     { category: "Frameworks", skills: ["React", "Rails (Ruby, API mode)"] },
@@ -184,7 +184,7 @@ test("readSkills: categories and lists", async () => {
 });
 
 test("readListEntries: name, issuer, date", async () => {
-  const { readListEntries } = await import("../lib/draft.js");
+  const { readListEntries } = await import("../src/lib/draft.ts");
   assert.deepEqual(readListEntries(["AWS Certified Developer — Amazon Web Services, Issued: 06/2022"]),
     [{ name: "AWS Certified Developer", issuer: "Amazon Web Services", date: "06/2022" }]);
   assert.deepEqual(readListEntries(["• SAP Innovator of the Year, SAP CTO office (2022)"]),
@@ -192,7 +192,7 @@ test("readListEntries: name, issuer, date", async () => {
 });
 
 test("readProjects: a header line and its bullets", async () => {
-  const { readProjects } = await import("../lib/draft.js");
+  const { readProjects } = await import("../src/lib/draft.ts");
   const p = readProjects(["BadgerBase | Next.js, Hono, Bun", "• Shipped an MCP server", "• Reached 2000+ users",
     "Local LLM Inference Lab | llama.cpp", "• Built an inference lab"]);
   assert.equal(p.length, 2);
@@ -201,21 +201,21 @@ test("readProjects: a header line and its bullets", async () => {
 });
 
 test("readHomeLocation: from the header", async () => {
-  const { readHomeLocation } = await import("../lib/draft.js");
+  const { readHomeLocation } = await import("../src/lib/draft.ts");
   assert.deepEqual(readHomeLocation(["Ruby Chen", "San Francisco, CA · ruby@email.com · (415) 555-0183"]),
     { city: "San Francisco", state: "CA", country: "" });
   assert.deepEqual(readHomeLocation(["Jane", "Berlin, Germany | jane@x.de"]), { city: "Berlin", state: "", country: "Germany" });
 });
 
 test("readListEntries: header rows skipped, bracket as issuer, trailing prose dropped", async () => {
-  const { readListEntries } = await import("../lib/draft.js");
+  const { readListEntries } = await import("../src/lib/draft.ts");
   assert.deepEqual(readListEntries(["Certification | Issuer | Status / Expiry"]), []);
   assert.deepEqual(readListEntries(["Ruby Certified Developer (Ruby Association, Japan) | the only industry exam that tests Ruby internals in depth"]),
     [{ name: "Ruby Certified Developer", issuer: "Ruby Association, Japan", date: "" }]);
 });
 
 test("readProjects: a sentence under a project is description", async () => {
-  const { readProjects } = await import("../lib/draft.js");
+  const { readProjects } = await import("../src/lib/draft.ts");
   const p = readProjects(["OpenMetrics Collector | Go", "Open-source Prometheus-compatible metrics aggregation library for edge devices",
     "Ongoing since late 2022", "DistSync | Rust"]);
   assert.deepEqual(p.map((x) => x.name), ["OpenMetrics Collector", "DistSync"]);

@@ -2,46 +2,49 @@
 //
 //   node bench/mutation-check.mjs [name-filter]
 //
-// For each entry below: undo one fix in extension/content.js, run the
+// For each entry below: undo one fix in whichever file under
+// extension/src/content/ holds it, bundle the mutant with esbuild, run the
 // content tests that should guard it, and report CAUGHT (some test failed
-// or hung) or MISSED (everything still passed -- the fix is unguarded).
-// Each mutant is a temp copy the tests load via SMARTPASTE_CONTENT; the real
-// content.js is only read. (Rewriting it in place once erased another
-// session's commit that landed mid-run.)
+// or hung) or MISSED (everything still passed -- the fix is unguarded). A
+// fix that no longer matches any file is STALE, one that matches more than
+// one is AMBIGUOUS, and a mutant that fails to bundle is BROKEN -- all three
+// mean the entry needs updating, not the code. Each mutant is a temp copy of
+// src/, edited and rebundled; the real source is only read. (Rewriting it in
+// place once erased another session's commit that landed mid-run.)
 //
 // Add an entry whenever a live bug gets a fix and a test: the entry is the
 // proof the test can see the bug. A MISSED entry means the fixture is kinder
 // than the site (bytedance.html's menus once closed each other, which the
 // real page never does, and hid the stale-menu bug).
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { join, dirname } from "node:path";
+import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SRC = join(root, "extension", "content.js");
 const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent box|search";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
-  ["ownership label", "return ownerLabel(field) || clean(field.placeholder)", "return clean(field.placeholder)"],
+  ["ownership label", "return ownerLabel(field) || clean((field as HTMLInputElement).placeholder)", "return clean((field as HTMLInputElement).placeholder)"],
   ["consent: the question around a lone box", "|| CONSENT.test(ownerLabel(box))) continue;", ") continue;"],
   ["consent: a bare 'I Accept'", "agree|accept|consent", "agree|consent"],
   ["page chrome (site search, cookie banner)",
-    "const pageChrome = (element) => element.closest(PAGE_CHROME) !== null ||\n    SEARCH_ACTION.test(element.closest(\"form\")?.getAttribute(\"action\") || \"\");",
-    "const pageChrome = () => false;"],
+    "export const pageChrome: (element: Element) => boolean = (element) => element.closest(PAGE_CHROME) !== null ||\n  SEARCH_ACTION.test(element.closest(\"form\")?.getAttribute(\"action\") || \"\");",
+    "export const pageChrome: (element: Element) => boolean = () => false;"],
   ["'search' inside a word is not a search form", "const SEARCH_ACTION = /(?:^|[/?&=._-])search(?:$|[/?&=.#_-])/i;", "const SEARCH_ACTION = /search/i;"],
   ["a 'No options' tick before a search is not its answer",
     "if (settled !== null && Date.now() - settled >= NOTICE_HOLDS) return [];", "if (settled !== null) return [];"],
-  ["month dropdown + Year box", "const hasYear = (node) => node.querySelector(YEAR_BOX) ||", "const hasYear = (node) =>"],
-  ["smallest date wrapper", "if (onlyDate(byId)) return byId;", "if (byId && hasYear(byId)) return byId;"],
-  ["read-only combobox is a dropdown", "(field.readOnly && !isCombobox(field))", "field.readOnly"],
-  ["ByteDance menu is the whole list", '.map((n) => n.closest(".ud__select__list") || n.parentElement))];', ".map((n) => n.parentElement))];"],
+  ["month dropdown + Year box", "const hasYear: (node: Element) => Element | boolean = (node) => node.querySelector(YEAR_BOX) ||", "const hasYear: (node: Element) => Element | boolean = (node) =>"],
+  ["smallest date wrapper", "if (onlyDate(byId)) return byId!;", "if (byId && hasYear(byId)) return byId!;"],
+  ["read-only combobox is a dropdown", "(el.readOnly && !isCombobox(field))", "el.readOnly"],
+  ["ByteDance menu is the whole list", '.map((n) => n.closest(".ud__select__list") || n.parentElement))] as Element[];', ".map((n) => n.parentElement))] as Element[];"],
   // Three defences, any one enough on its own: undo all of them.
   ["stale menus (close before, skip stale, close after)",
-    "      await closeUdMenus();\n      staleMenus.set(field, new Set(udLists()));\n      try { return await pickCombobox(field, want); } finally { await closeUdMenus(); }",
-    "      return pickCombobox(field, want);"],
+    "    await closeUdMenus();\n    staleMenus.set(field, new Set(udLists()));\n    try { return await pickCombobox(field, want); } finally { await closeUdMenus(); }",
+    "    return pickCombobox(field, want);"],
   ["a lone option counts only after a search", "texts.length === 1 && searched) index = 0;", "texts.length === 1) index = 0;"],
   ["tree: leaves named by path", "if (!tree.length) return", "if (true) return"],
   ["calendar picker takes YYYY-MM", "if (picker && parts?.month)", "if (false)"],
@@ -49,44 +52,44 @@ const MUTATIONS = [
   ["bare 'Mobile' is the number", "? `${label} phone number` : label;", "? label : label;"],
   ["resume dropzone text", "input.closest(\"[class*='upload' i]\")?.textContent?.slice(0, 140) || \"\"]", "\"\"]"],
   ["bare Add found by section title", "if (section && !found.some((f) => f.root === section.root)) found.push({ ...section, prefix: \"\", button });", ""],
-  ["roles split intern / work", "(p.experience || []).filter((role) => !split || !isIntern(role))", "(p.experience || [])"],
+  ["roles split intern / work", "((p.experience as ProfileEntry[] | undefined) || []).filter((role) => !split || !isIntern(role))", "((p.experience as ProfileEntry[] | undefined) || [])"],
   ["card label names its entry", 'return `${titled.name} ${n}${subject ? ` (${subject})` : ""}: `;', "return `${titled.name} ${n}: `;"],
   ["a section-wide fieldset is not a write-in", "return [...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length <= 1;", "return true;"],
   ["a section's legend is no field's label", "if ([...box.querySelectorAll(FIELD_SELECTOR)].filter(nodeVisible).length > 1) return null;", ""],
-  ["aria-labelledby outranks the legend", "      labelledBy(field),\n      questionText(field),", "      questionText(field),\n      labelledBy(field),"],
+  ["aria-labelledby outranks the legend", "    labelledBy(field),\n    questionText(field),", "    questionText(field),\n    labelledBy(field),"],
   // Rewritten by e49ddca (an Ashby title's for= names nothing on the page):
   // the mutant is now the line that decides whether that target counts.
-  ["label for= a group's container", "return Boolean(target) && !target.contains(inputs[0]);", "return true;"],
+  ["label for= a group's container", "return Boolean(target) && !(target as Element).contains(inputs[0]);", "return true;"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],
   ["long menus shortlisted by shared words", "if (index < 0) index = await chooseAmong(labelFor(field), want, texts);", "if (index < 0) index = await askChoice(labelFor(field), want, texts.slice(0, MAX_MENU));"],
-  ["a failed pick clears its search text", "      if (searched) nativeSet(field, \"\");\n", ""],
+  ["a failed pick clears its search text", "    if (searched) nativeSet(field, \"\");\n", ""],
   ["a wrapping label is not its widget's text", "candidate : labelOnly(candidate, field));", "candidate : shownText(candidate));"],
-  ["a required star before the question", "      .replace(/^\\s*[*\\u2731\\u2217]+\\s*/, \"\")\n", ""],
-  ["Workable's Education / Experience group names its boxes", "      if (named) return `${named}: `;\n", ""],
+  ["a required star before the question", "    .replace(/^\\s*[*\\u2731\\u2217]+\\s*/, \"\")\n", ""],
+  ["Workable's Education / Experience group names its boxes", "    if (named) return `${named}: `;\n", ""],
   // b9441a5 added the <select> exemption, so the line moved: a hidden native
   // select is the field behind a custom picker (Lever's select2 school list).
   ["a box hidden from screen readers is the widget's",
-    "    if (field.getAttribute(\"aria-hidden\") === \"true\" && field.tagName !== \"SELECT\") return false;\n", ""],
+    "  if (field.getAttribute(\"aria-hidden\") === \"true\" && field.tagName !== \"SELECT\") return false;\n", ""],
   ["a hidden <select> is still the field behind a picker",
     "&& field.tagName !== \"SELECT\") return false;", ") return false;"],
   ["a div is a dropdown too (Rippling)",
-    "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"], ' +\n    '[role=\"combobox\"][aria-haspopup=\"listbox\"]:not(input):not(select):not(textarea)';",
-    "  const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"]';"],
+    "export const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"], ' +\n  '[role=\"combobox\"][aria-haspopup=\"listbox\"]:not(input):not(select):not(textarea)';",
+    "export const LISTBOX_BUTTON = 'button[aria-haspopup=\"listbox\"]';"],
   // Rippling's EEO dropdowns are named twice over -- by aria-labelledby and
   // by the block above them -- so either path alone still labels them: undo
   // both. Its sponsorship question has only the block above.
   ["a dropdown's own name, then the question above it",
-    "    const text = clean(byFor?.textContent || \"\") || clean(labelledBy(button)) || clean(inEntry?.textContent || \"\");\n" +
-    "    if (text) return text;\n    const own = clean(\n" +
-    "      (button.getAttribute(\"aria-label\") || \"\")\n        .replace(button.textContent.trim(), \"\")\n" +
-    "        .replace(/\\b(?:select one|required)\\b/gi, \"\")\n    );\n" +
-    "    return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);",
-    "    const text = clean((byFor || inEntry)?.textContent || \"\");\n" +
-    "    if (text) return text;\n    return clean(\n" +
-    "      (button.getAttribute(\"aria-label\") || \"\")\n        .replace(button.textContent.trim(), \"\")\n" +
-    "        .replace(/\\b(?:select one|required)\\b/gi, \"\")\n    );"],
+    "  const text = clean(byFor?.textContent || \"\") || clean(labelledBy(button)) || clean(inEntry?.textContent || \"\");\n" +
+    "  if (text) return text;\n  const own = clean(\n" +
+    "    (button.getAttribute(\"aria-label\") || \"\")\n      .replace(button.textContent!.trim(), \"\")\n" +
+    "      .replace(/\\b(?:select one|required)\\b/gi, \"\")\n  );\n" +
+    "  return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);",
+    "  const text = clean((byFor || inEntry)?.textContent || \"\");\n" +
+    "  if (text) return text;\n  return clean(\n" +
+    "    (button.getAttribute(\"aria-label\") || \"\")\n      .replace(button.textContent!.trim(), \"\")\n" +
+    "      .replace(/\\b(?:select one|required)\\b/gi, \"\")\n  );"],
   ["the question above a dropdown that names nothing",
     "return own && !JUNK_LABELS.test(own) ? own : questionAbove(button);", "return own;"],
   ["'Select...' is an empty dropdown",
@@ -98,23 +101,47 @@ const MUTATIONS = [
   ["a card names its \"Select One\" question",
     "sectionPrefix(f.element) + cardQuestion(f.element, f.label)", "sectionPrefix(f.element) + f.label"],
   ["a location search that found nothing is run again",
-    "      items = await searchSuggestions(field, cityOf(value));", "      items = [];"],
+    "    items = await searchSuggestions(field, cityOf(value));", "    items = [];"],
 ];
 
+const SRC = join(root, "extension", "src");
+const CONTENT = join(SRC, "content");
+const sources = [];
+(function walk(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) walk(path);
+    else if (/\.[jt]s$/.test(entry.name)) sources.push({ path, text: readFileSync(path, "utf8") });
+  }
+})(CONTENT);
+
 const filter = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
-const original = readFileSync(SRC, "utf8");
 const scratch = mkdtempSync(join(tmpdir(), "smartpaste-mutant-"));
 const MUTANT = join(scratch, "content.js");
 let missed = 0;
 try {
   for (const [name, fixed, before] of MUTATIONS) {
     if (filter && !filter.test(name)) continue;
-    if (!original.includes(fixed)) {
-      console.log(`STALE   ${name} -- the fixed code is no longer there; update this entry`);
+    // Each fix lives in exactly one file. None means it was lost or edited;
+    // several means the entry no longer says which one it guards.
+    const hits = sources.filter((s) => s.text.includes(fixed));
+    if (hits.length !== 1) {
+      const where = hits.map((h) => relative(SRC, h.path)).join(", ");
+      console.log(`${hits.length ? "AMBIGUOUS" : "STALE  "} ${name} -- ${hits.length ? `in ${where}` : "the fixed code is no longer there"}; update this entry`);
       missed++;
       continue;
     }
-    writeFileSync(MUTANT, original.replace(fixed, before));
+    const copy = join(scratch, "src");
+    rmSync(copy, { recursive: true, force: true });
+    cpSync(SRC, copy, { recursive: true });
+    writeFileSync(join(copy, relative(SRC, hits[0].path)), hits[0].text.replace(fixed, before));
+    try {
+      writeFileSync(MUTANT, await bundleContent(copy));
+    } catch (error) {
+      console.log(`BROKEN  ${name} -- the mutant does not build: ${error.message.split("\n")[0]}`);
+      missed++;
+      continue;
+    }
     const run = spawnSync("node", ["--test", `--test-name-pattern=${TESTS}`, "extension/test/content.test.mjs"],
       { cwd: root, encoding: "utf8", timeout: 240_000, env: { ...process.env, SMARTPASTE_CONTENT: MUTANT } });
     const failed = [...new Set([...(run.stdout || "").matchAll(/^✖ (.+?) \(\d/gm)].map((m) => m[1]))];

@@ -7,9 +7,11 @@
  * the regex layer to extract a substring. Structured wins wherever it exists.
  */
 
-import { LABELS, ORDINALS, REPEATABLE } from "./schema.js";
-import { placesOptions } from "./places.js";
-import { answerOptions } from "./answers.js";
+import { LABELS, ORDINALS, REPEATABLE } from "./schema.ts";
+import type { Options, Profile, ProfileEntry, Settings } from "./schema.ts";
+import { placesOptions } from "./places.ts";
+import type { PlacesValue } from "./places.ts";
+import { answerOptions } from "./answers.ts";
 
 export const NONE = "__none__";
 export const MAX_OPTIONS = 254;
@@ -28,9 +30,9 @@ const HEADING = /^[A-Z][A-Z\s&]{3,}$/;
  * stop -- joining every unterminated line would weld "University of Wisconsin"
  * onto the date sitting beneath it.
  */
-export function unwrap(text) {
+export function unwrap(text: string): string {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const out = [];
+  const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     let block = lines[i];
     if (BULLET_START.test(block)) {
@@ -54,25 +56,25 @@ export function unwrap(text) {
 // the bullet has no full stop -- which most do not. Joining on "no full stop"
 // alone swallowed the next job's title, dates and company into a bullet.
 const DATEISH = /(?:19|20)\d{2}|\bPresent\b/;
-function titleLike(line) {
+function titleLike(line: string): boolean {
   const words = line.split(/\s+/);
   return words.length <= 6 && words.every((w) => /^[A-Z0-9&(]/.test(w) || /^(?:of|and|the|in|at|for|&|-|–|—)$/.test(w));
 }
-// The PDF extractor joins wrapped lines by position (lib/extract.js); text
+// The PDF extractor joins wrapped lines by position (lib/extract.ts); text
 // alone is only trusted for a line that plainly starts mid-sentence. A "long
 // line running on" rule swallowed whole Word entry lines into the bullet
 // above them.
-function continues(block, next) {
+function continues(block: string, next: string): boolean {
   if (BULLET_START.test(next) || HEADING.test(next)) return false;
   return /^[a-z(,;%$]/.test(next);
 }
 
 /** Free-form lines (resume bullets, extra notes) as unlabeled options. */
-export function extraSnippets(text, startIndex = 0, minLength = 8) {
-  const out = {};
+export function extraSnippets(text: string, startIndex = 0, minLength = 8): Record<string, string> {
+  const out: Record<string, string> = {};
   if (!text) return out;
   let n = startIndex;
-  const seen = new Set();
+  const seen = new Set<string>();
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim().replace(BULLET_PREFIX, "");
     // A company name can be very short. "Netflix" is seven characters, and
@@ -87,10 +89,12 @@ export function extraSnippets(text, startIndex = 0, minLength = 8) {
 }
 
 /** Repeated entries, each option labelled with its ordinal and its subject. */
-function repeatedOptions(profile) {
-  const options = {};
+function repeatedOptions(profile: Profile): Options {
+  const options: Options = {};
   for (const section of REPEATABLE) {
-    const entries = Array.isArray(profile[section.key]) ? profile[section.key] : [];
+    // A dynamic (non-literal) index access doesn't narrow through
+    // Array.isArray, so the cast just states what the check just confirmed.
+    const entries = (Array.isArray(profile[section.key]) ? profile[section.key] : []) as ProfileEntry[];
     entries.forEach((entry, index) => {
       const ordinal = ORDINALS[index] || `${index + 1}th most recent`;
       const subject = (entry[section.summary] || "").trim();
@@ -116,10 +120,10 @@ function repeatedOptions(profile) {
  * full-name box would be wrong. Joining the two is code's job, so the composed
  * answer is offered as an option of its own. Anything typed explicitly wins.
  */
-function derived(profile, settings = {}) {
-  const has = (key) => Boolean(String(profile[key] || "").trim());
-  const get = (key) => String(profile[key] || "").trim();
-  const out = {};
+function derived(profile: Profile, settings: Settings = {}): Record<string, string> {
+  const has = (key: string): boolean => Boolean(String(profile[key] || "").trim());
+  const get = (key: string): string => String(profile[key] || "").trim();
+  const out: Record<string, string> = {};
 
   if (!has("full_name") && has("first_name") && has("last_name")) {
     out.full_name = `${get("first_name")} ${get("last_name")}`;
@@ -190,10 +194,10 @@ const GRADUATE = /\bmaster|\bdoctor|\bph\.?\s?d\b|\bm\.?(?:s|a|eng|sc|phil)\b|\b
  * Workday's Websites section is a list of bare "URL" boxes, one per Add.
  * Numbered in a fixed order, "Websites 2: URL" has one right answer.
  */
-const WEBSITES = [["linkedin", "LinkedIn"], ["github", "GitHub"], ["portfolio", "portfolio"], ["other_link", "other site"]];
+const WEBSITES: [string, string][] = [["linkedin", "LinkedIn"], ["github", "GitHub"], ["portfolio", "portfolio"], ["other_link", "other site"]];
 
-function websiteOptions(profile) {
-  const options = {};
+function websiteOptions(profile: Profile): Options {
+  const options: Options = {};
   WEBSITES.filter(([key]) => String(profile[key] || "").trim()).forEach(([key, name], i) => {
     options[`website${i + 1}`] = { field: `URL of website ${i + 1} (${name})`, value: String(profile[key]).trim() };
   });
@@ -201,11 +205,11 @@ function websiteOptions(profile) {
 }
 
 /** The full option set: labelled profile fields first, then free-form lines. */
-export function buildOptions(profile = {}, extraText = "", settings = {}) {
-  const options = {};
+export function buildOptions(profile: Profile = {}, extraText = "", settings: Settings = {}): Options {
+  const options: Options = {};
   // Derived values win only for the keys they correct (names' apostrophes).
   const fixed = derived(profile, settings);
-  const complete = { ...fixed, ...profile };
+  const complete: Profile = { ...fixed, ...profile };
   for (const key of ["full_name", "first_name", "last_name", "preferred_name"]) {
     if (fixed[key] && String(profile[key] || "").trim()) complete[key] = fixed[key];
   }
@@ -216,21 +220,24 @@ export function buildOptions(profile = {}, extraText = "", settings = {}) {
   }
   Object.assign(options, repeatedOptions(profile));
   Object.assign(options, websiteOptions(profile));
-  Object.assign(options, placesOptions(profile.work_locations));
+  // TODO(types): Profile models every field generically as
+  // string | ProfileEntry[] | undefined; work_locations is really the
+  // { ranked, anywhere } shape places.ts reads.
+  Object.assign(options, placesOptions(profile.work_locations as PlacesValue));
   Object.assign(options, answerOptions(profile.custom_answers));
   Object.assign(options, extraSnippets(extraText));
   return Object.fromEntries(Object.entries(options).slice(0, MAX_OPTIONS));
 }
 
-export function asCriteria(options) {
+export function asCriteria(options: Options): Options {
   return { ...options, [NONE]: "None of these answers this field" };
 }
 
 /** A labelled option answers verbatim; a bare line still needs extraction. */
-export function isStructured(option) {
+export function isStructured(option: Options[string]): option is { field: string; value: string } {
   return Boolean(option) && typeof option === "object";
 }
 
-export function valueOf(option) {
+export function valueOf(option: Options[string]): string {
   return isStructured(option) ? option.value : option;
 }

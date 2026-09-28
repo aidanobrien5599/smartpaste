@@ -16,7 +16,10 @@
  * Everything in this file is pure, so it is tested without the API.
  */
 
-export const SECTION_KINDS = {
+/** One piece of a resume line, labelled (or not yet) for what it holds. */
+export type Piece = { text: string; label?: string; bullet?: boolean; index?: number };
+
+export const SECTION_KINDS: Record<string, string> = {
   education: "Education, academic background, qualifications, degrees",
   experience: "Work experience, employment, professional history, internships, jobs",
   projects: "Projects, personal or academic projects, open-source work, portfolio",
@@ -32,7 +35,7 @@ export const SECTION_KINDS = {
   __none__: "Not a section heading -- ordinary content",
 };
 
-export const EXPERIENCE_KINDS = {
+export const EXPERIENCE_KINDS: Record<string, string> = {
   company: "The employer or organisation name",
   title: "The job title or position held",
   location: "Where the job was: a city, region, country, or Remote",
@@ -41,7 +44,7 @@ export const EXPERIENCE_KINDS = {
   other: "Something else",
 };
 
-export const EDUCATION_KINDS = {
+export const EDUCATION_KINDS: Record<string, string> = {
   school: "The school, college or university name",
   degree: "The degree only, such as 'Bachelor of Science' or 'B.S.' or 'MBA'",
   field: "The field of study or major only, such as 'Computer Science'",
@@ -54,7 +57,7 @@ export const EDUCATION_KINDS = {
 };
 
 // A fixed list for "B.S." -> "Bachelor of Science": a choice, not a rewrite.
-export const DEGREES = [
+export const DEGREES: string[] = [
   "Associate of Arts", "Associate of Science", "Bachelor of Arts", "Bachelor of Science",
   "Bachelor of Science in Engineering", "Bachelor of Engineering", "Bachelor of Applied Science",
   "Bachelor of Technology", "Bachelor of Mathematics", "Bachelor of Business Administration",
@@ -90,17 +93,17 @@ const COLUMN_HEADER =
 const HAS_DATE = /\d|present|current|now|today/i;
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MONTH_INDEX = (word) => MONTH_NAMES.findIndex((m) => word.toLowerCase().startsWith(m.toLowerCase()));
+const MONTH_INDEX = (word: string): number => MONTH_NAMES.findIndex((m) => word.toLowerCase().startsWith(m.toLowerCase()));
 
 /**
  * One date, in one form: "Feb 2019", "2019", "Summer 2015", "Present".
  * Code, not the model -- "Feb ’19", "Dec. 2020", "2013/09" and "09.2013" are
  * spellings of a date, and a form wants the date.
  */
-export function normalizeDate(raw, borrowYear = "") {
+export function normalizeDate(raw: string, borrowYear = ""): string {
   const t = raw.trim().replace(/\s+/g, " ");
   if (/^(?:present|current|now|today)$/i.test(t)) return "Present";
-  const fullYear = (y) => (y.length === 2 || /^['\u2019]/.test(y)
+  const fullYear = (y: string): string => (y.length === 2 || /^['\u2019]/.test(y)
     ? (Number(y.replace(/\D/g, "")) > 50 ? "19" : "20") + y.replace(/\D/g, "")
     : y);
   let m = t.match(/^((?:19|20)\d{2})\s*[/.-]\s*(\d{1,2})$/); // 2013/09
@@ -118,7 +121,7 @@ export function normalizeDate(raw, borrowYear = "") {
 }
 
 /** "May 2026 – August 2026" -> { start, end }. A lone date is an end date. */
-export function parseDates(text) {
+export function parseDates(text: string): { start: string; end: string } {
   const clean = text.replace(/^(?:Expected|Class\s+of|Graduat(?:ed|ing|ion):?)\s+/i, "").trim();
   const parts = clean.split(DATE_SPLIT).map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
@@ -133,7 +136,7 @@ export function parseDates(text) {
 
 const BULLET = /^\s*[-*•·▪●‣⁃◦]\s*/;
 
-export const isBullet = (line) => BULLET.test(line);
+export const isBullet = (line: string): boolean => BULLET.test(line);
 
 const SECTION_WORDS =
   /\b(?:education|academic|experience|employment|work|history|background|career|professional|skills?|competenc|technical|projects?|summary|profile|objective|about|leadership|activities|involvement|volunteer|awards?|honou?rs|certifications?|licen[cs]es|publications?|research|languages?|interests|qualifications|coursework|affiliations|memberships|contact|references|training|achievements|extracurricular|teaching|service|ausbildung|berufserfahrung|kenntnisse|formation|exp[eé]rience|comp[eé]tences|educaci[oó]n|experiencia|habilidades)/i;
@@ -146,7 +149,7 @@ const SECTION_WORDS =
  * "Michigan Hackers" and "Embedded Software Intern", Jev called both
  * headings and split one job's entries into the wrong sections.
  */
-export function headingCandidates(lines) {
+export function headingCandidates(lines: string[]): { text: string; index: number }[] {
   return lines
     .map((text, index) => ({ text, index }))
     .filter(({ text }) => {
@@ -166,7 +169,7 @@ export function headingCandidates(lines) {
 
 // A strong section word decides the section when Jev declines a creative
 // heading: "Career Journey" is experience whatever else it is.
-const VOCABULARY = [
+const VOCABULARY: [RegExp, string][] = [
   [/\b(?:experience|employment|career|work history|professional history|positions|berufserfahrung|exp[eé]rience professionnelle|experiencia)\b/i, "experience"],
   [/\b(?:education|academic|credentials|qualifications|studies|ausbildung|formation|educaci[oó]n)\b/i, "education"],
   [/\b(?:projects?|open[- ]source|portfolio)\b/i, "projects"],
@@ -180,20 +183,23 @@ const VOCABULARY = [
   [/\b(?:skills|competenc|technical|kenntnisse|comp[eé]tences|habilidades)/i, "skills"],
 ];
 
-export function sectionByVocabulary(text) {
+export function sectionByVocabulary(text: string): string | null {
   const hit = VOCABULARY.find(([re]) => re.test(text));
   return hit ? hit[1] : null;
 }
+
+/** One resume line, placed in its section by sectionise. */
+export type Row = { text: string; index: number; section: string; heading: boolean };
 
 /**
  * Assign every line a section, from the headings Jev confirmed.
  * Lines before the first heading are the header: name and contact details.
  */
-export function sectionise(lines, headingKinds) {
+export function sectionise(lines: string[], headingKinds: Map<number, string>): Row[] {
   let current = "header";
   return lines.map((text, index) => {
     if (headingKinds.has(index)) {
-      current = headingKinds.get(index);
+      current = headingKinds.get(index)!; // headingKinds.has(index) just confirmed the entry is there
       return { text, index, section: current, heading: true };
     }
     return { text, index, section: current, heading: false };
@@ -218,7 +224,7 @@ const PLACE_CODE =
  * whole (they contain dashes), commas split, and a trailing place code is put
  * back on its city: "Towson" + "MD" -> "Towson, MD".
  */
-export function splitPieces(line) {
+export function splitPieces(line: string): string[] {
   // Prose is one piece. Length cannot tell it from an entry line -- "Bachelor
   // of Science, Computer Information Systems (CIS), Towson University,
   // Towson, MD" is eleven words and must be split -- but its words can: prose
@@ -227,10 +233,10 @@ export function splitPieces(line) {
   const lower = words.filter((w) => /^[a-z]/.test(w) && !/^(?:of|and|the|in|at|for|to|&)$/.test(w)).length;
   if (words.length > 8 && lower / words.length >= 0.4) return [line.replace(BULLET, "").trim()];
   if (isBullet(line)) return [line.replace(BULLET, "").trim()];
-  const dates = [];
+  const dates: string[] = [];
   // A bracket is one unit: "(Remote from Jan 2019 - 2020)" holds a date range
   // and "[Stealth Startup - NDA in effect]" a dash, and neither is a boundary.
-  const brackets = [];
+  const brackets: string[] = [];
   const bracketed = line.replace(/\([^()]*\)|\[[^\[\]]*\]/g, (m) => {
     brackets.push(m);
     return `\u0003${brackets.length - 1}\u0003`;
@@ -239,11 +245,13 @@ export function splitPieces(line) {
     dates.push(m.trim());
     return `\u0001${dates.length - 1}\u0001`;
   });
-  const raw = guarded
+  // lib.d.ts declares split's return as always string[], but with a capturing
+  // separator regex an unmatched group comes back undefined at runtime.
+  const raw = (guarded
     // A GPA always starts its own field: "BSE Computer Engineering GPA: 3.91".
-    .split(/\s*\u0001(\d+)\u0001\s*|\s+[|•·—]\s+|\s+–\s+(?=[A-Z])|;\s+|,\s+|\s+(?=(?:Cumulative\s+|Overall\s+|Major\s+)?C?GPA\b)/)
+    .split(/\s*\u0001(\d+)\u0001\s*|\s+[|•·—]\s+|\s+–\s+(?=[A-Z])|;\s+|,\s+|\s+(?=(?:Cumulative\s+|Overall\s+|Major\s+)?C?GPA\b)/) as (string | undefined)[])
     .filter((p) => p !== undefined);
-  const pieces = [];
+  const pieces: string[] = [];
   for (let i = 0; i < raw.length; i++) {
     let piece = raw[i];
     if (piece === undefined || piece === "") continue;
@@ -285,11 +293,14 @@ export function splitPieces(line) {
 
 // ---------------------------------------------------------------- assembly
 
-const EXP_FIELD = { company: "company", title: "title", location: "location", dates: "dates" };
-const EDU_FIELD = {
+const EXP_FIELD: Record<string, string> = { company: "company", title: "title", location: "location", dates: "dates" };
+const EDU_FIELD: Record<string, string> = {
   school: "school", degree: "degree", field: "major", degree_field: "degree_field",
   gpa: "gpa", location: "location", dates: "dates",
 };
+
+/** One assembled entry (a job, a school, …): whichever FIELD keys it collected, plus its description. */
+export type AssembledEntry = { description: string[]; [field: string]: string | string[] | undefined };
 
 /**
  * Pieces with labels -> entries. A new entry starts when a field that the
@@ -297,26 +308,31 @@ const EDU_FIELD = {
  * (company, title, school, degree) follows a description. That works whether
  * a layout leads with the date, the title or the company.
  */
-export function assemble(pieces, kind) {
+export function assemble(pieces: Piece[], kind: string): AssembledEntry[] {
   const FIELD = kind === "education" ? EDU_FIELD : EXP_FIELD;
   const HEAD = kind === "education"
     ? new Set(["school", "degree", "degree_field"])
     : new Set(["company", "title"]);
-  const entries = [];
-  let entry = null;
+  const entries: AssembledEntry[] = [];
+  // A cast on the initializer, not a `: AssembledEntry | null` annotation:
+  // with the latter, tsc's narrowing of `entry &&` checks later in this loop
+  // collapses to `never` once entry is reassigned inside open()'s closure.
+  let entry = null as AssembledEntry | null;
   const open = () => {
     entry = { description: [] };
     entries.push(entry);
   };
-  let last = null; // the previous labelled piece: { field, line }
+  let last: { field: string; line: number | undefined } | null = null; // the previous labelled piece: { field, line }
   for (const { text, label, bullet, index } of pieces) {
     if (bullet || label === "description" || label === "detail") {
       if (!entry) open();
-      if (label !== "detail") entry.description.push(text);
+      if (label !== "detail") entry!.description.push(text);
       last = null;
       continue;
     }
-    const field = FIELD[label];
+    // label is undefined only when bullet is also falsy, which the branch
+    // above already handles; FIELD[undefined] mirrors that -- always a miss.
+    const field = FIELD[label as string];
     if (!field) continue;
     if (field === "dates" && !HAS_DATE.test(text)) continue; // a "Dates" column header
     if (COLUMN_HEADER.test(text)) continue; // "Employer | Title | Dates"
@@ -324,19 +340,19 @@ export function assemble(pieces, kind) {
     // that held a comma: "Senior Director" + "International Business
     // Development". Without this the second opened a phantom entry.
     if (entry && last && last.field === field && index !== undefined && last.line === index) {
-      entry[field] = `${entry[field]}, ${text}`;
+      entry![field] = `${entry![field]}, ${text}`;
       continue;
     }
     last = { field, line: index };
-    const repeated = entry && entry[field] !== undefined;
-    const afterWork = entry && HEAD.has(label) && entry.description.length > 0;
+    const repeated = entry && entry![field] !== undefined;
+    const afterWork = entry && HEAD.has(label as string) && entry!.description.length > 0;
     // An entry with no dates and no description yet is not finished, so a
     // repeated title there replaces the first rather than opening a phantom
     // entry: "Sony Interactive Entertainment — EMEA Liaison" (split into a
     // company and a title) followed by the real title two lines later.
-    const unfinished = entry && !entry.dates && entry.description.length === 0;
-    if (!entry || afterWork || (repeated && !(unfinished && HEAD.has(label)))) open();
-    entry[field] = text;
+    const unfinished = entry && !entry!.dates && entry!.description.length === 0;
+    if (!entry || afterWork || (repeated && !(unfinished && HEAD.has(label as string)))) open();
+    entry![field] = text;
   }
   return entries.filter((e) => Object.keys(e).length > 1 || e.description.length);
 }
@@ -345,7 +361,7 @@ const DEGREE_PREFIX =
   /^\s*(?:(?:Bachelor|Master|Associate|Doctor)(?:'s)?(?:\s+of\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)?(?:\s+in\s+Engineering)?|Ph\.?D\.?|MBA|B\.?Tech|B\.?Eng|M\.?Eng|MEng|BEng|BSE|B\.?Sc?\.?|B\.?A\.?|M\.?Sc?\.?|M\.?A\.?|A\.?[AS]\.?)(?=[\s,(-]|$)\s*(?:\(Hons?\)\s*)?(?:in\s+|,\s*|-\s*|:\s*)?/;
 
 /** "B.S. in Computer Science" -> { degree: "B.S.", field: "Computer Science" } */
-export function splitDegreeField(text) {
+export function splitDegreeField(text: string): { degree: string; field: string } {
   const match = text.match(DEGREE_PREFIX);
   if (!match || !match[0].trim()) return { degree: "", field: text.trim() };
   const degree = match[0].replace(/\s+(?:in|,|-|:)\s*$/i, "").replace(/[,:-]\s*$/, "").trim();
@@ -353,7 +369,7 @@ export function splitDegreeField(text) {
 }
 
 /** Cut the number out of "GPA: 3.82/4.00" or "Cumulative GPA 3.6/4.0". */
-export function cleanGpa(text) {
+export function cleanGpa(text: string): string {
   const m = text.match(/\d+(?:\.\d+)?\s*(?:\/\s*\d+(?:\.\d+)?)?/);
   return m ? m[0].replace(/\s+/g, "") : text;
 }
@@ -366,14 +382,14 @@ export function cleanGpa(text) {
 
 const DATE_IN = new RegExp(DATE_RANGE.source, "i");
 const URL_IN = /(?:https?:\/\/|www\.)\S+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|io|dev|org|net|ai|app|co)(?:\/\S*)?/i;
-const strip = (line) => line.replace(BULLET, "").trim();
+const strip = (line: string): string => line.replace(BULLET, "").trim();
 
 const LIST_HEADER =
   /^(?:name|title|certification|certificate|credential|award|honou?r|issuer|issued by|awarded by|organi[sz]ation|date|dates?|year|status|expiry|expires|status \/ expiry|id|credential id|venue|publisher)s?:?$/i;
 
 /** "Languages: Go, Python, Rust" -> { category: "Languages", skills: [...] } */
-export function readSkills(lines) {
-  const groups = [];
+export function readSkills(lines: string[]): { category: string; skills: string[] }[] {
+  const groups: { category: string; skills: string[] }[] = [];
   for (const raw of lines) {
     const line = strip(raw);
     if (!line) continue;
@@ -393,8 +409,8 @@ export function readSkills(lines) {
  * One entry per line: a name, who gave it, and when.
  * "AWS Certified Developer — Amazon Web Services, Issued: 06/2022"
  */
-export function readListEntries(lines) {
-  const entries = [];
+export function readListEntries(lines: string[]): { name: string; issuer: string; date: string }[] {
+  const entries: { name: string; issuer: string; date: string }[] = [];
   for (const raw of lines) {
     const line = strip(raw);
     if (!line || line.split(/\s+/).length > 30) continue;
@@ -408,7 +424,7 @@ export function readListEntries(lines) {
     // In a list entry "|" and a spaced dash always separate fields, so split on
     // them first -- a line with a sentence after the "|" reads as prose otherwise.
     const pieces = withoutDate.split(/\s+[|\u2013\u2014-]\s+/).flatMap((part) => splitPieces(part));
-    const rest = [];
+    const rest: string[] = [];
     for (const p of pieces) {
       if (!date && DATE_IN.test(p) && p.replace(DATE_IN, "").trim().length <= 2) date = p;
       // Trailing commentary is not an issuer: "| the only industry exam for Ruby".
@@ -436,7 +452,7 @@ export function readListEntries(lines) {
  * carries a separator, a link or a date. A sentence under a project -- or its
  * wrapped tail, "Ongoing since late 2022" -- is description, not the next one.
  */
-function projectTitleLike(line) {
+function projectTitleLike(line: string): boolean {
   const words = strip(line).split(/\s+/);
   if (/\||—|https?:|www\.|github\.com/.test(line)) return true;
   if (words.length > 8) return false;
@@ -445,9 +461,11 @@ function projectTitleLike(line) {
 }
 
 /** A project starts at a title-like line; the lines under it are its description. */
-export function readProjects(lines) {
-  const projects = [];
-  let current = null;
+export function readProjects(
+  lines: string[]
+): { name: string; url: string; dates: string; description: string[] }[] {
+  const projects: { name: string; url: string; dates: string; description: string[] }[] = [];
+  let current: { name: string; url: string; dates: string; description: string[] } | null = null;
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
@@ -472,7 +490,9 @@ const COUNTRIES =
   /^(?:USA|US|U\.S\.A?\.|United States|UK|U\.K\.|United Kingdom|Canada|India|Germany|France|Spain|Italy|Ireland|Australia|Singapore|Japan|China|Netherlands|Switzerland|Sweden|Brazil|Mexico|México|Argentina|UAE)$/i;
 
 /** City, state and country from the header's "San Francisco, CA" piece. */
-export function readHomeLocation(headerLines) {
+export function readHomeLocation(
+  headerLines: string[]
+): { city: string; state: string; country: string } | null {
   for (const line of headerLines) {
     for (const piece of splitPieces(line)) {
       if (/@|\d{3}|https?:|www\.|\.com/i.test(piece)) continue;
@@ -480,7 +500,10 @@ export function readHomeLocation(headerLines) {
       if (parts.length < 2 || parts.length > 3) continue;
       if (!parts.every((p) => /^[A-ZÀ-Þ][\p{L}.' -]*$/u.test(p))) continue;
       const [city, second, third] = parts;
-      const country = COUNTRIES.test(third || "") ? third : COUNTRIES.test(second) ? second : "";
+      // COUNTRIES.test(third || "") only passes when third is itself a
+      // matching string, never on the "" fallback (the pattern matches no
+      // empty alternative) -- so this branch's `third` is never undefined.
+      const country = COUNTRIES.test(third || "") ? (third as string) : COUNTRIES.test(second) ? second : "";
       const state = /^[A-Z]{2}$/.test(second) || (third && !COUNTRIES.test(second)) ? second : "";
       if (!state && !country) continue;
       return { city, state, country };

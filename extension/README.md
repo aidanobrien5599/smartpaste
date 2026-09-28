@@ -9,6 +9,9 @@ never invents a value and never eats the keystroke.
 
 ## Setup
 
+0. At the repo root: `npm install && npm run build` (or leave `npm run watch`
+   running). The code lives in `src/` and Chrome runs the build in `dist/`;
+   `src/README.md` maps every file.
 1. `chrome://extensions` → **Developer mode** → **Load unpacked** → this folder.
 2. Click the icon → **Open settings**.
 3. Paste your API key from `console.typesafe.ai/keys`.
@@ -18,7 +21,8 @@ never invents a value and never eats the keystroke.
    stored documents.
 
 Chrome does not reload an unpacked extension by itself. After pulling changes,
-press **Reload** on `chrome://extensions` or you are running the old code.
+run `npm run build`, then press **Reload** on `chrome://extensions`, or you are
+running the old code.
 
 ## Use
 
@@ -50,11 +54,11 @@ anywhere in code.
 | `0.40 – 0.85` | filled, flagged as worth checking, alternatives kept |
 | `< 0.40`, or the escape option wins | **no value offered at all** |
 
-Thresholds live in `lib/resolve.js`.
+Thresholds live in `src/lib/resolve.ts`.
 
 **Jev selects; it never composes.** Asked for `Name` with only a first and last
 name stored it correctly returns nothing — handing back `Aidan` for a full-name
-box would be wrong. Joining them is code's job, so `lib/profile.js` derives the
+box would be wrong. Joining them is code's job, so `src/lib/profile.ts` derives the
 composed answers (`full_name` from first + last, first and last back out of a
 full name, `location` from city + state) and offers each as an option in its
 own right. Anything typed explicitly beats a derived value.
@@ -102,7 +106,7 @@ settings, on something you read before saving. Fields you have already filled
 are never touched.
 
 **Reading the PDF.** pdf.js returns positioned fragments, not lines, so
-`lib/extract.js` rebuilds them. Three things matter on a real resume:
+`src/lib/extract.ts` rebuilds them. Three things matter on a real resume:
 
 - **Columns.** A right-aligned date sits on the same baseline as the job title,
   so grouping by height alone produced `Software Engineer Intern May 2026 -
@@ -408,8 +412,8 @@ deliver it.
 ## Tests
 
 ```bash
-node --test extension/test/          # lib + content script in headless Chrome
-node bench/mutation-check.mjs        # does each live-found fix have a test that sees it?
+npm test                             # build, typecheck, structure, lib, content script in headless Chrome
+npm run mutation                     # does each live-found fix have a test that sees it?
 node bench/dogfood-live.mjs <url>    # a live page, the stub playing Jev
 node bench/dogfood-real.mjs <url>    # a live page, real Jev and my real profile
 ```

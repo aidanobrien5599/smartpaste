@@ -1,11 +1,11 @@
-// Unit tests for extension/lib. Run: node --test extension/test/
+// Unit tests for extension/src/lib. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../lib/resolve.js";
-import { placeSaysYes } from "../lib/places.js";
-import { isPriorEmploymentQuestion } from "../lib/history.js";
-import { LABELS } from "../lib/schema.js";
-import { buildOptions, unwrap, extraSnippets, NONE } from "../lib/profile.js";
+import { isYesNo, maxTicks, refine, resolve, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
+import { placeSaysYes } from "../src/lib/places.ts";
+import { isPriorEmploymentQuestion } from "../src/lib/history.ts";
+import { LABELS } from "../src/lib/schema.ts";
+import { buildOptions, unwrap, extraSnippets, NONE } from "../src/lib/profile.ts";
 
 test("refine: names from an all-caps header", () => {
   assert.equal(refine("First name", "AIDAN O'BRIEN"), "Aidan");

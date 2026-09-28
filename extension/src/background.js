@@ -5,17 +5,18 @@
  * cross-origin request from whatever company you are applying to -- and would
  * hand that page's context your API key. The key never leaves here.
  */
+/** @typedef {import("./shared/messages.ts").ContentMessage} ContentMessage -- the messages this worker answers. */
 
-import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.js";
-import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.js";
+import { asCriteria, buildOptions, extraSnippets, NONE, unwrap } from "./lib/profile.ts";
+import { FIELDS, ORDINALS, REPEATABLE } from "./lib/schema.ts";
 import {
   assemble, cleanGpa, DEGREES, sectionByVocabulary, readSkills, readListEntries, readProjects,
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
-} from "./lib/draft.js";
-import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.js";
-import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.js";
-import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.js";
+} from "./lib/draft.ts";
+import { AUTO, MENU, isYesNo, maxTicks, resolve, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.ts";
+import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.ts";
+import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.ts";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const MODEL = "jev-latest";
@@ -473,7 +474,7 @@ async function profileFromResume(text) {
 }
 
 /* ------------------------------------------------------------------------
- * Drafting by classification ("segments" engine). See lib/draft.js for why.
+ * Drafting by classification ("segments" engine). See lib/draft.ts for why.
  * ---------------------------------------------------------------------- */
 
 const choice = (instructions, criteria) => ({ type: "choice", instructions, criteria });

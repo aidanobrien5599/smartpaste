@@ -6,11 +6,14 @@
  * inside the 10MB local quota even with a transcript and cover letter.
  */
 
-import { DOCUMENTS } from "./schema.js";
+import { DOCUMENTS } from "./schema.ts";
+
+/** One file kept in chrome.storage.local's `documents`, base64-encoded. */
+export type StoredDocument = { name: string; type: string; size: number; data: string };
 
 export const MAX_BYTES = 3 * 1024 * 1024;
 
-export function toBase64(buffer) {
+export function toBase64(buffer: ArrayBufferLike): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
   // Chunked, because spreading a large array into String.fromCharCode
@@ -21,7 +24,7 @@ export function toBase64(buffer) {
   return btoa(binary);
 }
 
-export function fromBase64(base64) {
+export function fromBase64(base64: string): Uint8Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -29,7 +32,7 @@ export function fromBase64(base64) {
 }
 
 /** Which stored document, if any, a file input is asking for. */
-export function documentFor(label) {
+export function documentFor(label: string | null | undefined): string | null {
   const low = (label || "").toLowerCase();
   for (const [key, , keywords] of DOCUMENTS) {
     if (keywords.some((word) => low.includes(word))) return key;
@@ -37,7 +40,7 @@ export function documentFor(label) {
   return null;
 }
 
-export function humanSize(bytes) {
+export function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;

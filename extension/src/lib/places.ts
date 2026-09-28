@@ -9,9 +9,14 @@
  * highest-ranked one it offers.
  */
 
+import type { Options } from "./schema.ts";
+
+/** The stored shape of a places preference, before normalizePlaces cleans it. */
+export type PlacesValue = { ranked?: unknown[]; anywhere?: unknown } | null | undefined;
+
 /** Stored shape, cleaned: { ranked: [most preferred first], anywhere }. */
-export function normalizePlaces(value) {
-  const ranked = [];
+export function normalizePlaces(value: PlacesValue): { ranked: string[]; anywhere: boolean } {
+  const ranked: string[] = [];
   for (const place of Array.isArray(value?.ranked) ? value.ranked : []) {
     const text = String(place || "").replace(/\s+/g, " ").trim();
     if (text && !ranked.some((p) => p.toLowerCase() === text.toLowerCase())) ranked.push(text);
@@ -27,9 +32,9 @@ const ANYWHERE = "Willing to work in, or relocate to, a particular city, " +
   "region or office the job names -- open to any location";
 
 /** Profile options for these preferences, in buildOptions' shape. */
-export function placesOptions(value) {
+export function placesOptions(value: PlacesValue): Options {
   const { ranked, anywhere } = normalizePlaces(value);
-  const options = {};
+  const options: Options = {};
   if (ranked.length) {
     options.work_locations = {
       field: "Places I would like to work, most preferred first (not where I live now)",
@@ -60,7 +65,10 @@ export function placesOptions(value) {
  * location is what makes the answer Yes. Without "anywhere" a place is no
  * answer: matching "NYC area" against a list is a guess.
  */
-export function placeSaysYes(key, options) {
+export function placeSaysYes(key: string, options: Options): boolean {
   if (!["work_locations", "top_work_location", "open_to_any_location"].includes(key)) return false;
-  return /^yes\b/i.test(String(options.open_to_any_location?.value || "").trim());
+  // open_to_any_location, when present, is always a structured { field, value }
+  // option (set a few lines up in this file); the cast reflects that.
+  const entry = options.open_to_any_location as { value?: string } | undefined;
+  return /^yes\b/i.test(String(entry?.value || "").trim());
 }

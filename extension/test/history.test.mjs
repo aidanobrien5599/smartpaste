@@ -1,7 +1,7 @@
 // Questions answered from the work history. Run: node --test extension/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isPriorEmploymentQuestion, workHistory } from "../lib/history.js";
+import { isPriorEmploymentQuestion, workHistory } from "../src/lib/history.ts";
 
 test("prior-employment questions are recognised in their usual wordings", () => {
   for (const label of [

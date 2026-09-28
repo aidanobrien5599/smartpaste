@@ -1,7 +1,7 @@
 // linesFromItems against pdf.js-shaped fragments taken from a real resume.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { linesFromItems } from "../lib/extract.js";
+import { linesFromItems } from "../src/lib/extract.ts";
 
 const item = (str, x, y, width, height = 10, fontName = "text") =>
   ({ str, transform: [1, 0, 0, 1, x, y], width, height, fontName });
@@ -121,7 +121,7 @@ test("a word hyphenated across the line break is rejoined", () => {
 });
 
 test("page furniture: footers everywhere, running headers after page 1", async () => {
-  const { inBody } = await import("../lib/extract.js");
+  const { inBody } = await import("../src/lib/extract.ts");
   const at = (y) => ({ transform: [1, 0, 0, 1, 50, y] });
   assert.equal(inBody(at(20), 792, 1), false);   // footer
   assert.equal(inBody(at(760), 792, 1), true);   // page 1 top: the name

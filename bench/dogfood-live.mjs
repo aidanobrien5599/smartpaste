@@ -18,11 +18,12 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { chromePath } from "../extension/test/browser.mjs";
+import { bundleContent } from "../extension/build.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EXT = join(here, "..", "extension");
 const stub = readFileSync(join(EXT, "test", "fixtures", "stub.js"), "utf8");
-const content = readFileSync(join(EXT, "content.js"), "utf8");
+const content = await bundleContent();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

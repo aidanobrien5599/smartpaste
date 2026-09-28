@@ -1,8 +1,8 @@
-import { DOCUMENTS, GROUPS, ORDINALS, REPEATABLE } from "./lib/schema.js";
-import { humanSize, MAX_BYTES, toBase64 } from "./lib/documents.js";
-import { normalizePlaces } from "./lib/places.js";
-import { normalizeAnswers } from "./lib/answers.js";
-import { textFromStoredPdf } from "./lib/extract.js";
+import { DOCUMENTS, GROUPS, ORDINALS, REPEATABLE } from "./lib/schema.ts";
+import { humanSize, MAX_BYTES, toBase64 } from "./lib/documents.ts";
+import { normalizePlaces } from "./lib/places.ts";
+import { normalizeAnswers } from "./lib/answers.ts";
+import { textFromStoredPdf } from "./lib/extract.ts";
 
 let state = { profile: {}, documents: {} };
 
@@ -407,7 +407,7 @@ async function save() {
   state.profile = profile;
   renderPlaces(); // show the lists as saved: blanks and duplicates gone
   renderAnswers();
-  const { buildOptions } = await import("./lib/profile.js");
+  const { buildOptions } = await import("./lib/profile.ts");
   const count = Object.keys(buildOptions(profile, extraText)).length;
   const docs = Object.keys(state.documents).length;
   say(

@@ -1,0 +1,19 @@
+{
+  "name": "smartpaste",
+  "private": true,
+  "scripts": {
+    "build": "node extension/build.mjs",
+    "watch": "node extension/build.mjs --watch",
+    "typecheck": "tsc -p .",
+    "test": "node --test extension/test/",
+    "mutation": "node bench/mutation-check.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "@types/chrome": "^0.3.0"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

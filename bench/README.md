@@ -37,3 +37,30 @@ different id from the main checkout's -- and `bench/.sweep-template`, whose
 stored profile lives under the main checkout's id, does not apply: every page
 comes back `no-pill`. sweep.mjs copies the stored
 profile to whatever id its own path gives, so a worktree run works as-is.
+
+## Mutation check
+
+`node bench/mutation-check.mjs [name-filter]` (or `npm run mutation`) proves
+each live-found fix has a test that sees it. Every entry names the fixed code
+and the code before the fix. For each entry the check:
+
+1. finds the one file under `extension/src/content/` that holds the fixed
+   code;
+2. undoes the fix in a temporary copy of `src/`;
+3. bundles that copy;
+4. runs the content tests against the bundle.
+
+It reports each entry as one of:
+
+| result | meaning |
+|---|---|
+| `CAUGHT` | a test failed |
+| `MISSED` | the fix is unguarded |
+| `STALE` | the fixed code is no longer anywhere |
+| `AMBIGUOUS` | it is in more than one file |
+| `BROKEN` | the mutant does not build |
+
+The real source is only ever read. When a refactor moves or re-indents
+guarded code, change the entry's fixed and before text the same way. Run it
+on its own: a hung run kills every `smartpaste-chrome-` process, so
+concurrent runs manufacture false hangs.

@@ -8,7 +8,16 @@
  * verbatim instead of being re-extracted with a regex.
  */
 
-export const GROUPS = [
+/** [key, label, placeholder, long?] -- a form field's name, its shown label, its example, and whether it is a textarea. */
+export type FieldTuple = [key: string, label: string, placeholder: string, long?: boolean];
+
+export type SchemaGroup = {
+  title: string;
+  long?: boolean;
+  fields: FieldTuple[];
+};
+
+export const GROUPS: SchemaGroup[] = [
   {
     title: "Identity",
     fields: [
@@ -136,7 +145,16 @@ export const GROUPS = [
  * which employer is which, and because two entries with identical field names
  * are otherwise indistinguishable options.
  */
-export const REPEATABLE = [
+export type RepeatableSection = {
+  key: string;
+  title: string;
+  singular: string;
+  summary: string;
+  named?: boolean;
+  fields: FieldTuple[];
+};
+
+export const REPEATABLE: RepeatableSection[] = [
   {
     key: "education",
     title: "Education",
@@ -222,7 +240,7 @@ REPEATABLE.push(
   },
 );
 
-export const ORDINALS = [
+export const ORDINALS: string[] = [
   "most recent",
   "2nd most recent",
   "3rd most recent",
@@ -230,14 +248,24 @@ export const ORDINALS = [
   "5th most recent",
 ];
 
+export type DocumentTuple = [key: string, label: string, keywords: string[]];
+
 /** Files the extension keeps and attaches to a form's upload fields. */
-export const DOCUMENTS = [
+export const DOCUMENTS: DocumentTuple[] = [
   ["resume", "Resume / CV", ["resume", "cv", "curriculum"]],
   ["transcript", "Transcript", ["transcript", "academic record"]],
   ["cover_letter", "Cover letter", ["cover letter", "coverletter"]],
 ];
 
-export const FIELDS = GROUPS.flatMap((g) =>
+export type SchemaField = {
+  key: string;
+  label: string;
+  placeholder: string;
+  long: boolean;
+  group: string;
+};
+
+export const FIELDS: SchemaField[] = GROUPS.flatMap((g) =>
   g.fields.map(([key, label, placeholder]) => ({
     key,
     label,
@@ -247,18 +275,35 @@ export const FIELDS = GROUPS.flatMap((g) =>
   }))
 );
 
-export const LABELS = Object.fromEntries(FIELDS.map((f) => [f.key, f.label]));
+export const LABELS: Record<string, string> = Object.fromEntries(FIELDS.map((f) => [f.key, f.label]));
 
 LABELS.phone_country_code = "Phone number country code";
-// Derived in lib/profile.js from visa status and the education list.
+// Derived in lib/profile.ts from visa status and the education list.
 LABELS.on_visa = "Currently on a student or temporary work visa or permit " +
   "(F-1, OPT, CPT, STEM OPT, H-1B, TN, etc.)";
 LABELS.graduate_degree = "Graduate degree (master's or doctorate), for its GPA or graduation date";
 
-// Offered only with Settings -> "Say yes" on (lib/profile.js); not a form field.
+// Offered only with Settings -> "Say yes" on (lib/profile.ts); not a form field.
 LABELS.willing_default = "Default answer on any question asking whether I am " +
   "willing, able, intend or consent to something the hiring process asks: " +
   "commit to its hours, dates or length, pursue a certification or license " +
   "it expects, relocate, travel, accept the pay it states, complete its " +
   "checks and assessments, or agree to an interview being recorded or " +
   "transcribed";
+
+/** One repeatable entry (a job, a school, a project, …): its fields, as typed. */
+export type ProfileEntry = Record<string, string>;
+
+/** The stored profile: scalar fields, plus arrays of entries for repeatable sections. */
+export type Profile = { [key: string]: string | ProfileEntry[] | undefined };
+
+/** Settings -> chrome.storage.local, read in lib/profile.ts and options.js. */
+export type Settings = { acknowledge?: boolean; say_yes?: boolean; [key: string]: unknown };
+
+/**
+ * One entry in Jev's option set: a labelled profile field (structured, answers
+ * verbatim) or a bare resume line (needs lib/resolve.ts's extraction). See
+ * lib/profile.ts's isStructured / valueOf.
+ */
+export type Option = string | { field: string; value: string };
+export type Options = Record<string, Option>;
