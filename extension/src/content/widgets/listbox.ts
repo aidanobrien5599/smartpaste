@@ -49,6 +49,9 @@ async function openListbox(button: HTMLElement): Promise<boolean> {
  * menu open through its own round trip.
  */
 export async function surveyListbox(button: HTMLElement, want: string): Promise<MenuTexts> {
+  // A Workday dropdown never marks the row it took; the button's own text
+  // is the only proof, and it changes in the same tick as the click.
+  const chosen = () => !EMPTY_BUTTON.test(button.textContent!.trim());
   const opened = await openListbox(button);
   const texts: MenuTexts = opened ? await readMenu(button, want) : [];
   // The answer is right there: click it now rather than close, decide and
@@ -57,12 +60,12 @@ export async function surveyListbox(button: HTMLElement, want: string): Promise<
   if (exact >= 0) {
     const node = await findOption(button, texts[exact], texts.at?.get(texts[exact]));
     if (node) {
-      await pickOption(node);
-      if (!EMPTY_BUTTON.test(button.textContent!.trim())) { texts.done = true; return texts; }
+      await pickOption(node, chosen);
+      if (chosen()) { texts.done = true; return texts; }
     }
   }
   closeMenu(button);
-  await sleep(40);
+  await settlePopups(button);
   return texts;
 }
 
@@ -71,8 +74,9 @@ export async function applyListbox(button: HTMLElement, texts: MenuTexts, index:
   if (!(await openListbox(button))) { closeMenu(button); return false; }
   const node = await findOption(button, texts[index], texts.at?.get(texts[index]));
   if (!node) { closeMenu(button); return false; }
-  await pickOption(node);
-  return !EMPTY_BUTTON.test(button.textContent!.trim());
+  const chosen = () => !EMPTY_BUTTON.test(button.textContent!.trim());
+  await pickOption(node, chosen);
+  return chosen();
 }
 
 /** A Workday dropdown: a button that opens a listbox. */

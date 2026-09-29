@@ -249,12 +249,23 @@ export async function readMenu(anchor: Element, stopAt?: string): Promise<MenuTe
   pane = nodes.length && scroller(nodes[0]);
   if (!pane) return texts;
   pane.scrollTop = 0;
+  // The rows on screen right now, to tell a redrawn list from one that has
+  // not caught up yet.
+  const drawn = () => optionsNear(anchor).map(optionText).join("\u0000");
+  const newRows = (before: string) => { const now = drawn(); return Boolean(now) && now !== before; };
   for (let step = 0; step < 80; step++) {
     if (stopAt && texts.some((t) => normalize(t) === normalize(stopAt))) break;
     if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2) break;
+    const before = drawn();
     pane.scrollTop += Math.max(40, pane.clientHeight * 0.9);
     pane.dispatchEvent(new Event("scroll"));
-    await frames(2); // a virtualized list draws the new rows on the next frame
+    // A virtualized list draws the rows for the new scrollTop a frame or
+    // two later -- but plenty draw them in the scroll handler itself, and
+    // two frames spent per step on every step is what made Workday's 250
+    // countries cost 0.85s. Wait for rows that are both there and new, no
+    // longer than the two frames this always took: a list caught with no
+    // rows at all is mid-redraw, not redrawn.
+    for (let waited = 0; waited < 2 && !newRows(before); waited++) await frames(1);
     add(optionsNear(anchor));
   }
   return texts;
@@ -267,14 +278,18 @@ export async function findOption(anchor: Element, text: string, seenAt?: number)
   const first = optionsNear(anchor)[0];
   const pane = first && scroller(first);
   if (!pane) return null;
+  // Look before every wait, not after: a list that draws its rows in the
+  // scroll handler has the row there already, and sleeping first cost a
+  // flat 40ms on every jump back to where the option was seen.
   if (seenAt !== undefined) {
     pane.scrollTop = seenAt;
     pane.dispatchEvent(new Event("scroll"));
-    for (let i = 0; i < 5; i++) { await sleep(40); if (here()) return here(); }
+    for (let i = 0; i < 5; i++) { if (here()) return here(); await sleep(40); }
   }
   pane.scrollTop = 0;
   for (let step = 0; step < 80; step++) {
     pane.dispatchEvent(new Event("scroll"));
+    if (here()) return here();
     await sleep(50);
     if (here()) return here();
     if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2) break;
@@ -324,6 +339,9 @@ export function closeMenu(field: Element): void {
   }
 }
 
+// How long a clicked row is given to show that it took the click.
+const TOOK_THE_CLICK = 240;
+
 /** The element that actually takes an option's click. */
 const optionTarget: (node: Element) => Element = (node) => node.closest(PROMPT_LEAF) || node.closest('[role="option"]') || node;
 
@@ -340,14 +358,22 @@ export function optionPicked(node: Element): boolean {
  * Click an option where it listens: the row, not the label inside it. If
  * the row did not take it, its own radio / checkbox is the last resort --
  * never a second click on the row, which would untick a multiselect.
+ *
+ * `took` is the caller's own proof the click landed, and it is what makes
+ * this fast. Not every widget marks the row: a Workday result row sets
+ * data-automation-checked, but a dropdown button only changes its own
+ * text, so waiting for a mark that never comes sat out the whole budget --
+ * 240ms on every menu and on every skill added, a quarter of a Workday
+ * fill. Both signals land in the same tick as the click, so they are
+ * polled for, and checked once before any waiting at all.
  */
-export async function pickOption(node: Element): Promise<void> {
+export async function pickOption(node: Element, took: () => boolean = () => false): Promise<void> {
   const target = optionTarget(node);
   target.scrollIntoView({ block: "nearest" });
   click(target);
-  for (let i = 0; i < 6; i++) {
-    await sleep(40);
-    if (!target.isConnected || optionPicked(node)) return;
+  for (const deadline = Date.now() + TOOK_THE_CLICK; Date.now() < deadline;) {
+    if (!target.isConnected || optionPicked(node) || took()) return;
+    await sleep(10);
   }
   const box = target.querySelector<HTMLInputElement>('input[type="radio"], input[type="checkbox"]');
   if (box && !box.checked) { click(box); await sleep(200); }

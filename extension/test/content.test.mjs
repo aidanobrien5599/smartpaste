@@ -448,6 +448,11 @@ test("fill: a whole Workday page", { skip }, () =>
       });
     // 21 filled; the "broken" prompt never takes a click and is left for you.
     assert.match(summary, /^filled 21 in [0-9.]+s, attached 1 file, left 1 for you(?: · slowest: .*)?$/);
+    // No menu is left open. A shut Workday popup stays on screen while it
+    // animates out -- the fixture removes it 250ms later, as the page does
+    // -- and the fill now finishes inside that animation, so wait for them
+    // to go rather than take the fill being slower than it as the proof.
+    await page.waitFor("document.querySelectorAll('.pop').length === 0", 3000);
     assert.equal(await page.eval("document.querySelectorAll('.pop').length"), 0, "a menu was left open");
     // Only menus with no plain match go to Jev: "United States" is the one
     // country starting with it, "LinkedIn" the one source. Degree and gender
@@ -600,6 +605,46 @@ test("fill: a plain box called Location is not searched twice", { skip }, () =>
     for (const [id, count] of Object.entries(searches || {})) {
       assert.equal(count, 1, `${id} was searched ${count} times`);
     }
+  }));
+
+/** The fill's console timeline, one row per field, with its `ms`. */
+const timeline = (page) => page.eval("window.__smartpasteTest.timeline");
+
+// Adobe's My Experience step, live, spent 11.9s on 30 fields, and most of
+// what it spent was waiting on nothing in particular: a flat 240ms after
+// every option clicked, waiting for a mark that a Workday dropdown never
+// sets; two animation frames per scroll step, 0.85s to read 237 countries;
+// and a flat settle after closing each menu. Every one of those has a
+// signal from the page to wait for instead, and each budget below is far
+// above what the page needs and far below what the timer cost.
+test("fill: Workday menus are read and clicked on the page's own signals, not on a timer", { skip }, () =>
+  withPage("workday.html", async (page) => {
+    await autofill(page, 60000);
+    const steps = await timeline(page);
+    // 237 countries, drawn a dozen at a time: reading it means scrolling it.
+    const country = steps.find((s) => s.field === "Country");
+    assert.ok(country?.ok, `Country was not filled: ${JSON.stringify(country)}`);
+    assert.ok(country.ms < 300, `reading 237 countries took ${country.ms}ms`);
+    // Every dropdown here is opened, read, clicked and closed. The button's
+    // own text says the click landed, in the same tick as the click.
+    const menus = steps.filter((s) => (s.kind || "").startsWith("listbox") && s.ok);
+    assert.equal(menus.length, 5, JSON.stringify(steps.map((s) => [s.kind, s.field, s.ms])));
+    for (const menu of menus) {
+      assert.ok(menu.ms < 150, `${menu.field} took ${menu.ms}ms with nothing left to wait for`);
+    }
+  }));
+
+// Workday's Skills box takes one search and one pick per skill, so every
+// flat wait in that loop is paid over again for each one: live on Adobe it
+// cost 2.0s in one run and 4.6s in another.
+test("fill: Workday Skills -- every skill is one search and one pick, with no timer between", { skip }, () =>
+  withPage("workday-experience.html", async (page) => {
+    await autofill(page, 60000);
+    const skills = (await timeline(page)).find((s) => s.kind === "skills");
+    assert.ok(skills?.ok, `Skills was not filled: ${JSON.stringify(skills)}`);
+    assert.deepEqual(await page.eval("window.__model.skills"),
+      ["Python", "TypeScript", "Java", "React.js"]);
+    assert.ok(skills.ms < 150, `four skills took ${skills.ms}ms`);
   }));
 
 // workday-adobe-menus.html: a Workday build that marks no active popup and
@@ -803,6 +848,25 @@ test("fill: C3 -- text, month + year pairs, resume; consent boxes left alone", {
     for (const [key, value] of Object.entries(want)) assert.equal(model[key], value, `${key}: ${JSON.stringify(model)}`);
     assert.equal(await page.eval(`[...document.querySelectorAll(".gh-apply-form__checkbox input")][0].checked`), false, "ticked I Accept");
     assert.equal(await page.eval(`document.getElementById("ckyCCPAOptOut").checked`), false, "ticked Do Not Sell");
+  }));
+
+// C3's School, Degree and Field of study are <input list=> boxes over an
+// empty <datalist>. A datalist is the browser's own chrome: its suggestions
+// never enter the DOM, so waiting for them to appear under the box could
+// only run out in full -- twice over, first search and second. The three
+// boxes cost 2.7s each, 8 of that fill's 9.5 seconds, to end up typing the
+// value they were given all along.
+test("fill: C3 -- a datalist box is filled, not searched for a menu it cannot draw", { skip }, () =>
+  withPage("c3.html", async (page) => {
+    await autofill(page, 60000);
+    const steps = (await timeline(page))
+      .filter((s) => /^Education: (School|Degree|Field of study)$/.test(s.field));
+    assert.equal(steps.length, 3, JSON.stringify(steps));
+    for (const step of steps) {
+      assert.ok(step.ok, `${step.field} was not filled`);
+      assert.ok(step.ms < 500, `${step.field} took ${step.ms}ms waiting on a datalist`);
+    }
+    assert.equal(await page.eval("window.__model.School"), "University of Wisconsin - Madison");
   }));
 
 // bytedance.html rebuilds ByteDance's signed-in application and its widgets

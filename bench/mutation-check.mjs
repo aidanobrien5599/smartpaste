@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -176,6 +176,22 @@ const MUTATIONS = [
     "  return YES_NO_OPENER.test(last);", "lib"],
   ["a checkbox's text through its label for=",
     "          (b.id && document.querySelector(`label[for=\"${CSS.escape(b.id)}\"]`)?.textContent) ||\n", ""],
+  // Four waits that were spent whatever the page did. Each is undone back
+  // to the flat wait it replaced, and the budgets in the "not on a timer"
+  // tests are what see it.
+  ["a datalist has no menu to wait for",
+    'if (field.list) return false;\n  if (field.getAttribute("aria-autocomplete")) return true;',
+    'if (field.getAttribute("aria-autocomplete") || field.getAttribute("list")) return true;'],
+  ["a clicked row is proved by the widget, not by a timer",
+    "    if (!target.isConnected || optionPicked(node) || took()) return;\n    await sleep(10);",
+    "    await sleep(40);\n    if (!target.isConnected || optionPicked(node)) return;"],
+  ["a virtualized list is read as fast as it redraws",
+    "for (let waited = 0; waited < 2 && !newRows(before); waited++) await frames(1);",
+    "await frames(2);"],
+  // prompt.ts no longer imports sleep, so the flat wait is spelled out.
+  ["a skill waits for its menu to go, not for 80ms",
+    '    nativeSet(input, "");\n    await settlePopups(input);',
+    '    nativeSet(input, "");\n    await new Promise((done) => setTimeout(done, 80));'],
 ];
 
 const SRC = join(root, "extension", "src");

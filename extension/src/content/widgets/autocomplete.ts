@@ -31,7 +31,14 @@ const SUGGESTION_BOX =
   '[class*="autocomplete"], [class*="typeahead"], [class*="pac-container"]';
 
 export function looksLikeAutocomplete(field: HTMLInputElement): boolean {
-  if (field.getAttribute("aria-autocomplete") || field.getAttribute("list")) return true;
+  // A <datalist> is the browser's own chrome, not a menu on the page: its
+  // suggestions never enter the DOM, so a wait for them to appear under the
+  // box can only run out in full -- twice, first and second search. C3's
+  // School, Degree and Field of study are <input list=> boxes, and spent
+  // 2.7s each waiting for a menu that cannot exist: 8 of that fill's 9.5
+  // seconds. A datalist box takes free text, so what is typed is its answer.
+  if (field.list) return false;
+  if (field.getAttribute("aria-autocomplete")) return true;
   // "Email Address" is not a place, and waiting on it for suggestions that
   // never come cost three seconds a form.
   if (field.type === "email" || /e-?mail/i.test(labelFor(field))) return false;

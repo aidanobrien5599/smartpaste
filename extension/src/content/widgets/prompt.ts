@@ -20,10 +20,10 @@
 import { chooseAmong, localMatch } from "../answer/ask.ts";
 import { labelFor } from "../discover/labels.ts";
 import { FIELD_ENTRY } from "../discover/selectors.ts";
-import { click, press, sleep } from "../dom/query.ts";
+import { click, press } from "../dom/query.ts";
 import { normalize, optionText } from "../dom/text.ts";
 import { narrowingToken } from "./combobox.ts";
-import { closeMenu, findOption, optionPicked, optionsNear, pickOption, readMenu, waitForOptions } from "./menus.ts";
+import { closeMenu, findOption, optionPicked, optionsNear, pickOption, readMenu, settlePopups, waitForOptions } from "./menus.ts";
 import type { MenuTexts } from "./menus.ts";
 import { nativeSet } from "./text.ts";
 
@@ -43,13 +43,13 @@ export async function surveyPrompt(input: HTMLInputElement, want: string): Promi
   if (exact >= 0) {
     const node = await findOption(input, texts[exact], texts.at?.get(texts[exact]));
     if (node) {
-      await pickOption(node);
+      await pickOption(node, () => promptChosen(input));
       if (promptChosen(input) || optionPicked(node)) { closeMenu(input); texts.done = true; return texts; }
     }
   }
   closeMenu(input);
   nativeSet(input, "");
-  await sleep(40);
+  await settlePopups(input);
   return texts;
 }
 
@@ -59,7 +59,7 @@ export async function applyPrompt(input: HTMLInputElement, want: string, texts: 
     if ((await waitForOptions(input, 2500)).length) {
       const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
       if (node) {
-        await pickOption(node);
+        await pickOption(node, () => promptChosen(input));
         if (promptChosen(input) || optionPicked(node)) { closeMenu(input); return true; }
         // Clicked and nothing took: retrying is what froze the page.
         if (sameMenu(input, texts)) { closeMenu(input); nativeSet(input, ""); return false; }
@@ -72,14 +72,21 @@ export async function applyPrompt(input: HTMLInputElement, want: string, texts: 
 }
 
 /**
- * Whether a prompt holds a choice. Its list is never empty -- an empty one
+ * How many picks a prompt holds. Its list is never empty -- an empty one
  * says "0 items selected" -- so count selected items, or read that count.
+ * Skills holds many, and the count is what says the latest one landed.
  */
-export function promptChosen(input: Element): boolean {
+export function promptCount(input: Element): number {
   const box = input.closest('[data-automation-id="multiSelectContainer"]') || input.parentElement!;
-  if (box.querySelector('[data-automation-id="selectedItem"]')) return true;
+  const picked = box.querySelectorAll('[data-automation-id="selectedItem"]').length;
+  if (picked) return picked;
   const count = (input.closest(FIELD_ENTRY) || box).textContent!.match(/(\d+)\s+items?\s+selected/i);
-  return count ? Number(count[1]) > 0 : false;
+  return count ? Number(count[1]) : 0;
+}
+
+/** Whether a prompt holds a choice at all. */
+export function promptChosen(input: Element): boolean {
+  return promptCount(input) > 0;
 }
 
 // How long one picker may hold the page, and how many Jev questions it
@@ -121,14 +128,14 @@ export async function setPrompt(input: HTMLInputElement, want: string): Promise<
       if (index < 0) return done(false); // Jev saw the options: none fits
       const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
       if (!node) break;
-      await pickOption(node);
+      await pickOption(node, () => promptChosen(input));
       if (promptChosen(input) || optionPicked(node)) return done(true);
       // A category opens its children in place; anything else means the
       // click did not take, and asking again would only click again.
       if (sameMenu(input, texts)) return done(false);
     }
     closeMenu(input);
-    await sleep(100);
+    await settlePopups(input);
   }
   return done(false);
 }
@@ -157,11 +164,12 @@ export async function setMultiPrompt(input: HTMLInputElement, value: string): Pr
     if (!(await waitForOptions(input, 1500)).length) { closeMenu(input); continue; }
     const texts = await readMenu(input, item);
     const index = localMatch(texts, item);
+    const held = promptCount(input);
     const node = index >= 0 && (await findOption(input, texts[index], texts.at?.get(texts[index])));
-    if (node) { await pickOption(node); added++; }
+    if (node) { await pickOption(node, () => promptCount(input) > held); added++; }
     closeMenu(input);
     nativeSet(input, "");
-    await sleep(80);
+    await settlePopups(input);
   }
   return added > 0;
 }
