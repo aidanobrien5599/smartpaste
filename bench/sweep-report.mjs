@@ -29,12 +29,12 @@ const ats = (host) => /greenhouse/.test(host) ? "greenhouse" : /ashbyhq/.test(ho
 const IGNORE = /^(search|g-recaptcha|captcha)|cover letter|middle name|preferred (first )?name|pronoun|twitter|facebook|x \(fka/i;
 
 console.log(dir);
-console.log("\nPAGE".padEnd(60), "status   filled/controls  req-blank  fill-s");
+console.log("\nPAGE".padEnd(60), "status   filled/controls  req-blank  fill");
 for (const p of pages.sort((a, b) => a.n - b.n)) {
   const c = (p.controls || []).filter((x) => nameOf(x) && !IGNORE.test(nameOf(x)));
   const filled = c.filter((x) => x.value).length;
   const reqBlank = c.filter((x) => x.required && !x.value).length;
-  console.log(`${String(p.n).padStart(2)} ${ats(p.host).padEnd(10)} ${p.url.split("/")[3]?.slice(0, 40).padEnd(44)} ${p.status.padEnd(8)} ${String(filled).padStart(3)}/${String(c.length).padEnd(4)}        ${String(reqBlank).padStart(3)}      ${p.fillSeconds ?? "-"} ${p.why || p.error || ""}`);
+  console.log(`${String(p.n).padStart(2)} ${ats(p.host).padEnd(10)} ${p.url.split("/")[3]?.slice(0, 40).padEnd(44)} ${p.status.padEnd(8)} ${String(filled).padStart(3)}/${String(c.length).padEnd(4)}        ${String(reqBlank).padStart(3)}      ${p.fillMs ? (p.fillMs / 1000).toFixed(1) + "s" : "-"} ${p.why || p.error || ""}`);
 }
 
 const byAts = {};

@@ -178,12 +178,18 @@ async function runOne(url, n) {
     }
     await sleep(2500);
     result.note = last;
-    result.fillSeconds = Math.round((Date.now() - clickAt) / 100) / 10;
+    // Wall clock here is this file's own wait loop, not the fill: every page
+    // came out at 10.5s, its floor. The extension times itself and says so.
+    result.watchedSeconds = Math.round((Date.now() - clickAt) / 100) / 10;
+    result.fillMs = (result.logs || []).flatMap((line) => [...String(line).matchAll(/filled in (\d+)ms/g)])
+      .reduce((total, m) => total + Number(m[1]), 0) || null;
     const after = await evaluate(READOUT);
     // A readout that threw is not a page with no fields: say so, loudly.
     if (!Array.isArray(after)) { result.status = "readout-failed"; result.error = String(after?.error).slice(0, 200); }
     result.controls = Array.isArray(after) ? after : [];
     result.logs = logs;
+    result.fillMs = logs.flatMap((line) => [...String(line).matchAll(/filled in (\d+)ms/g)])
+      .reduce((total, m) => total + Number(m[1]), 0) || null;
     result.status = "filled";
     return result;
   } catch (error) {
