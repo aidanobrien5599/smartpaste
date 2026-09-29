@@ -240,6 +240,26 @@ test("buildOptions: outside business and IP to keep are entries of their own, ne
     { choice: "ip_ownership", confidence: 0.98, probabilities: { ip_ownership: 0.99 } }, o), 0);
 });
 
+test("resolve: entries that agree on Yes or No add up", () => {
+  // Adobe's Workday asks "able to work daily at the location? If not,
+  // willing to relocate at your own expense?" as a menu, so it is asked
+  // with no options and answered from the profile -- where three entries
+  // say Yes and split the vote. Live: 0.45, under the bar, left blank.
+  const options = buildOptions({ relocate: "Yes, willing to relocate", office_days: "Yes, five days a week" }, "", { say_yes: true });
+  const split = {
+    choice: "relocate", confidence: 0.92,
+    probabilities: { relocate: 0.34, office_days: 0.31, willing_default: 0.28, __none__: 0.07 },
+  };
+  const pooled = resolve("Are you able to work on a daily basis...?", split, options);
+  assert.equal(pooled.status, "auto", JSON.stringify(pooled));
+  assert.ok(pooled.confidence > 0.8, `pooled to ${pooled.confidence}`);
+  // Two entries that merely agree on a school name say nothing about each
+  // other: only plain Yes / No answers pool.
+  const names = buildOptions({ education: [{ school: "University of Wisconsin - Madison" }, { school: "Shore Regional" }] });
+  const spread = { choice: "education1_school", confidence: 0.9, probabilities: { education1_school: 0.4, education2_school: 0.35 } };
+  assert.equal(resolve("School", spread, names).status, "pick");
+});
+
 test("isPriorEmploymentQuestion: a right-to-work question is not about this employer", () => {
   // Rivian/VW (Ashby), live: "currently ... work for" matched, so it went out
   // as a question over my work history and came back "cannot tell which

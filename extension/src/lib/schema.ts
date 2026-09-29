@@ -60,7 +60,7 @@ export const GROUPS: SchemaGroup[] = [
   {
     title: "Work authorization",
     fields: [
-      ["work_auth", "Authorized to work in the US", "Yes"],
+      ["work_auth", "Authorized to work in the US, and able to show documents proving my identity and right to work", "Yes"],
       ["sponsorship", "Requires visa sponsorship", "No"],
       ["visa_status", "Visa status", "US citizen"],
       ["clearance", "Security clearance", "None"],

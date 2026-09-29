@@ -216,7 +216,17 @@ export function resolve(label: string, answer: Answer, options: Options): Resolu
   if (choice === NONE || !(choice in options)) {
     return { label, status: "none", value: null, confidence, alternatives: [] };
   }
-  const certainty = Math.min(Number(probabilities[choice] ?? confidence), confidence);
+  // Entries that agree add up. Adobe's Workday asks "able to work daily at
+  // the location? If not, willing to relocate at your own expense?" as a
+  // menu, so it is asked with no options and answered from the profile --
+  // where the relocation entry, the flexibility catch-all and (with Say yes
+  // on) the willing catch-all all say Yes and split the vote: 0.45, under
+  // the bar, blank. Only plain Yes / No answers pool; two entries that
+  // happen to agree on a school name say nothing about each other.
+  const pooled = yesNoCertainty(answer, options);
+  const own = Math.min(Number(probabilities[choice] ?? confidence), confidence);
+  const agreeing = yesNoOf(choice, options);
+  const certainty = agreeing && pooled.said === agreeing ? Math.max(own, pooled.certainty) : own;
   if (certainty < MENU) {
     return { label, status: "none", value: null, confidence: certainty, alternatives: [] };
   }
