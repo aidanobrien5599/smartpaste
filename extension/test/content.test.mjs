@@ -602,6 +602,22 @@ test("fill: a plain box called Location is not searched twice", { skip }, () =>
     }
   }));
 
+// workday-adobe-menus.html: a Workday build that marks no active popup and
+// leaves a closed menu on screen. Live on Adobe, reading by position merged
+// them -- State read "United States of America (+1) | Select One | Alabama"
+// -- and a Yes/No question was answered by clicking a row from the menu
+// above it, so "Yes" landed as "No" and the field stayed on Select One.
+test("fill: each Workday menu is read and clicked inside its own popup", { skip }, () =>
+  withPage("workday-adobe-menus.html", async (page) => {
+    await autofill(page, 60000);
+    const model = await page.eval("window.__model");
+    assert.equal(model.relocate, "Yes", JSON.stringify(model));
+    assert.equal(model.sponsorship, "No", JSON.stringify(model));
+    assert.equal(model.State, "Wisconsin", JSON.stringify(model));
+    // Nothing was answered with a row from another question's menu.
+    assert.ok(!Object.values(model).includes("Select One"), JSON.stringify(model));
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);

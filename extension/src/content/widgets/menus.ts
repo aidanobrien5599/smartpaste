@@ -176,6 +176,15 @@ function menuNotice(field: Element): string {
  * the visible options nearest the thing that opened it.
  */
 export function optionsNear(anchor: Element): Element[] {
+  // The popup this anchor opened, when we know it. Nothing else can be
+  // confused for it -- not a menu left over from the field before, not one
+  // that merely sits nearby.
+  const id = anchor.getAttribute("aria-controls");
+  const owned = (id && document.getElementById(id)) || ownPopup.get(anchor);
+  if (owned?.isConnected && nodeVisible(owned)) {
+    const rows = leafOptions(owned);
+    if (rows.length) return rows;
+  }
   // Workday marks the open popup data-automation-activepopup="true" and
   // its field aria-expanded="true". Read only that popup: a menu that just
   // closed stays on screen for a moment as it animates out, and reading
@@ -272,6 +281,34 @@ export async function findOption(anchor: Element, text: string, seenAt?: number)
     pane.scrollTop += Math.max(40, pane.clientHeight * 0.8);
   }
   return null;
+}
+
+// Every container a menu can be drawn in. Used to tell which popup a button
+// opened: the one that was not on screen before it was clicked.
+const POPUP = '[data-automation-activepopup], [data-automation-id="activeListContainer"], ' +
+  '[role="listbox"], [role="grid"], [class*="popup" i], [class*="menu" i]';
+const ownPopup = new WeakMap<Element, Element>();
+
+/** The popups on screen right now, to compare against after opening one. */
+export function popupsNow(): Set<Element> {
+  return new Set([...document.querySelectorAll(POPUP)].filter(nodeVisible));
+}
+
+/**
+ * Remember the popup this anchor just opened.
+ *
+ * Adobe's Workday marks no popup data-automation-activepopup, so reading
+ * fell back to position -- and a menu near the field answered for it. State
+ * came back "United States of America (+1) | Select One | Alabama...", the
+ * phone's country-code list merged into it, and a Yes/No menu was answered
+ * by clicking a row belonging to the question above it.
+ */
+export function rememberPopup(anchor: Element, before: Set<Element>): void {
+  const fresh = [...document.querySelectorAll(POPUP)].filter((p) => nodeVisible(p) && !before.has(p));
+  // The innermost of the new ones: a popup often sits inside a wrapper that
+  // is new too, and the rows live in the innermost.
+  const own = fresh.filter((p) => !fresh.some((other) => other !== p && p.contains(other))).pop();
+  if (own) ownPopup.set(anchor, own);
 }
 
 const ACTIVE_POPUP =

@@ -18,7 +18,7 @@ import { listboxLabel } from "../discover/labels.ts";
 import { EMPTY_BUTTON } from "../discover/selectors.ts";
 import { click, fire, sleep } from "../dom/query.ts";
 import { normalize } from "../dom/text.ts";
-import { closeMenu, findOption, pickOption, readMenu, settlePopups, waitForOptions } from "./menus.ts";
+import { closeMenu, findOption, pickOption, readMenu, settlePopups, waitForOptions , popupsNow, rememberPopup} from "./menus.ts";
 import type { MenuTexts } from "./menus.ts";
 
 /**
@@ -31,11 +31,16 @@ import type { MenuTexts } from "./menus.ts";
 async function openListbox(button: HTMLElement): Promise<boolean> {
   await settlePopups(button);
   button.focus();
+  // What was on screen before: whatever appears now is this button's.
+  let before = popupsNow();
   fire(button, "click");
-  if ((await waitForOptions(button, 600)).length) return true;
+  if ((await waitForOptions(button, 600)).length) { rememberPopup(button, before); return true; }
   await settlePopups(button);
+  before = popupsNow();
   click(button);
-  return (await waitForOptions(button)).length > 0;
+  const opened = (await waitForOptions(button)).length > 0;
+  if (opened) rememberPopup(button, before);
+  return opened;
 }
 
 /**

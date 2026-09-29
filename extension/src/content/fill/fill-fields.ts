@@ -38,7 +38,11 @@ import { setValue } from "../widgets/set-value.ts";
 import { setChecks, setToggle } from "../widgets/toggle.ts";
 
 /** One row of the console timeline a fill prints. */
-interface Step { field: string; kind: string | null | undefined; ms: number; ok: boolean; read?: string; wanted?: string }
+interface Step { field: string; kind: string | null | undefined; ms: number; ok: boolean; read?: string; wanted?: string;
+  // For a menu: the row that was clicked, and what the field says afterwards.
+  // A field that ends up holding an answer it was never told to pick has
+  // been answered from another menu, which no other column would show.
+  chose?: string; became?: string }
 /** A menu surveyed in step 3, waiting on Jev's decision. */
 interface MenuRecord { entry: KnownField; texts: MenuTexts; read: string; decision: Promise<number>; failed?: boolean }
 
@@ -192,8 +196,10 @@ export async function fillFields(started: number, attached: number, prefix = "",
   }
   for (const { entry, texts, decision, read } of menus) {
     const before = timeline.length;
+    let chose = "";
     await timed(entry, `${entry.widget} (jev)`, async () => {
       const index = await decision;
+      chose = index >= 0 ? String(texts[index] ?? "") : "(no option matched)";
       return entry.widget === "listbox"
         ? applyListbox(entry.element, texts, index)
         : applyPrompt(entry.element as HTMLInputElement, entry.result.value as string, texts, index);
@@ -201,6 +207,8 @@ export async function fillFields(started: number, attached: number, prefix = "",
     if (timeline[before]) {
       timeline[before].read = read;
       timeline[before].wanted = String(entry.result.value).slice(0, 40);
+      timeline[before].chose = chose.slice(0, 40);
+      timeline[before].became = (entry.element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40);
       if (!timeline[before].ok) menus.find((m) => m.entry === entry)!.failed = true;
     }
   }
