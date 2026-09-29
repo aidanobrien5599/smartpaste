@@ -188,6 +188,22 @@ export function questionFor(inputs: Element[]): string {
     const target = document.getElementById(node.htmlFor);
     return Boolean(target) && !(target as Element).contains(inputs[0]);
   };
+  // The group this belongs to, however deep the boxes sit inside it. Adobe's
+  // Workday questionnaire puts five checkboxes in a role="grid" of rows and
+  // cells, inside a CheckboxGroup fieldset, inside the fieldset whose
+  // <legend> holds the question -- about twelve levels up. The walk below
+  // gave up at six, so the question was never found and the whole group was
+  // dropped. A group's own legend is its question wherever it sits.
+  for (let group = inputs[0].closest("fieldset, [role=radiogroup], [role=group]"), hops = 0;
+       group && hops < 4; group = group.parentElement?.closest("fieldset, [role=radiogroup], [role=group]") || null, hops++) {
+    // Only a group that holds these boxes and nothing else: Eightfold wraps
+    // a whole section in one fieldset, whose legend names the section, not
+    // any question in it.
+    if ([...group.querySelectorAll(ANY_CONTROL)].some((c) => !inputs.includes(c))) break;
+    const named = [...group.querySelectorAll("legend, label, .application-label")]
+      .find((l) => !own(l) && !foreign(l as HTMLLabelElement) && clean(l.textContent));
+    if (named) return clean(named.textContent);
+  }
   let node = inputs[0].parentElement;
   for (let depth = 0; node && depth < 6; depth++, node = node.parentElement) {
     const direct = questionText(inputs[0]);

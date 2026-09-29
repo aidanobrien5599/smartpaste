@@ -618,6 +618,24 @@ test("fill: each Workday menu is read and clicked inside its own popup", { skip 
     assert.ok(!Object.values(model).includes("Select One"), JSON.stringify(model));
   }));
 
+// workday-checkbox-grid.html: Adobe's questionnaire puts a checkbox group
+// in a role="grid" inside a CheckboxGroup fieldset inside the fieldset whose
+// legend asks the question -- about twelve levels above the boxes.
+test("labels: a checkbox group deep in a grid still finds its legend", { skip }, () =>
+  withPage("workday-checkbox-grid.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    // Live it arrived as three questions: the group twice and a bare
+    // "Employee", none of them answered.
+    assert.ok(labels.includes("Have you ever worked at Adobe in the following capacity"), JSON.stringify(labels));
+    // Once, not three times: live it also arrived as a bare "Employee".
+    assert.ok(!labels.includes("Employee"), JSON.stringify(labels));
+    assert.equal(labels.filter((l) => /ever worked at Adobe/.test(l)).length, 1, JSON.stringify(labels));
+    const capacity = await page.eval(
+      "window.__messages.find(m => m.type === 'answer-fields').fields.find(f => /ever worked at Adobe/.test(f.label))");
+    assert.equal(capacity.options.length, 5, JSON.stringify(capacity));
+    assert.ok(capacity.multi, JSON.stringify(capacity));
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);

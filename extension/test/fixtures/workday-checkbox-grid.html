@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply - Adobe - Workday</title>
+<style>body{font:14px system-ui;max-width:640px;margin:30px auto}</style></head>
+<body>
+<!-- adobe.wd5.myworkdayjobs.com, 2026-09-29, copied from a live console
+     report. A questionnaire checkbox group is TWO nested fieldsets: the
+     outer one holds the question in a <legend><div data-automation-id=
+     "richText">, the inner one is the CheckboxGroup, and the boxes sit in
+     a role="grid" of rows and cells. Live it arrived as three questions --
+     the group twice and a bare "Employee" -- and none of them was
+     answered, though real Jev picks "I have not worked for Adobe in the
+     past." at 0.71 when asked once with all five options. -->
+<main data-automation-id="applyFlowPage">
+<h2>Application Questions</h2>
+<div data-automation-id="formField-legalName--firstName"><label for="name--firstName">First Name</label>
+ <input id="name--firstName" type="text" data-automation-id="legalNameSection_firstName"></div>
+<div data-automation-id="formField-email"><label for="email">Email</label>
+ <input id="email" type="text" data-automation-id="email"></div>
+<div data-automation-id="formField-305a1163be7301dceb027192b201c28a">
+<fieldset>
+  <legend><div id="checkbox-group-label12"><div data-automation-id="richText"><p><b>Have you ever worked at Adobe in the following capacity:</b><abbr title="required">*</abbr></p></div></div></legend>
+  <div><div><span data-automation-id="350549057-rows_5">
+    <fieldset data-automation-id="305a1163be7301dceb027192b201c28a-CheckboxGroup" id="primaryQuestionnaire--305a1163be7301dceb027192b201c28a" aria-required="true">
+      <div><div aria-label="grid" aria-readonly="true" role="grid" tabindex="0">
+        <div role="row"><div role="row"><div role="cell"><div><div>
+          <input id="cap-employee-305a1163be7301dceb027192b201c28a" type="checkbox" aria-checked="false" aria-required="true"><span></span><div><div></div></div>
+        </div></div><label cursor="pointer" for="cap-employee-305a1163be7301dceb027192b201c28a">Employee</label></div></div></div>
+        <div role="row"><div role="cell"><div><div>
+          <input id="cap-intern-305a1163be7301dceb027192b201c28a" type="checkbox" aria-checked="false" aria-required="true"><span></span>
+        </div></div><label cursor="pointer" for="cap-intern-305a1163be7301dceb027192b201c28a">Intern</label></div></div>
+        <div role="row"><div role="cell"><div><div>
+          <input id="cap-vendor-305a1163be7301dceb027192b201c28a" type="checkbox" aria-checked="false" aria-required="true"><span></span>
+        </div></div><label cursor="pointer" for="cap-vendor-305a1163be7301dceb027192b201c28a">Temporary Agency or Vendor</label></div></div>
+        <div role="row"><div role="cell"><div><div>
+          <input id="cap-other-305a1163be7301dceb027192b201c28a" type="checkbox" aria-checked="false" aria-required="true"><span></span>
+        </div></div><label cursor="pointer" for="cap-other-305a1163be7301dceb027192b201c28a">Other</label></div></div>
+        <div role="row"><div role="cell"><div><div>
+          <input id="cap-none-305a1163be7301dceb027192b201c28a" type="checkbox" aria-checked="false" aria-required="true"><span></span>
+        </div></div><label cursor="pointer" for="cap-none-305a1163be7301dceb027192b201c28a">I have not worked for Adobe in the past.</label></div></div>
+      </div></div>
+    </fieldset>
+  </span></div></div>
+</fieldset>
+</div>
+</main>
+</body></html>
