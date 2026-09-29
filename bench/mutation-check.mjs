@@ -124,6 +124,8 @@ const MUTATIONS = [
   // not to reach for "other". The group is asked the pick-one question too.
   ["a checkbox group's pick-one fallback",
     "  if (!yes.length) return theOne(label, options, pick);", "  if (!yes.length) return theOne(label, options, undefined);", "lib"],
+  ["disclosures: outside business and IP entries",
+    '["outside_business", "Outside business activities', '["outside_business_gone", "Outside business activities', "lib"],
   ["a checkbox group is asked the pick-one question too",
     "      questions[`f${i}_pick`] = {", "      questions[`unasked${i}`] = {", "lib"],
   // Greenhouse's newer React form: the box's text is in a <label for=> that

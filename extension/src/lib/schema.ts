@@ -67,6 +67,14 @@ export const GROUPS: SchemaGroup[] = [
       ["over_18", "At least 18 years of age", "Yes"],
       ["related_employee", "Related to anyone who works at the company I'm applying to", "No"],
       ["non_compete", "Bound by a non-compete or other agreement that could limit this job", "No"],
+      // Robinhood asks five disclosures as one Yes/No: relatives there,
+      // outside business, big holdings, stakes in a competitor, IP to keep.
+      // With no entry for the last ones, the ties catch-all said No for all
+      // five, even for someone who is still building their own company.
+      ["outside_business", "Outside business activities I will continue while " +
+        "employed (a company I founded, work for, advise or freelance for; a side business)", "No"],
+      ["ip_ownership", "Intellectual property I own and want to keep or keep " +
+        "developing (patents, trademarks, copyrights, apps or side projects I've built)", "No"],
       // Scoped like the flexibility catch-all below, and for the same reason:
       // PwC alone asks four of these, each worded its own way. It names what
       // it covers so it never answers work authorization, sponsorship or age.

@@ -225,6 +225,21 @@ test("buildOptions defaults conflict-of-interest answers to No unless set", () =
   assert.equal(buildOptions({ non_compete: "Yes, a 6-month non-compete" }).non_compete.value, "Yes, a 6-month non-compete");
 });
 
+test("buildOptions: outside business and IP to keep are entries of their own, never defaulted", () => {
+  // Robinhood's "Do you have a) relatives here ... b) outside business ...
+  // e) IP you wish to retain?" is one Yes/No. With nowhere to say Yes, the
+  // ties catch-all answered No at 0.82; real Jev picks these at 0.99.
+  assert.match(LABELS.outside_business, /outside business/i);
+  assert.match(LABELS.ip_ownership, /intellectual property/i);
+  const blank = buildOptions({ first_name: "Aidan" });
+  assert.equal(blank.outside_business, undefined);
+  assert.equal(blank.ip_ownership, undefined);
+  const o = buildOptions({ outside_business: "Yes, Intelligible", ip_ownership: "Yes, smartpaste" });
+  assert.match(o.outside_business.field, /continue while employed/);
+  assert.equal(yesNoFromEntry(["Yes", "No"],
+    { choice: "ip_ownership", confidence: 0.98, probabilities: { ip_ownership: 0.99 } }, o), 0);
+});
+
 test("isPriorEmploymentQuestion: a right-to-work question is not about this employer", () => {
   // Rivian/VW (Ashby), live: "currently ... work for" matched, so it went out
   // as a question over my work history and came back "cannot tell which

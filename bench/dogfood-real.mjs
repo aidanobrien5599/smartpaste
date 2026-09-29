@@ -29,8 +29,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const EXT = join(here, "..", "extension");
 const profile = join(here, ".real-profile");
 const pw = join(homedir(), "Library/Caches/ms-playwright");
-const build = readdirSync(pw).filter((d) => /^chromium-\d+$/.test(d)).sort().pop();
-const binary = join(pw, build, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
+// Not "build": that name is the esbuild run imported above.
+const chromium = readdirSync(pw).filter((d) => /^chromium-\d+$/.test(d)).sort().pop();
+const binary = join(pw, chromium, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
 const url = process.argv[2];
 const flag = process.argv.indexOf("--settings");
 const settings = flag > 0 ? JSON.parse(process.argv[flag + 1]) : null;
