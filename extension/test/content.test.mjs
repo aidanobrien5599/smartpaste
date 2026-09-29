@@ -361,6 +361,38 @@ test("labels: a Lever question whose own text is \"Select One\" is named by its 
     assert.equal(await page.eval("document.querySelector('#heard input:checked')?.value"), "LinkedIn");
   }));
 
+test("labels: two Lever cards asking the same 200 characters are told apart by card", { skip }, () =>
+  withPage("lever-cards.html", async (page) => {
+    // CesiumAstro, live: "U.S. Person Status" asks "... Are you a U.S.
+    // Person?" and "Employment Eligibility" asks "... Are you a U.S. Person
+    // or eligible to obtain the required authorizations ...". The two share
+    // their first 200 characters and clean() cuts a label there, so both
+    // arrived as one question -- and answers are keyed by label, so the two
+    // fields could not be told apart when the page rebuilt. The sponsorship
+    // pair differs only by a double space, which clean() collapses, and the
+    // relatives question really is asked by two cards word for word.
+    const labels = await page.waitFor(asked);
+    assert.equal(new Set(labels).size, labels.length, `two fields share a label: ${labels.join(" | ")}`);
+    const card = (l) => l.split(": ")[0];
+    const question = (l) => l.split(": ").slice(1).join(": ");
+    const person = labels.filter((l) => /must be a U\.S\. Person or able to obtain an export license/.test(l));
+    assert.deepEqual(person.map(card).sort(),
+      ["Employment Eligibility", "U.S. Person Status"], person.join(" | "));
+    // The questions themselves still read alike: what is left of them after
+    // the cut at 200 characters is the same text, so only the card tells
+    // them apart -- a prefix added before the cut would be cut off with it.
+    assert.equal(question(person[0]), question(person[1]));
+    const sponsor = labels.filter((l) => /require sponsorship for employment visa status/.test(l));
+    assert.deepEqual(sponsor.map(card).sort(),
+      ["Employment Eligibility", "Employment Sponsorship"], sponsor.join(" | "));
+    const relatives = labels.filter((l) => /family member that is currently employed/.test(l));
+    assert.deepEqual(relatives.map(card).sort(),
+      ["Employment Eligibility", "Employment of Relatives"], relatives.join(" | "));
+    // A question no other field collides with keeps its own words.
+    assert.ok(labels.includes("Full name"), labels.join(" | "));
+    assert.ok(labels.includes("Email"), labels.join(" | "));
+  }));
+
 test("fill: Lever's school picker is matched against its whole list, not asked as a menu", { skip }, () =>
   withPage("lever-questions.html", async (page) => {
     // Shield AI, live: 2,965 schools, alphabetical by country. Sent as a

@@ -1,0 +1,75 @@
+<!doctype html><meta charset="utf-8"><title>Apply - Lever</title>
+<!-- CesiumAstro's Lever form, trimmed from the live apply page
+     (jobs.lever.co/CesiumAstro/96e97f22-…/apply, 2026-09-27). Four custom
+     question cards whose questions collide once clean() has cut them to 200
+     characters:
+       - "U.S. Person Status" asks "... Are you a U.S. Person?" and
+         "Employment Eligibility" asks "... Are you a U.S. Person or eligible
+         to obtain the required authorizations from the U.S. Department of
+         State?" -- the same first 200 characters, so both arrived as one
+         label and one answer covered both.
+       - the two sponsorship questions differ only by a double space, which
+         clean() collapses, so they collide whatever the cut-off.
+       - "Do you have a family member that is currently employed with
+         CesiumAstro?" really is asked twice, by two different cards.
+     The question text is the live text, in full: the bug only exists past
+     character 200, so nothing here may be shortened. -->
+<style>body { font: 14px system-ui; max-width: 700px; margin: 30px auto }
+  .section { margin: 24px 0 } .text { margin-bottom: 6px }</style>
+<body>
+<div class="application-question"><label><div class="application-label">Full name ✱</div><input name="name" type="text"></label></div>
+<div class="application-question"><label><div class="application-label">Email ✱</div><input name="email" type="email"></label></div>
+
+<div class="section page-centered application-form" data-qa="additional-cards"><h4 data-qa="card-name">U.S. Person Status</h4>
+  <ul><li class="application-question custom-question"><div>
+    <div class="application-label full-width multiple-choice"><div class="text">As a result of the work performed by CesiumAstro, all eligible candidates must be a U.S. Person or able to obtain an export license. U.S. Persons include U.S. Citizens, Permanent Residents, conditional residents, asylees, and refugees. Are you a U.S. Person?<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><ul data-qa="multiple-choice">
+      <li><label><input type="radio" name="cards[dbe33c8e-c601-4fde-8527-3f3d34b6c362][field0]" value="Yes" required="required"><span class="application-answer-alternative">Yes</span></label></li>
+      <li><label><input type="radio" name="cards[dbe33c8e-c601-4fde-8527-3f3d34b6c362][field0]" value="No" required="required"><span class="application-answer-alternative">No</span></label></li></ul></div>
+  </div></li></ul>
+</div>
+
+<div class="section page-centered application-form" data-qa="additional-cards"><h4 data-qa="card-name">Employment Sponsorship</h4>
+  <ul><li class="application-question custom-question"><div>
+    <div class="application-label full-width multiple-choice"><div class="text">Do you now or will you in the future require sponsorship for employment visa status?  Please select "Yes" if you will require the Company to commence ("sponsor") an immigration or work permit case in order to employ you, either now or at some point in the future.  Otherwise select "No".<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><ul data-qa="multiple-choice">
+      <li><label><input type="radio" name="cards[caec2790-b52c-4bc2-91a9-0b79fbdd77b4][field0]" value="Yes" required="required"><span class="application-answer-alternative">Yes</span></label></li>
+      <li><label><input type="radio" name="cards[caec2790-b52c-4bc2-91a9-0b79fbdd77b4][field0]" value="No" required="required"><span class="application-answer-alternative">No</span></label></li></ul></div>
+  </div></li></ul>
+</div>
+
+<div class="section page-centered application-form" data-qa="additional-cards"><h4 data-qa="card-name">Employment of Relatives</h4>
+  <ul><li class="application-question custom-question"><div>
+    <div class="application-label full-width multiple-choice"><div class="text">Do you have a family member that is currently employed with CesiumAstro?<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><ul data-qa="multiple-choice">
+      <li><label><input type="radio" name="cards[9716a4e2-b47d-4d32-8e2d-b7ea3c022e6e][field0]" value="Yes" required="required"><span class="application-answer-alternative">Yes</span></label></li>
+      <li><label><input type="radio" name="cards[9716a4e2-b47d-4d32-8e2d-b7ea3c022e6e][field0]" value="No" required="required"><span class="application-answer-alternative">No</span></label></li></ul></div>
+  </div></li>
+  <li class="application-question custom-question"><div>
+    <div class="application-label full-width textarea"><div class="text">If yes, please specify the individual(s) and the department or location in which they work:</div></div>
+    <div class="application-field full-width"><textarea class="card-field-input" name="cards[9716a4e2-b47d-4d32-8e2d-b7ea3c022e6e][field1]"></textarea></div>
+  </div></li></ul></div>
+
+<div class="section page-centered application-form" data-qa="additional-cards"><h4 data-qa="card-name">Employment Eligibility</h4>
+  <ul><li class="application-question custom-question"><div>
+    <div class="application-label full-width multiple-choice"><div class="text">As a result of the work performed by CesiumAstro, all eligible candidates must be a U.S. Person or able to obtain an export license. U.S. Persons include U.S. Citizens, Permanent Residents, conditional residents, asylees, and refugees. Are you a U.S. Person or eligible to obtain the required authorizations from the U.S. Department of State?<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><ul data-qa="multiple-choice">
+      <li><label><input type="radio" name="cards[7b662abe-276c-44d9-a6c6-17e013738f9c][field0]" value="Yes" required="required"><span class="application-answer-alternative">Yes</span></label></li>
+      <li><label><input type="radio" name="cards[7b662abe-276c-44d9-a6c6-17e013738f9c][field0]" value="No" required="required"><span class="application-answer-alternative">No</span></label></li></ul></div>
+  </div></li>
+  <li class="application-question custom-question"><div>
+    <div class="application-label full-width multiple-choice"><div class="text">Do you now or will you in the future require sponsorship for employment visa status? Please select "Yes" if you will require the Company to commence ("sponsor") an immigration or work permit case in order to employ you, either now or at some point in the future. Otherwise select "No".<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><ul data-qa="multiple-choice">
+      <li><label><input type="radio" name="cards[7b662abe-276c-44d9-a6c6-17e013738f9c][field1]" value="Yes" required="required"><span class="application-answer-alternative">Yes</span></label></li>
+      <li><label><input type="radio" name="cards[7b662abe-276c-44d9-a6c6-17e013738f9c][field1]" value="No" required="required"><span class="application-answer-alternative">No</span></label></li></ul></div>
+  </div></li>
+  <li class="application-question custom-question"><div>
+    <div class="application-label full-width multiple-choice"><div class="text">Do you have a family member that is currently employed with CesiumAstro?<span class="required">✱</span></div></div>
+    <div class="application-field full-width required-field"><ul data-qa="multiple-choice">
+      <li><label><input type="radio" name="cards[7b662abe-276c-44d9-a6c6-17e013738f9c][field2]" value="Yes" required="required"><span class="application-answer-alternative">Yes</span></label></li>
+      <li><label><input type="radio" name="cards[7b662abe-276c-44d9-a6c6-17e013738f9c][field2]" value="No" required="required"><span class="application-answer-alternative">No</span></label></li></ul></div>
+  </div></li>
+  <li class="application-question custom-question"><div>
+    <div class="application-label full-width text"><div class="text">If yes, please specify the individual(s) and the department or location in which they work:</div></div>
+    <div class="application-field full-width"><input class="card-field-input" type="text" placeholder="Type your response" value="" name="cards[7b662abe-276c-44d9-a6c6-17e013738f9c][field3]"></div>
+  </div></li></ul></div>

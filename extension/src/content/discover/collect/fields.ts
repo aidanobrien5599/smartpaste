@@ -13,6 +13,9 @@
  * - "If yes, please provide the name of the relative" explains a Yes; the
  *   profile never holds that explanation, and Jev filled one with "No"
  *   (FOLLOW_UP, dropped rather than asked).
+ * - Two CesiumAstro (Lever) cards ask questions whose first 200 characters
+ *   match, and a label is cut to 200: both arrived as one label, which
+ *   answers are keyed by (distinguishByCard).
  * - A write-in ("Other: ___") inside a choice question is not that
  *   question: New York Life's (Eightfold) "Position Specific Questions" is
  *   one <fieldset> around every question, and each was taken for the
@@ -27,7 +30,7 @@ import { visible, nodeVisible, isCombobox } from "../../dom/controls.ts";
 import { FIELD_SELECTOR, DATE_PART, PROMPT_INPUT, junkLabel, QUESTION_BOX } from "../selectors.ts";
 import { labelFor } from "../labels.ts";
 import { pageChrome } from "../gate.ts";
-import { sectionPrefix, cardQuestion } from "../sections.ts";
+import { sectionPrefix, cardQuestion, distinguishByCard } from "../sections.ts";
 import { selectOptions, collectToggleGroups, collectRadioGroups } from "./choices.ts";
 import { collectWidgets, monthYearWrapper } from "./widgets.ts";
 import { collectCheckboxGroups, collectSingleCheckboxes } from "./checkboxes.ts";
@@ -63,7 +66,7 @@ function insideChoiceQuestion(element: Element): boolean {
 }
 
 export function collectFields(): Field[] {
-  return deepAll(FIELD_SELECTOR)
+  const fields = deepAll(FIELD_SELECTOR)
     .filter((element) => visible(element) && !element.matches(DATE_PART) && !insideChoiceQuestion(element) && !pageChrome(element) && !monthYearWrapper(element))
     .map((element): Field => ({
       element: element as HTMLElement,
@@ -79,4 +82,6 @@ export function collectFields(): Field[] {
     .concat(collectCheckboxGroups())
     .concat(collectSingleCheckboxes())
     .map((f) => ({ ...f, label: sectionPrefix(f.element) + cardQuestion(f.element, f.label) }));
+  // Answers are keyed by label, so two fields may not share one.
+  return distinguishByCard(fields);
 }

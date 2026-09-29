@@ -24,12 +24,18 @@
  * - Hermeus (Lever) writes a card's own question as "Select One" for all
  *   fifteen of its radios; a question whose own text is nameless is named
  *   by the card's heading instead (cardQuestion).
+ * - CesiumAstro (Lever) asks two different questions whose first 200
+ *   characters match, and clean() cuts a label at 200: both arrived as one
+ *   label, and answers are keyed by label. A label two fields share is
+ *   prefixed with its card's heading (distinguishByCard).
  *
- * Depends on: dom/text.ts, state.ts (state.profileCache), lib/schema.ts.
+ * Depends on: dom/text.ts, state.ts (state.profileCache), lib/schema.ts,
+ * shared/types.ts.
  */
 import { clean } from "../dom/text.ts";
 import { state } from "../state.ts";
 import type { Profile, ProfileEntry } from "../../lib/schema.ts";
+import type { Field } from "../../shared/types.ts";
 
 /**
  * Which entry of a repeated section a field sits in. Workday asks "Job
@@ -101,13 +107,49 @@ export function sectionPrefix(element: Element): string {
 // a required question no profile could answer was left blank.
 const NAMELESS = /^(?:select|choose|pick)(?:\s+(?:one|an?\s+option|from(?:\s+the)?\s+(?:list|below)))?$/i;
 export function cardQuestion(element: Element, label: string): string {
-  if (!NAMELESS.test(label)) return label;
+  return NAMELESS.test(label) ? cardName(element) || label : label;
+}
+
+/** The heading of the card a field sits in, within five levels. */
+function cardName(element: Element): string {
   for (let node = element?.parentElement, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
     const heading = node.querySelector(":scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > legend");
     const text = heading ? clean(heading.textContent) : "";
     if (text.length > 2) return text;
   }
-  return label;
+  return "";
+}
+
+/**
+ * Two fields with one label are one field to everything downstream: answers
+ * are keyed by label (answer/known.ts rebind), so a rebuilt page hands both
+ * the same answer and neither can be told from the other.
+ *
+ * CesiumAstro (Lever) asks two different questions that share their first
+ * 200 characters -- clean() cuts a label there -- and two more that differ
+ * only by a double space, which clean() collapses; a third question its two
+ * cards both ask word for word. The card each one sits in is what tells
+ * them apart, so a colliding label is prefixed with its card's heading.
+ * The prefix goes on after clean() has cut the label, never before: added
+ * before, it would be cut off along with the rest of the question.
+ *
+ * Only a group whose cards all have distinct names is renamed -- a prefix
+ * both fields would share moves the collision rather than settling it.
+ */
+export function distinguishByCard(fields: Field[]): Field[] {
+  const groups = new Map<string, Field[]>();
+  for (const field of fields) groups.set(field.label, [...(groups.get(field.label) || []), field]);
+  const renamed = new Map<Field, string>();
+  for (const [label, group] of groups) {
+    if (group.length < 2) continue;
+    const names = group.map((f) => cardName(f.element));
+    // A card that already named the question (cardQuestion, sectionPrefix)
+    // would otherwise say its name twice.
+    if (names.some((n) => !n || label.startsWith(`${n}: `))) continue;
+    if (new Set(names).size !== names.length) continue;
+    group.forEach((f, i) => renamed.set(f, `${names[i]}: ${label}`));
+  }
+  return renamed.size ? fields.map((f) => (renamed.has(f) ? { ...f, label: renamed.get(f)! } : f)) : fields;
 }
 
 /** An entry stem's numbers ("20", "21"...) in page order. */

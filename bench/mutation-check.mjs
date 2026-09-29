@@ -134,6 +134,13 @@ const MUTATIONS = [
   // Greenhouse's newer React form: the box's text is in a <label for=> that
   // is the input's sibling, not its parent, so without the id lookup every
   // option read as its posted number ("750161080").
+  // CesiumAstro (Lever), live: "U.S. Person Status" and "Employment
+  // Eligibility" ask two different questions whose first 200 characters
+  // match, and clean() cuts a label at 200. Both arrived as one label, and
+  // answers are keyed by label, so neither field could be told from the
+  // other when the page rebuilt.
+  ["a label two fields share is named by its card",
+    "  return distinguishByCard(fields);", "  return fields;"],
   ["a checkbox's text through its label for=",
     "          (b.id && document.querySelector(`label[for=\"${CSS.escape(b.id)}\"]`)?.textContent) ||\n", ""],
 ];
