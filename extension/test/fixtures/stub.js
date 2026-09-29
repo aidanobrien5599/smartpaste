@@ -15,6 +15,11 @@ const ANSWERS = [
   [/^Education History: Start Date$/, "Sep 2023"], [/^Education History: End Date$/, "May 2027"],
   // Ashby rejects an End Date next to a ticked "Still Student?".
   [/^Education History: Still Student\?$/, "Yes"],
+  // workable.html: OnLogic's yes/no questions in free-text boxes. Real Jev,
+  // asked these as yes/no questions, says No (0.57-0.64) to the schedule one
+  // -- the role runs to June 2027 and the profile graduates in May -- and Yes
+  // to the relocation one. The word is what goes in the box.
+  [/align with your academic schedule\?$/, "No"],
   // workable.html: Workable names its own Education / Experience groups.
   [/^Experience: Title$/, "Software Engineer Intern"], [/^Experience: Company$/, "Netflix"],
   [/^Experience: Start date$/, "May 2026"], [/^Experience: End date$/, "August 2026"],

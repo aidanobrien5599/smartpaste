@@ -1084,6 +1084,32 @@ test("fill: Workable -- the phone, both date pairs and the bare Title land", { s
     assert.match(summary, /^filled \d+ in [0-9.]+s, attached 1 file/);
   }));
 
+// OnLogic, live: two of its required questions are yes/no questions in
+// free-text boxes, each behind a sentence of preamble. The whole question
+// has to reach Jev -- cut to the preamble, or to the box's name, nothing
+// can answer it -- and only a word may be typed back in. What decides that
+// word is background.js (see lib/resolve.ts yesNoAnswer, and the round trip
+// in background.test.mjs); this pins the page side of it.
+test("labels: Workable -- a yes/no question in a text box is asked whole", { skip }, () =>
+  withPage("workable.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    for (const question of [
+      "We expect this role to begin in January 2027 and run until June 2027. " +
+        "Does this align with your academic schedule?",
+      "We are unable to offer any relocation assistance at this time. " +
+        "Do you have the necessary resources available to work in South Burlington, VT?",
+    ]) {
+      assert.ok(labels.includes(question), `missing ${question}: ${JSON.stringify(labels)}`);
+    }
+  }));
+
+test("fill: Workable -- a yes/no box gets the word, not the sentence behind it", { skip }, () =>
+  withPage("workable.html", async (page) => {
+    await autofill(page);
+    assert.equal(await page.eval(value("#QA_12379932")), "No");
+    assert.equal(await page.eval(value("#QA_12379933")), "Yes");
+  }));
+
 // rippling.html: Rippling's own ATS, where every dropdown is a <div
 // role="combobox"> -- no <select>, no <button>, nothing FIELD_SELECTOR or
 // collectWidgets knew. The EEO block and a required sponsorship question

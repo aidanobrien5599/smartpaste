@@ -154,6 +154,25 @@ const MUTATIONS = [
   // other when the page rebuilt.
   ["a label two fields share is named by its card",
     "  return distinguishByCard(fields);", "  return fields;"],
+  // OnLogic (apply.workable.com/onlogic-inc), live: three required questions
+  // are yes/no questions asked in free-text boxes, each behind a sentence of
+  // preamble. Asked only which profile ENTRY answers them, Jev split the vote
+  // across entries that cannot pool (the current-status sentence, a
+  // graduation date, a start date) and the winner would have been typed into
+  // the box whole -- on an earlier run, the bare date "May 2027".
+  ["a yes/no question in a text box is asked as yes/no",
+    "        instructions: { field: field.label, ask: ASK_YES_NO },\n" +
+    "        criteria: { [NONE]: \"The profile does not say\", ...YES_NO },",
+    "        instructions: { field: field.label, ask: ASK_TEXT },\n        criteria,", "lib"],
+  ["a yes/no text box gets the word, not the entry that says it",
+    "      return yesNoAnswer(field.label, answer, answers[`f${i}_entry`], options);",
+    "      return resolve(field.label, answer, options);", "lib"],
+  ["the yes/no question is the last sentence, after the preamble",
+    '  const last = (sentences[sentences.length - 1] || "").replace(CONNECTIVE, "");',
+    "  const last = text;", "lib"],
+  ["a box that wants prose after the Yes is no yes/no box",
+    "  return YES_NO_OPENER.test(last) && !WANTS_MORE.test(last);",
+    "  return YES_NO_OPENER.test(last);", "lib"],
   ["a checkbox's text through its label for=",
     "          (b.id && document.querySelector(`label[for=\"${CSS.escape(b.id)}\"]`)?.textContent) ||\n", ""],
 ];

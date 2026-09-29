@@ -206,6 +206,20 @@ fieldset{border:0;padding:0;margin:0;display:flex;gap:8px}
     <div><label><span><span><strong>*</strong></span><span><span id="QA_12379931_label"><strong>What academic year (junior, senior) will you be in January 2027?</strong></span></span></span>
       <div data-role="illustrated-input"><div><textarea aria-required="true" id="QA_12379931" name="QA_12379931" aria-labelledby="QA_12379931_label" required rows="5" dir="auto"></textarea></div></div>
     </label></div>
+
+    <!-- A yes/no question in a free-text box. OnLogic asks three of them,
+         two of which are here: a one-line box and a textarea. The question
+         proper is the last sentence, after a preamble the employer wrote,
+         and the box takes only "Yes" or "No" -- not the profile entry that
+         says so. Live, these were answered with the whole current-status
+         sentence and (an earlier run) with the bare date "May 2027". -->
+    <div><label><span><span><strong>*</strong></span><span><span id="QA_12379932_label"><strong>We expect this role to begin in January 2027 and run until June 2027. Does this align with your academic schedule?</strong></span></span></span>
+      <div data-role="illustrated-input"><div><input aria-required="true" id="QA_12379932" name="QA_12379932" aria-labelledby="QA_12379932_label" required type="text" dir="auto" value=""></div></div>
+    </label></div>
+
+    <div><label><span><span><strong>*</strong></span><span><span id="QA_12379933_label"><strong>We are unable to offer any relocation assistance at this time. Do you have the necessary resources available to work in South Burlington, VT?</strong></span></span></span>
+      <div data-role="illustrated-input"><div><textarea aria-required="true" id="QA_12379933" name="QA_12379933" aria-labelledby="QA_12379933_label" required rows="5" dir="auto"></textarea></div></div>
+    </label></div>
   </div>
 </section>
 

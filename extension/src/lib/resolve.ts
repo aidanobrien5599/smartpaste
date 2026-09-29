@@ -379,3 +379,81 @@ export function isYesNo(fieldOptions: string[] | null | undefined): boolean {
   const set = new Set((fieldOptions || []).map((t) => String(t).trim().toLowerCase()));
   return set.has("yes") && set.has("no");
 }
+
+/**
+ * A yes/no question asked in a free-text box.
+ *
+ * OnLogic's Workable form, live: "We expect this role to begin in January
+ * 2027 and run until June 2027. Does this align with your academic
+ * schedule?" is a plain text box. Asked which profile entry answers it, Jev
+ * split the vote between the current-status entry (0.45), the graduation
+ * date (0.25) and the start date (0.20) -- and those do not pool, because
+ * pooling only applies to entries whose value starts with Yes or No. The
+ * winner would have typed a sentence about being enrolled into a box whose
+ * only sensible answers are "Yes" and "No"; an earlier run typed the bare
+ * date "May 2027". A Yes/No dropdown is already asked its own two options
+ * as well as its entries (isYesNo, yesNoFromEntry); this says when a box
+ * with no options at all deserves the same treatment.
+ *
+ * The test is the LAST sentence, because the question proper sits at the end
+ * of whatever preamble the employer wrote. It must open with a yes/no
+ * auxiliary, and it must not go on to ask for something a bare Yes or No
+ * cannot supply -- "...and if so, which one?" is not a yes/no box.
+ */
+const YES_NO_OPENER =
+  /^(?:do|does|did|are|is|was|were|will|would|can|could|have|has|had|should|shall|may|must)\s+(?:you|your|i|we|they|he|she|it|this|that|there|the|any|all)\b/i;
+// "If yes, does this…", "And are you…": a connective in front of the auxiliary.
+const CONNECTIVE = /^(?:and|but|so|also|then|if\s+(?:so|yes|no|not))\b[\s,:;-]*/i;
+// Neither a Yes nor a No answers any of these, so the box wants prose.
+const WANTS_MORE =
+  /\b(?:how|what|which|when|where|why|who|whom|whose|explain|describe|specify|elaborate|list|provide|detail|details)\b/i;
+
+export function isYesNoQuestion(label: string | null | undefined): boolean {
+  const text = String(label || "").trim();
+  if (!text.endsWith("?")) return false;
+  const sentences = text.split(/(?<=[.?!])\s+/).filter(Boolean);
+  const last = (sentences[sentences.length - 1] || "").replace(CONNECTIVE, "");
+  return YES_NO_OPENER.test(last) && !WANTS_MORE.test(last);
+}
+
+/**
+ * What to type into a free-text yes/no box: the word, never the entry.
+ *
+ * Asked both ways, as a Yes/No dropdown is. `direct` is "is the answer Yes
+ * or No?"; `entry` is "which profile entry answers this?", whose Yes- and
+ * No-valued entries pool exactly as they do for a dropdown -- OnLogic's "we
+ * offer no relocation assistance; do you have the resources to work here?"
+ * splits 0.39 willing / 0.24 relocate, and only pooled does it clear the
+ * bar. The stronger of the two wins, and the value returned is "Yes" or
+ * "No" whichever entry said it: the catch-all sentence it is stored as
+ * belongs in the profile, not in the employer's box.
+ */
+export function yesNoAnswer(
+  label: string,
+  direct: Answer | null | undefined,
+  entry: Answer | null | undefined,
+  options: Options
+): Resolution {
+  const ranked: { value: string; p: number }[] = [];
+  if (direct && (direct.choice === "yes" || direct.choice === "no")) {
+    ranked.push({
+      value: direct.choice === "yes" ? "Yes" : "No",
+      p: Math.min(Number(direct.probabilities?.[direct.choice] ?? 0), Number(direct.confidence ?? 0)),
+    });
+  }
+  const pooled = yesNoCertainty(entry, options);
+  if (pooled.said) ranked.push({ value: pooled.said === "yes" ? "Yes" : "No", p: pooled.certainty });
+  ranked.sort((a, b) => b.p - a.p);
+  const best = ranked[0];
+  if (!best || best.p < MENU) {
+    return { label, status: "none", value: null, confidence: best ? best.p : 0, alternatives: [] };
+  }
+  const alternatives = ranked.filter((a, i) => ranked.findIndex((b) => b.value === a.value) === i);
+  return {
+    label,
+    status: best.p >= AUTO ? "auto" : "pick",
+    value: best.value,
+    confidence: best.p,
+    alternatives,
+  };
+}

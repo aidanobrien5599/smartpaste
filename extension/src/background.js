@@ -14,7 +14,7 @@ import {
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.ts";
-import { AUTO, isYesNo, resolve, ticks, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.ts";
+import { AUTO, isYesNo, isYesNoQuestion, resolve, ticks, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.ts";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.ts";
 import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.ts";
 
@@ -31,6 +31,15 @@ const ASK_TEXT =
 const ASK_SELECT =
   "This form field is a dropdown. Given the applicant's profile, which of " +
   "these options should be selected? Choose the escape option only if the " +
+  "profile does not say.";
+
+// A free-text box that asks a yes/no question (see isYesNoQuestion). Worded
+// for a box rather than a dropdown, because the answer is typed in: nothing
+// but the word belongs there.
+const ASK_YES_NO =
+  "This application question is a yes/no question, asked in a box the " +
+  "applicant types a free-text answer into. Going only by the applicant's " +
+  "profile, is the answer Yes or No? Choose the escape option only if the " +
   "profile does not say.";
 
 async function loadOptions() {
@@ -209,6 +218,22 @@ async function answerFields(fields, page = {}) {
       };
       return;
     }
+    // A yes/no question in a free-text box. Asked both ways, as a Yes/No
+    // dropdown is -- its own two answers, and which profile entry answers
+    // it -- because what gets typed in is the word, not the entry.
+    if (!(field.options && field.options.length) && isYesNoQuestion(field.label)) {
+      questions[`f${i}`] = {
+        type: "choice",
+        instructions: { field: field.label, ask: ASK_YES_NO },
+        criteria: { [NONE]: "The profile does not say", ...YES_NO },
+      };
+      questions[`f${i}_entry`] = {
+        type: "choice",
+        instructions: { field: field.label, ask: ASK_TEXT },
+        criteria,
+      };
+      return;
+    }
     if (field.options && field.options.length) {
       const choices = { [NONE]: "The profile does not say" };
       field.options.forEach((text, j) => {
@@ -279,6 +304,9 @@ async function answerFields(fields, page = {}) {
         return { label: field.label, status: "none", value: null, confidence, alternatives: [] };
       }
       return { label: field.label, status: confidence >= AUTO ? "auto" : "pick", value, confidence, alternatives: [] };
+    }
+    if (!(field.options && field.options.length) && isYesNoQuestion(field.label)) {
+      return yesNoAnswer(field.label, answer, answers[`f${i}_entry`], options);
     }
     if (field.options && field.options.length) {
       const index = Number(String(answer.choice).replace("o", ""));

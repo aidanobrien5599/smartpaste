@@ -18,7 +18,8 @@ globalThis.chrome = {
 };
 const STORE = {
   apiKey: "apikey_test",
-  profile: { first_name: "Aidan", last_name: "O'Brien", referral: "Other",
+  profile: { first_name: "Aidan", last_name: "O'Brien", referral: "Other", relocate: "Yes",
+    flexibility_default: "Yes I am flexible",
     education: [{ school: "University of Wisconsin - Madison", end_date: "May 2027" }] },
   extraText: "",
   settings: {},
@@ -81,4 +82,67 @@ test("a box that cleared the bar keeps the group; a blank pick-one leaves it", a
   const [blank] = await ask([GRADUATION], { ...no, f0_pick: box("__none__", 0.83) });
   assert.equal(blank.status, "none");
   assert.equal(blank.value, null);
+});
+
+// OnLogic (apply.workable.com/onlogic-inc), live 2026-09-28: "We expect this
+// role to begin in January 2027 and run until June 2027. Does this align with
+// your academic schedule?" is a required FREE-TEXT box asking a yes/no
+// question. Asked only "which profile entry answers this?", Jev split the
+// vote between the current-status entry (0.45), the graduation date (0.25)
+// and the start date (0.20) -- entries that do not pool, because pooling is
+// for entries whose value starts with Yes or No. The winner would have typed
+// a whole sentence about being enrolled into the box; an earlier run typed
+// the bare date "May 2027". So the box is asked both ways, as a Yes/No
+// dropdown is, and what goes in is the word.
+const SCHEDULE = {
+  label: "We expect this role to begin in January 2027 and run until June 2027. " +
+    "Does this align with your academic schedule?",
+};
+const OPEN = { label: "What academic year (junior, senior) will you be in January 2027?" };
+
+test("a yes/no question in a text box is asked its own two answers, and by entry", async () => {
+  await ask([SCHEDULE, OPEN], {});
+  assert.deepEqual(Object.keys(sent).sort(), ["f0", "f0_entry", "f1"]);
+  assert.deepEqual(Object.keys(sent.f0.criteria).sort(), ["__none__", "no", "yes"]);
+  assert.match(sent.f0.instructions.ask, /yes\/no question/);
+  // The whole question, preamble and all, goes out with both asks.
+  assert.equal(sent.f0_entry.instructions.field, SCHEDULE.label);
+  assert.ok(sent.f0_entry.criteria.relocate, "the entry ask offers the profile");
+  // An open question in the same kind of box is untouched: one ask, entries.
+  assert.equal(sent.f1.criteria.yes, undefined);
+  assert.ok(sent.f1.criteria.relocate);
+});
+
+test("a yes/no text box is answered with the word, not with the entry or a date", async () => {
+  const [result] = await ask([SCHEDULE], {
+    f0: { choice: "no", confidence: 0.75, probabilities: { no: 0.86, yes: 0.09, __none__: 0.05 } },
+    f0_entry: { choice: "current_status", confidence: 0.44,
+      probabilities: { current_status: 0.45, education1_end_date: 0.25, start_date: 0.2 } },
+  });
+  assert.equal(result.value, "No");
+  assert.equal(result.status, "auto");
+  // Not the sentence that entry holds, and not the date inside it.
+  assert.ok(!/May 2027|enrolled/.test(JSON.stringify(result)), JSON.stringify(result));
+});
+
+test("a yes/no text box: Yes-valued entries pool when the direct ask is unsure", async () => {
+  const [result] = await ask([{
+    label: "We are unable to offer any relocation assistance at this time. " +
+      "Do you have the necessary resources available to work in South Burlington, VT?",
+  }], {
+    f0: { choice: "yes", confidence: 0.39, probabilities: { yes: 0.59, __none__: 0.4, no: 0.01 } },
+    f0_entry: { choice: "relocate", confidence: 0.9,
+      probabilities: { relocate: 0.5, flexibility_default: 0.4, __none__: 0.1 } },
+  });
+  assert.equal(result.value, "Yes");
+  assert.equal(result.status, "auto");
+});
+
+test("a yes/no text box neither ask is sure about stays blank", async () => {
+  const [result] = await ask([SCHEDULE], {
+    f0: { choice: "no", confidence: 0.28, probabilities: { no: 0.52, yes: 0.32, __none__: 0.16 } },
+    f0_entry: { choice: "current_status", confidence: 0.44, probabilities: { current_status: 0.45 } },
+  });
+  assert.equal(result.status, "none");
+  assert.equal(result.value, null);
 });

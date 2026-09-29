@@ -1,7 +1,7 @@
 // Unit tests for extension/src/lib. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isYesNo, maxTicks, refine, resolve, ticks, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
+import { isYesNo, isYesNoQuestion, maxTicks, refine, resolve, ticks, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
 import { placeSaysYes } from "../src/lib/places.ts";
 import { isPriorEmploymentQuestion } from "../src/lib/history.ts";
 import { LABELS } from "../src/lib/schema.ts";
@@ -333,6 +333,55 @@ test("yesNoFromEntry: entries that say the same Yes pool their probability", () 
   const torn = { ...split, probabilities: { flexibility_default: 0.55, history_default: 0.15, [NONE]: 0.3 } };
   assert.equal(yesNoFromEntry(["Yes", "No"], torn, buildOptions({ flexibility_default: "Yes" })), -1);
   assert.equal(yesNoFromEntry(["Yes", "No"], { ...split, confidence: 0.3 }, options), -1);
+});
+
+test("isYesNoQuestion: the last sentence decides, and only a bare Yes or No answers it", () => {
+  // OnLogic (apply.workable.com/onlogic-inc), live: three required questions
+  // asked as free text, the question itself behind a sentence of preamble.
+  assert.ok(isYesNoQuestion("We expect this role to begin in January 2027 and run until " +
+    "June 2027. Does this align with your academic schedule?"));
+  assert.ok(isYesNoQuestion("We are unable to offer any relocation assistance at this time. " +
+    "Do you have the necessary resources available to work in South Burlington, VT?"));
+  assert.ok(isYesNoQuestion("Are you applying with a school affiliated co-op program? " +
+    "If so, does this match your programs requirements?"));
+  assert.ok(isYesNoQuestion("Are you willing to move to New York and work with us in-person?"));
+  // Not yes/no: an open question, one that wants prose after the Yes, and a
+  // statement. "What academic year will you be in?" sits on the same form.
+  assert.ok(!isYesNoQuestion("What academic year (junior, senior) will you be in January 2027?"));
+  assert.ok(!isYesNoQuestion("Do you require sponsorship, and if so what type?"));
+  assert.ok(!isYesNoQuestion("Are you a veteran? Please explain further."));
+  assert.ok(!isYesNoQuestion("Alternate Email"));
+  assert.ok(!isYesNoQuestion("Tell us about a project you are proud of."));
+  assert.ok(!isYesNoQuestion(""));
+  assert.ok(!isYesNoQuestion(null));
+});
+
+test("yesNoAnswer: a free-text yes/no box gets the word, never the entry that says it", () => {
+  const options = buildOptions({ relocate: "Yes", flexibility_default: "Yes I am flexible",
+    education: [{ school: "UW - Madison", end_date: "May 2027", degree: "B.S." }] });
+  // Asked as a yes/no question, real Jev says No at 0.75/conf 0.63 to
+  // OnLogic's schedule question. The entry ask, meanwhile, leans on the
+  // current-status entry -- a whole sentence, and no answer at all here.
+  const direct = { choice: "no", confidence: 0.63, probabilities: { no: 0.75, yes: 0.17, [NONE]: 0.08 } };
+  const entry = { choice: "current_status", confidence: 0.44,
+    probabilities: { current_status: 0.45, education1_end_date: 0.25, start_date: 0.2 } };
+  const said = yesNoAnswer("Does this align with your academic schedule?", direct, entry, options);
+  assert.equal(said.value, "No");
+  assert.equal(said.status, "pick");
+  assert.ok(Math.abs(said.confidence - 0.63) < 1e-9);
+  // The other way round: nothing from the direct ask, but Yes-valued entries
+  // that pool over the bar. The value is still the word, not the sentence.
+  const pooled = { choice: "flexibility_default", confidence: 0.9,
+    probabilities: { flexibility_default: 0.55, relocate: 0.35, [NONE]: 0.1 } };
+  const both = yesNoAnswer("Can you work onsite?", { choice: NONE, confidence: 0.9, probabilities: { [NONE]: 0.9 } }, pooled, options);
+  assert.equal(both.value, "Yes");
+  assert.equal(both.status, "auto");
+  // Neither ask is sure: blank, and no sentence offered to cycle to either.
+  const unsure = yesNoAnswer("Does this align?",
+    { choice: "no", confidence: 0.28, probabilities: { no: 0.52, yes: 0.32 } }, entry, options);
+  assert.equal(unsure.status, "none");
+  assert.equal(unsure.value, null);
+  assert.deepEqual(unsure.alternatives, []);
 });
 
 test("yesNoFromEntry: a place preference reads Yes only when anywhere is fine", () => {
