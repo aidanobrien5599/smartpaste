@@ -79,6 +79,7 @@ const MUTATIONS = [
   ["a group's legend, however deep its boxes sit",
     '  for (let group = inputs[0].closest("fieldset, [role=radiogroup], [role=group]"), hops = 0;',
     "  for (let group = null, hops = 0;"],
+  ["the education list says my current status", "  if (!has(\"current_status\") && schooling && ends) {", "  if (false) {", "lib"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],

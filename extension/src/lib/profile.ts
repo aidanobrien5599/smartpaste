@@ -184,7 +184,30 @@ function derived(profile: Profile, settings: Settings = {}): Record<string, stri
   if (!has("graduate_degree") && degrees.length && !degrees.some((d) => GRADUATE.test(d))) {
     out.graduate_degree = "None — no master's or doctoral degree, completed or in progress";
   }
+  // "Which one of the following best describes your current status?" is a
+  // dropdown on Adobe's Workday and on plenty of campus forms, and nothing
+  // in the profile says what I am -- a student, a graduate, employed. The
+  // education list does: an end date still ahead of today means enrolled.
+  const schooling = (Array.isArray(profile.education) ? profile.education : [])[0] as ProfileEntry | undefined;
+  const ends = String(schooling?.end_date || "").trim();
+  if (!has("current_status") && schooling && ends) {
+    const when = monthAndYear(ends);
+    const studying = when ? when.getTime() > Date.now() : /present|current|expected/i.test(ends);
+    const study = [String(schooling.degree || "").trim(), String(schooling.major || "").trim()].filter(Boolean).join(" in ");
+    out.current_status = studying
+      ? `Currently an enrolled full-time student${study ? `, ${study}` : ""} at ${String(schooling.school || "").trim()}, graduating ${ends}`
+      : `Graduated ${ends}${study ? ` with a ${study}` : ""}; not currently enrolled`;
+  }
   return out;
+}
+
+/** The month a date names, for "is that still ahead of us?". */
+function monthAndYear(text: string): Date | null {
+  const m = String(text).match(/(?:(\w{3,9})\s+)?((?:19|20)\d{2})/);
+  if (!m) return null;
+  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const month = m[1] ? months.indexOf(m[1].slice(0, 3).toLowerCase()) : 6;
+  return new Date(Number(m[2]), month < 0 ? 6 : month, 28);
 }
 
 const CITIZEN_OR_RESIDENT = /\bcitizen\b|\bnational\b|permanent resident|green card/i;

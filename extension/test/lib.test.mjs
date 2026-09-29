@@ -260,6 +260,22 @@ test("resolve: entries that agree on Yes or No add up", () => {
   assert.equal(resolve("School", spread, names).status, "pick");
 });
 
+test("buildOptions: the education list says what my current status is", () => {
+  // "Which one of the following best describes your current status?" is a
+  // dropdown on Adobe's Workday, and nothing in the profile said what I am.
+  // With this, real Jev answers it at 1.00 -- "Student", "Currently
+  // enrolled in a degree program", whichever words the form uses.
+  const ahead = buildOptions({ education: [{ school: "UW-Madison", degree: "Bachelor of Science", major: "Computer Science", end_date: "May 2099" }] });
+  assert.match(ahead.current_status.value, /^Currently an enrolled full-time student/);
+  assert.match(ahead.current_status.value, /graduating May 2099/);
+  const done = buildOptions({ education: [{ school: "UW-Madison", degree: "Bachelor of Science", end_date: "May 2020" }] });
+  assert.match(done.current_status.value, /^Graduated May 2020/);
+  assert.match(done.current_status.value, /not currently enrolled/);
+  // Nothing to go on, or a status of my own: no invention, no override.
+  assert.equal(buildOptions({ first_name: "Aidan" }).current_status, undefined);
+  assert.equal(buildOptions({ current_status: "On a career break", education: [{ school: "UW", end_date: "May 2099" }] }).current_status.value, "On a career break");
+});
+
 test("isPriorEmploymentQuestion: a right-to-work question is not about this employer", () => {
   // Rivian/VW (Ashby), live: "currently ... work for" matched, so it went out
   // as a question over my work history and came back "cannot tell which
