@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|year|consent box|search|Greenhouse's checkbox";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -54,7 +54,7 @@ const MUTATIONS = [
   ["calendar picker takes YYYY-MM", "if (picker && parts?.month)", "if (false)"],
   ["year-only box gets the year", "if (onlyYear && parts && !shape) return parts.year;", ""],
   ["bare 'Mobile' is the number", "? `${label} phone number` : label;", "? label : label;"],
-  ["resume dropzone text", "input.closest(\"[class*='upload' i]\")?.textContent?.slice(0, 140) || \"\"]", "\"\"]"],
+  ["resume dropzone text", "input.closest(\"[class*='upload' i]\")?.textContent?.slice(0, 140) || \"\",", "\"\","],
   ["bare Add found by section title", "if (section && !found.some((f) => f.root === section.root)) found.push({ ...section, prefix: \"\", button });", ""],
   ["roles split intern / work", "((p.experience as ProfileEntry[] | undefined) || []).filter((role) => !split || !isIntern(role))", "((p.experience as ProfileEntry[] | undefined) || [])"],
   ["card label names its entry", 'return `${titled.name} ${n}${subject ? ` (${subject})` : ""}: `;', "return `${titled.name} ${n}: `;"],
@@ -134,7 +134,8 @@ const MUTATIONS = [
   ["the question above a box that names nothing",
     "questionAbove(field), (field as HTMLInputElement).name]", "(field as HTMLInputElement).name]"],
   ["a location search that found nothing is run again",
-    "    items = await searchSuggestions(field, cityOf(value));", "    items = [];"],
+    "    items = declared || menuOpenedNear(field) ? await searchSuggestions(field, cityOf(value)) : [];",
+    "    items = [];"],
   // Relay Pro and CTC, live: a "check all that apply" whose real answer is
   // the catch-all stayed blank, because each box asked on its own is told
   // not to reach for "other". The group is asked the pick-one question too.

@@ -240,6 +240,13 @@ test("buildOptions: outside business and IP to keep are entries of their own, ne
     { choice: "ip_ownership", confidence: 0.98, probabilities: { ip_ownership: 0.99 } }, o), 0);
 });
 
+test("buildOptions: work authorization says it can show the documents", () => {
+  // Adobe asks "can you provide documentation establishing your identity and
+  // right to work?" -- a different question from "are you authorized?", and
+  // the entry has to answer both. Live it went 0.46 -> 1.00 when it said so.
+  assert.match(buildOptions({ work_auth: "Yes" }).work_auth.field, /documents proving my identity and right to work/i);
+});
+
 test("resolve: entries that agree on Yes or No add up", () => {
   // Adobe's Workday asks "able to work daily at the location? If not,
   // willing to relocate at your own expense?" as a menu, so it is asked
