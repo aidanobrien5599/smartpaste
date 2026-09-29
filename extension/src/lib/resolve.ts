@@ -203,7 +203,21 @@ export type Resolution = {
  * One Jev answer -> what Cmd-V should do. `alternatives` lets a second Cmd-V
  * cycle to the next most likely snippet instead of needing any menu.
  */
+// "If you are accepted for this in-person position, what city will you be
+// working from?" is asking where the JOB is, which only the employer knows.
+// Live on SEP (Westfield, IN) the ranked preference answered it "New York
+// City" at 0.74, on two boxes of that form. Rewording the preference entries
+// away from it made Jev answer NO to "would you relocate to the NYC area?",
+// which is worse, so the entries keep their wording and this question keeps
+// its silence.
+const THEIR_OFFICE = /\b(?:what|which|where)\b[^?]*\b(?:city|town|location|office|site)\b[^?]*\b(?:you|your)\b[^?]*\b(?:work|working|based|report)/i;
+const THIS_JOB = /\bthis (?:position|role|job|internship)\b|\bif (?:you are|you're) (?:accepted|hired|offered|selected)\b/i;
+const PREFERENCE = new Set(["work_locations", "top_work_location", "open_to_any_location"]);
+
 export function resolve(label: string, answer: Answer, options: Options): Resolution {
+  if (PREFERENCE.has(String(answer?.choice)) && THEIR_OFFICE.test(label) && THIS_JOB.test(label)) {
+    return { label, status: "none", value: null, confidence: 0, alternatives: [] };
+  }
   const probabilities = answer.probabilities || {};
   const ranked = Object.entries(probabilities)
     .filter(([k]) => k !== NONE && k in options)

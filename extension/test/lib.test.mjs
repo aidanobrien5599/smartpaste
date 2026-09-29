@@ -247,6 +247,25 @@ test("buildOptions: work authorization says it can show the documents", () => {
   assert.match(buildOptions({ work_auth: "Yes" }).work_auth.field, /documents proving my identity and right to work/i);
 });
 
+test("resolve: a preference does not answer where THIS job is based", () => {
+  // SEP (Lever), live: "If you are accepted for this in-person position,
+  // what city will you be working from?" was auto-filled "New York City" at
+  // 0.74 from the ranked preference, on two boxes -- SEP is in Westfield,
+  // IN. Only the employer knows that answer. Rewording the preference
+  // entries away from it made Jev answer No to "would you relocate to the
+  // NYC area?", so the rule lives here instead.
+  const options = buildOptions({ work_locations: { ranked: ["New York City", "San Francisco"], anywhere: true } });
+  const picked = { choice: "top_work_location", confidence: 0.9, probabilities: { top_work_location: 0.9 } };
+  const theirs = resolve("If you are accepted for this in-person position, what city will you be working from?", picked, options);
+  assert.equal(theirs.status, "none", JSON.stringify(theirs));
+  // A question about my own preference still gets my preference, and a
+  // question about where I live is not one of these at all.
+  assert.equal(resolve("Which of our offices would you prefer?", picked, options).value, "New York City");
+  assert.equal(resolve("What city will you be working from?", picked, options).value, "New York City");
+  const home = buildOptions({ location: "Madison, WI" });
+  assert.equal(resolve("What city do you currently live in?", { choice: "location", confidence: 1, probabilities: { location: 1 } }, home).value, "Madison, WI");
+});
+
 test("resolve: entries that agree on Yes or No add up", () => {
   // Adobe's Workday asks "able to work daily at the location? If not,
   // willing to relocate at your own expense?" as a menu, so it is asked
