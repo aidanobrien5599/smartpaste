@@ -63,14 +63,36 @@ export function fileHintTiers(input: HTMLInputElement): [string, string] {
        ?.textContent?.slice(0, 140) || "",
      // ByteDance: a bare input labelled "Attachment", inside a dropzone
      // that says "Drag your resume here".
-     input.closest("[class*='upload' i]")?.textContent?.slice(0, 140) || ""].join(" "),
+     input.closest("[class*='upload' i]")?.textContent?.slice(0, 140) || "",
+     nearestBlock(input)].join(" "),
   ];
+}
+
+/**
+ * The most an upload can say about itself without speaking for the form.
+ *
+ * Not the nearest ancestor: Rippling's innermost block reads "Total 0 file
+ * selected", which names no document. The fullest block still under 200
+ * characters reads "Resume*Total 0 file selected...", and the cover letter's
+ * says "Cover letter...". Wider than that and one upload claims them both.
+ */
+function nearestBlock(input: HTMLInputElement): string {
+  let best = "";
+  for (let node = input.parentElement, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
+    const text = (node.textContent || "").replace(/\s+/g, " ").trim();
+    if (text.length <= 200 && text.length > best.length) best = text;
+  }
+  return best;
 }
 
 const AUTOFILL_DROPZONE = /autofill|auto-fill|parse (?:your )?resume/i;
 
+// "Resume" with both accents is the same word: Rippling's upload says so,
+// and only in the block around it -- the input has no id, name or label.
+const plain = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
 export function documentFor(label: string): string | null {
-  const low = (label || "").toLowerCase();
+  const low = plain(label || "").toLowerCase();
   if (AUTOFILL_DROPZONE.test(low)) return null;
   for (const [key, words] of DOC_KEYWORDS) {
     if (words.some((word) => low.includes(word))) return key;

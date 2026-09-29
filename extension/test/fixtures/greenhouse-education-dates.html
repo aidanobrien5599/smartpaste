@@ -1,0 +1,76 @@
+<!doctype html><meta charset="utf-8"><title>Job Application for Software Engineer, Public Sector - New Grad at Scale AI</title>
+<body style="font:14px system-ui;max-width:640px;margin:30px auto">
+<!-- job-boards.greenhouse.io/scaleai, 2026-09-28. Its education block, as
+     served: the month is a React Select, the year is a bare
+     <input type="number"> beside it, and only the year is required. The
+     boxes say "Start date month" / "Start date year" and nothing else, so
+     without the section around them they read as the date I could start a
+     job (June 2027), not as when I started school. -->
+<form id="application-form" class="application--form">
+<div class="field-wrapper"><div class="input-wrapper"><label id="first_name-label" for="first_name" class="label">First Name<span aria-hidden="true">*</span></label>
+  <input id="first_name" class="input input__single-line" type="text" aria-required="true"></div></div>
+<div class="field-wrapper"><div class="input-wrapper"><label id="email-label" for="email" class="label">Email<span aria-hidden="true">*</span></label>
+  <input id="email" class="input input__single-line" type="text" aria-required="true"></div></div>
+
+<div class="education--container"><div class="education--form">
+  <div class="field-wrapper"><div class="select"><div class="select__container">
+    <label id="school--0-label" for="school--0" class="label select__label">School<span aria-hidden="true">*</span></label>
+    <div class="select-shell"><div><div class="select__control"><div class="select__value-container">
+      <div class="select__placeholder" id="react-select-school--0-placeholder">Select...</div>
+      <div class="select__input-container" data-value=""><input class="select__input" autocomplete="off" id="school--0" type="text"
+        aria-autocomplete="list" aria-expanded="false" aria-haspopup="true" aria-labelledby="school--0-label" role="combobox"></div>
+    </div></div></div></div>
+  </div></div></div>
+
+  <div class="education--half-width-container">
+    <div class="education--date-container">
+      <div class="select"><div class="select__container">
+        <label id="start-month--0-label" for="start-month--0" class="label select__label">Start date month</label>
+        <div class="select-shell"><div><div class="select__control"><div class="select__value-container">
+          <div class="select__placeholder" id="react-select-start-month--0-placeholder">Select...</div>
+          <div class="select__input-container" data-value=""><input class="select__input" autocomplete="off" id="start-month--0" type="text"
+            aria-autocomplete="list" aria-expanded="false" aria-haspopup="true" aria-labelledby="start-month--0-label" role="combobox"></div>
+        </div></div></div></div>
+      </div></div>
+      <div class="text-input-wrapper"><div class="input-wrapper">
+        <label id="start-year--0-label" for="start-year--0" class="label label">Start date year<span aria-hidden="true">*</span></label>
+        <input id="start-year--0" class="input input__single-line" aria-label="Start date year" aria-required="true" type="number">
+      </div></div>
+    </div>
+    <div class="education--date-container">
+      <div class="text-input-wrapper"><div class="input-wrapper">
+        <label id="end-year--0-label" for="end-year--0" class="label label">End date year</label>
+        <input id="end-year--0" class="input input__single-line" aria-label="End date year" type="number">
+      </div></div>
+    </div>
+  </div>
+</div></div>
+</form>
+<script>
+// The month picker, as React Select draws it: a menu of month names, and
+// the choice shown in a sibling the input never holds.
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const input = document.getElementById("start-month--0"), shell = input.closest(".select-shell");
+const show = () => {
+  shell.querySelector(".select__menu")?.remove();
+  input.setAttribute("aria-expanded", "true");
+  const menu = document.createElement("div"); menu.className = "select__menu";
+  const list = document.createElement("div"); list.className = "select__menu-list"; list.setAttribute("role", "listbox");
+  for (const month of MONTHS.filter((m) => !input.value || m.toLowerCase().includes(input.value.toLowerCase()))) {
+    const option = document.createElement("div");
+    option.className = "select__option"; option.setAttribute("role", "option"); option.textContent = month;
+    option.addEventListener("mousedown", () => {
+      shell.querySelector(".select__placeholder")?.remove();
+      let shown = shell.querySelector(".select__single-value");
+      if (!shown) { shown = document.createElement("div"); shown.className = "select__single-value"; shell.querySelector(".select__value-container").prepend(shown); }
+      shown.textContent = month;
+      input.setAttribute("aria-expanded", "false");
+      menu.remove();
+    });
+    list.appendChild(option);
+  }
+  menu.appendChild(list); shell.appendChild(menu);
+};
+input.addEventListener("mousedown", show);
+input.addEventListener("input", show);
+</script>

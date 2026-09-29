@@ -67,6 +67,14 @@ export function formatForField(field: HTMLInputElement, value: string): string {
   // "Graduation date" keep the whole date, "Years of experience" is a count.
   const onlyYear = /\byear\b/i.test(hint) && !/\b(?:month|day|date|mm|dd)\b/i.test(hint);
   if (onlyYear && parts && !shape) return parts.year;
+  // A number box can only hold a number, whatever its label says. Scale AI's
+  // "Start date year" says "date", so the rule above leaves it alone, and
+  // "September 2023" goes in and is dropped: the required box stayed empty.
+  if (field.type === "number" && parts) {
+    if (/\byear\b/i.test(hint)) return parts.year;
+    if (/\bmonth\b/i.test(hint) && parts.month) return String(parts.month);
+    if (/\bday\b/i.test(hint) && parts.day) return String(parts.day);
+  }
   // A calendar picker's text box with no format stated (ByteDance's start
   // / end range) takes ISO, and drops anything else on blur.
   const picker = !shape && field.closest('[class*="date-range-picker"], [class*="date-picker"], [class*="picker-input"]');

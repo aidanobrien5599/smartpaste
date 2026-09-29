@@ -75,6 +75,11 @@ export function sectionPrefix(element: Element): string {
       const subject = entry && kind.summary ? String((entry as ProfileEntry)[kind.summary] || "").trim() : "";
       return `${titled.name} ${n}${subject ? ` (${subject})` : ""}: `;
     }
+    // Greenhouse's education block: no heading of its own, but every part
+    // of it is under .education--form. Its boxes say only "Start date month"
+    // / "Start date year", which read as the date I could start a job
+    // (June 2027) rather than when I started school.
+    if (element.closest?.(".education--form")) return "Education: ";
     // A section headed "Education" around bare "School" / "Start" boxes.
     for (let node = element.parentElement, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
       const heading = node.querySelector(":scope > h2, :scope > h3, :scope > h4");

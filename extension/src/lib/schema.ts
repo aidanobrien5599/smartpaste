@@ -296,8 +296,9 @@ LABELS.willing_default = "Default answer on any question asking whether I am " +
   "willing, able, intend or consent to something the hiring process asks: " +
   "commit to its hours, dates or length, pursue a certification or license " +
   "it expects, relocate, travel, accept the pay it states, complete its " +
-  "checks and assessments, or agree to an interview being recorded or " +
-  "transcribed";
+  "checks and assessments, agree to an interview being recorded or " +
+  "transcribed, or agree to receive texts or emails from the employer " +
+  "about my application";
 
 /** One repeatable entry (a job, a school, a project, …): its fields, as typed. */
 export type ProfileEntry = Record<string, string>;

@@ -527,6 +527,37 @@ test("fill: Greenhouse's checkbox fieldset -- options from label for=, question 
       ["Other"]);
   }));
 
+// greenhouse-education-dates.html: Scale AI's education block, where the
+// month is a React Select and the year a bare number box beside it.
+test("labels: a Greenhouse education date says which section it is in", { skip }, () =>
+  withPage("greenhouse-education-dates.html", async (page) => {
+    const labels = await page.waitFor(asked);
+    // Unprefixed, "Start date month" reads as the date I could start a job
+    // (June 2027) rather than the date I started school.
+    for (const label of ["Education: Start date month", "Education: Start date year", "Education: End date year"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${labels.join(" | ")}`);
+    }
+  }));
+
+test("fill: a year in a number box is filled, month and year from one entry", { skip }, () =>
+  withPage("greenhouse-education-dates.html", async (page) => {
+    // input[type=number] was not in FIELD_SELECTOR at all, so the REQUIRED
+    // "Start date year" was never asked about and stayed empty.
+    await autofill(page);
+    assert.equal(await page.eval(value("#start-year--0")), "2023");
+    assert.equal(await page.eval(value("#end-year--0")), "2027");
+    assert.equal(await page.eval("document.querySelector('.select__single-value')?.textContent || ''"), "September");
+  }));
+
+test("fill: an upload named only by the block around it takes the resume", { skip }, () =>
+  withPage("rippling.html", async (page) => {
+    // Rippling: no id, no name, no label, hashed wrappers -- and "Resume"
+    // written with both accents. The cover letter box beside it stays empty.
+    await autofill(page);
+    const names = await page.eval(`[...document.querySelectorAll('input[type=file]')].map(f => f.files[0]?.name || "")`);
+    assert.deepEqual(names, ["resume.pdf", ""], JSON.stringify(names));
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);

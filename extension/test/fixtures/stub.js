@@ -42,6 +42,9 @@ const ANSWERS = [
   // Only the question as smartpaste words it: bare, Jev left it blank live.
   [/Electronic Signature: \(type your full legal name\)$|Electronic Signature \(type your full legal name\)$/, "Aidan O'Brien"],
   // C3's Greenhouse-API form: an "Education" section of bare labels.
+  // greenhouse-education-dates.html (Scale AI): a month box and a year box.
+  [/^Education: Start date month$/, "September 2023"], [/^Education: Start date year$/, "September 2023"],
+  [/^Education: End date year$/, "May 2027"],
   [/^Education: School$/, "University of Wisconsin - Madison"], [/^Education: Degree$/, "Bachelor's Degree"],
   [/^Education: Field of study$/, "Computer Science"], [/^Education: Start$/, "Sep 2023"], [/^Education: End/, "May 2027"],
   // greenhouse-school.html: Greenhouse's own School question, unprefixed.

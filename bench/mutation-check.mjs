@@ -64,6 +64,9 @@ const MUTATIONS = [
   // Rewritten by e49ddca (an Ashby title's for= names nothing on the page):
   // the mutant is now the line that decides whether that target counts.
   ["label for= a group's container", "return Boolean(target) && !(target as Element).contains(inputs[0]);", "return true;"],
+  ["a number box is a field", 'input[type="date"], input[type="number"], textarea, select', 'input[type="date"], textarea, select'],
+  ["Greenhouse's education block names its boxes", '    if (element.closest?.(".education--form")) return "Education: ";\n', ""],
+  ["a date in a number box is just the number", '  if (field.type === "number" && parts) {', "  if (false) {"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],
