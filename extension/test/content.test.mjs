@@ -549,6 +549,15 @@ test("fill: a year in a number box is filled, month and year from one entry", { 
     assert.equal(await page.eval("document.querySelector('.select__single-value')?.textContent || ''"), "September");
   }));
 
+test("fill: an upload named only by the block around it takes the resume", { skip }, () =>
+  withPage("rippling.html", async (page) => {
+    // Rippling: no id, no name, no label, hashed wrappers -- and "Resume"
+    // written with both accents. The cover letter box beside it stays empty.
+    await autofill(page);
+    const names = await page.eval(`[...document.querySelectorAll('input[type=file]')].map(f => f.files[0]?.name || "")`);
+    assert.deepEqual(names, ["resume.pdf", ""], JSON.stringify(names));
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);
