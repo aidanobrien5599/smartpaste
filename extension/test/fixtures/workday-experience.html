@@ -208,4 +208,20 @@ prompt(document.getElementById("skills--skills"), "skills", "skills");
 document.querySelector('[data-automation-id="file-upload-input-ref"]').addEventListener("change", (e) => { window.__model.resume = e.target.files[0]?.name; });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePops(); });
 </script>
+<script>
+// How many times each Location box was typed into from the start. A second,
+// shortened search (Adobe: "Los Gatos, CA", then "Los Gatos") restarts the
+// box, so its value gets shorter than it was. Delegated, because Workday's
+// entries -- and their boxes -- only exist once "Add" has been clicked.
+window.__searches = {};
+const seen = new WeakMap();
+document.addEventListener("input", (e) => {
+  const box = e.target;
+  if (!box.id || !box.id.endsWith("--location")) return;
+  const previous = seen.get(box) || "";
+  window.__searches[box.id] = window.__searches[box.id] || 1;
+  if (box.value.length < previous.length) window.__searches[box.id]++;
+  seen.set(box, box.value);
+}, true);
+</script>
 </body></html>

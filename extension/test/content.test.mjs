@@ -590,6 +590,18 @@ test("fill: an upload named only by the block around it takes the resume", { ski
     assert.deepEqual(names, ["resume.pdf", ""], JSON.stringify(names));
   }));
 
+test("fill: a plain box called Location is not searched twice", { skip }, () =>
+  withPage("workday-experience.html", async (page) => {
+    // Adobe, live: three Work Experience Location boxes at 2.6s each -- a
+    // full wait for suggestions, then a second search for just the city,
+    // then another wait -- before typing the value that was right first.
+    await autofill(page);
+    const searches = await page.eval("window.__searches");
+    for (const [id, count] of Object.entries(searches || {})) {
+      assert.equal(count, 1, `${id} was searched ${count} times`);
+    }
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);

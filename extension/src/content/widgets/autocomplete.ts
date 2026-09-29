@@ -43,6 +43,16 @@ export function looksLikeAutocomplete(field: HTMLInputElement): boolean {
 
 interface Suggestion { node: Element; text: string }
 
+/** Whether any menu at all opened under the field, even an empty one. */
+function menuOpenedNear(field: Element): boolean {
+  const box = field.getBoundingClientRect();
+  for (const list of document.querySelectorAll(SUGGESTION_BOX)) {
+    const rect = list.getBoundingClientRect();
+    if (rect.height && rect.top >= box.top - 4 && rect.top <= box.bottom + 400) return true;
+  }
+  return false;
+}
+
 /** Suggestions that appeared just below the field, in reading order. */
 function suggestionsNear(field: Element): Suggestion[] {
   const box = field.getBoundingClientRect();
@@ -62,14 +72,27 @@ function suggestionsNear(field: Element): Suggestion[] {
 }
 
 /** One search: type `probe`, then wait for the suggestions it brings back. */
-async function searchSuggestions(field: HTMLInputElement, probe: string): Promise<Suggestion[]> {
+async function searchSuggestions(field: HTMLInputElement, probe: string, rounds = 12): Promise<Suggestion[]> {
   await typeLikeAPerson(field, probe);
   let items: Suggestion[] = [];
-  for (let i = 0; i < 12 && !items.length; i++) {
+  for (let i = 0; i < rounds && !items.length; i++) {
     await sleep(100);
     items = suggestionsNear(field);
   }
   return items;
+}
+
+/**
+ * Whether the box says it is an autocomplete, rather than merely being
+ * called "Location". Workday's Work Experience Location is a plain text
+ * box: on Adobe's form, three of them spent 2.6s each -- a full wait, a
+ * second shortened search, another full wait -- before typing the value
+ * that was right the first time. Nearly 8 of that fill's 14 seconds.
+ */
+function declaresItself(field: HTMLInputElement): boolean {
+  return Boolean(field.getAttribute("aria-autocomplete") || field.getAttribute("list") ||
+    field.getAttribute("role") === "combobox" || field.getAttribute("aria-expanded") ||
+    field.getAttribute("aria-controls") || field.closest('[class*="autocomplete" i], [class*="typeahead" i]'));
 }
 
 // A geocoder that knows no state abbreviation finds nothing for "Madison,
@@ -87,9 +110,16 @@ const cityOf: (value: string) => string = (value) => value.split(",")[0].trim() 
  * So the search is run again before the field is given up on.
  */
 export async function setAutocomplete(field: HTMLInputElement, value: string): Promise<boolean> {
-  let items = await searchSuggestions(field, value);
+  // A box that never says it is an autocomplete gets one short look. The
+  // second search is for a real one that answered "no location found".
+  const declared = declaresItself(field);
+  let items = await searchSuggestions(field, value, declared ? 12 : 5);
   if (!items.length) {
-    items = await searchSuggestions(field, cityOf(value));
+    // Lever answers a search it cannot place with "No location found. Try
+    // entering a different location" -- a menu, just an unhelpful one, and
+    // worth a second, shorter search. Workday's plain Location box opens
+    // nothing at all, and searching it again only costs another 1.3s.
+    items = declared || menuOpenedNear(field) ? await searchSuggestions(field, cityOf(value)) : [];
     if (!items.length) {
       // Two searches, no suggestions: the box may be a plain one after all
       // (Workday's "Location"), where what was typed is the answer -- so
