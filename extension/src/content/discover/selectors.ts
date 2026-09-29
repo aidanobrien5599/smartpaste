@@ -87,10 +87,14 @@ export const EMPTY_BUTTON = /^(?:select one|select(?:\.{3}|…)?|choose one|choo
 // Lever wraps inputs in a <label> that also holds status text ("No location
 // found. Try entering…"), and its custom questions have no label at all.
 export const QUESTION_BOX = '.application-question, [role="radiogroup"], fieldset';
+// input[type="number"] is in here for a reason: Scale AI's Greenhouse
+// education block draws the month as a React Select and the year as a bare
+// number box, and without it the REQUIRED "Start date year" was never even
+// asked about. A number box also holds a GPA, a salary or a count of years.
 export const FIELD_SELECTOR =
   'input:not([type]), input[type="text"], input[type="email"], ' +
   'input[type="tel"], input[type="url"], input[type="search"], ' +
-  'input[type="date"], textarea, select';
+  'input[type="date"], input[type="number"], textarea, select';
 
 export const ANY_CONTROL = 'input:not([type="hidden"]):not([type="file"]), textarea, select';
 
