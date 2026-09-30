@@ -1,7 +1,7 @@
 // Unit tests for extension/src/lib. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isYesNo, isYesNoQuestion, maxTicks, refine, resolve, ticks, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
+import { AUTO, isYesNo, isYesNoQuestion, maxTicks, MENU, refine, resolve, ticks, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
 import { placeSaysYes } from "../src/lib/places.ts";
 import { isPriorEmploymentQuestion } from "../src/lib/history.ts";
 import { LABELS } from "../src/lib/schema.ts";
@@ -59,9 +59,13 @@ test("resolve: the escape option yields nothing, not a guess", () => {
 
 test("resolve: confidence gate", () => {
   const opts = { a: { field: "A", value: "x" }, b: { field: "B", value: "y" } };
+  // Written against the bars themselves: they have moved once (0.65 -> 0.55)
+  // and a test that pins a number instead only says the bar used to be there.
+  const between = (MENU + AUTO) / 2;
   assert.equal(resolve("A", { choice: "a", probabilities: { a: 0.97 }, confidence: 0.97 }, opts).status, "auto");
-  assert.equal(resolve("A", { choice: "a", probabilities: { a: 0.6, b: 0.4 }, confidence: 0.6 }, opts).status, "pick");
-  assert.equal(resolve("A", { choice: "a", probabilities: { a: 0.3 }, confidence: 0.3 }, opts).status, "none");
+  assert.equal(resolve("A", { choice: "a", probabilities: { a: AUTO + 0.01 }, confidence: AUTO + 0.01 }, opts).status, "auto");
+  assert.equal(resolve("A", { choice: "a", probabilities: { a: between, b: 1 - between }, confidence: between }, opts).status, "pick");
+  assert.equal(resolve("A", { choice: "a", probabilities: { a: MENU - 0.1 }, confidence: MENU - 0.1 }, opts).status, "none");
 });
 
 test("buildOptions: derives a full name, explicit value wins", () => {
@@ -286,6 +290,21 @@ test("resolve: entries that agree on Yes or No add up", () => {
   assert.equal(resolve("School", spread, names).status, "pick");
 });
 
+test("buildOptions: a finished internship is not my current employer", () => {
+  // "Current company" is asked on half the Lever forms here, and the most
+  // recent role answered it -- an internship that ended in August. Real Jev
+  // now answers "Current company" / "Current employer" / "Who is your
+  // current employer?" at 0.97-0.99 with this, while "Most recent company"
+  // still gives Netflix at 0.98.
+  const past = buildOptions({ experience: [{ company: "Netflix", title: "SWE Intern", start_date: "May 2026", end_date: "August 2026" }] });
+  assert.match(past.current_employer.value, /^None/);
+  // Still employed: no invention, and an explicit answer always wins.
+  assert.equal(buildOptions({ experience: [{ company: "Intelligible", end_date: "Present" }] }).current_employer, undefined);
+  assert.equal(buildOptions({ experience: [{ company: "Intelligible", end_date: "" }] }).current_employer, undefined);
+  assert.equal(buildOptions({ experience: [], first_name: "Aidan" }).current_employer, undefined);
+  assert.equal(buildOptions({ current_employer: "Acme", experience: [{ company: "Netflix", end_date: "August 2026" }] }).current_employer.value, "Acme");
+});
+
 test("buildOptions: the education list says what my current status is", () => {
   // "Which one of the following best describes your current status?" is a
   // dropdown on Adobe's Workday, and nothing in the profile said what I am.
@@ -388,13 +407,14 @@ test("yesNoAnswer: a free-text yes/no box gets the word, never the entry that sa
   // Asked as a yes/no question, real Jev says No at 0.75/conf 0.63 to
   // OnLogic's schedule question. The entry ask, meanwhile, leans on the
   // current-status entry -- a whole sentence, and no answer at all here.
-  const direct = { choice: "no", confidence: 0.63, probabilities: { no: 0.75, yes: 0.17, [NONE]: 0.08 } };
+  const under = (MENU + AUTO) / 2; // offered by Cmd-V, not typed in
+  const direct = { choice: "no", confidence: under, probabilities: { no: 0.75, yes: 0.17, [NONE]: 0.08 } };
   const entry = { choice: "current_status", confidence: 0.44,
     probabilities: { current_status: 0.45, education1_end_date: 0.25, start_date: 0.2 } };
   const said = yesNoAnswer("Does this align with your academic schedule?", direct, entry, options);
   assert.equal(said.value, "No");
   assert.equal(said.status, "pick");
-  assert.ok(Math.abs(said.confidence - 0.63) < 1e-9);
+  assert.ok(Math.abs(said.confidence - under) < 1e-9);
   // The other way round: nothing from the direct ask, but Yes-valued entries
   // that pool over the bar. The value is still the word, not the sentence.
   const pooled = { choice: "flexibility_default", confidence: 0.9,

@@ -85,6 +85,8 @@ const MUTATIONS = [
     "  if (false) {", "lib"],
   ["a list-only box is never left holding typed text",
     "    if (isReactSelect(field) || picksFromAList(field)) {", "    if (isReactSelect(field)) {"],
+  ["a finished role is not my current employer",
+    '  if (!has("current_employer") && roles.length && !current) {', "  if (false) {", "lib"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],

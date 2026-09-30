@@ -13,7 +13,12 @@ import type { Option, Options } from "./schema.ts";
 
 // Above AUTO, Cmd-V pastes silently. Below MENU we offer nothing at all and
 // let the keystroke fall through to an ordinary paste.
-export const AUTO = 0.65;
+// Aidan, 2026-09-30: 0.65 left too much for the keyboard on borderline
+// questions. Measured on the 42-form corpus, 0.55 newly fills 13 fields;
+// the ones with a value are "Other website" on four forms (right) and
+// "Current company" on three (wrong, and fixed in lib/profile.ts by saying
+// there is no current employer rather than naming a finished internship).
+export const AUTO = 0.55;
 export const MENU = 0.4;
 
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/g;

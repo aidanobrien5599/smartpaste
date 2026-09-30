@@ -289,6 +289,7 @@ LABELS.phone_country_code = "Phone number country code";
 // Derived in lib/profile.ts from visa status and the education list.
 LABELS.on_visa = "Currently on a student or temporary work visa or permit " +
   "(F-1, OPT, CPT, STEM OPT, H-1B, TN, etc.)";
+LABELS.current_employer = "Current employer, if I am working somewhere right now";
 LABELS.current_status = "Current status: whether I am an enrolled student, a recent graduate, or working";
 LABELS.graduate_degree = "Graduate degree (master's or doctorate), for its GPA or graduation date";
 

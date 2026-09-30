@@ -184,6 +184,16 @@ function derived(profile: Profile, settings: Settings = {}): Record<string, stri
   if (!has("graduate_degree") && degrees.length && !degrees.some((d) => GRADUATE.test(d))) {
     out.graduate_degree = "None — no master's or doctoral degree, completed or in progress";
   }
+  // "Current company" is asked on half the Lever forms in the corpus, and
+  // the most recent role answered it -- an internship that ended in August.
+  // A role is current only if it says so; otherwise the honest answer is
+  // that there is none, which a form can still take as words.
+  const roles = (Array.isArray(profile.experience) ? profile.experience : []) as ProfileEntry[];
+  const current = roles.find((r) => /present|current|ongoing/i.test(String(r?.end_date || "")) ||
+    (String(r?.end_date || "").trim() === "" && String(r?.company || "").trim()));
+  if (!has("current_employer") && roles.length && !current) {
+    out.current_employer = "None — I am a full-time student, not currently employed";
+  }
   // "Which one of the following best describes your current status?" is a
   // dropdown on Adobe's Workday and on plenty of campus forms, and nothing
   // in the profile says what I am -- a student, a graduate, employed. The
