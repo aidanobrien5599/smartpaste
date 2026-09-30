@@ -44,7 +44,11 @@ export const READOUT = `(() => {
       : el.tagName === "SELECT" ? (el.value ? clean(el.selectedOptions[0]?.textContent) : "") : el.value;
     out.push({ kind: el.type === "file" ? "file" : el.tagName === "SELECT" ? "select" : el.getAttribute("role") === "combobox" ? "combobox" : el.type || el.tagName.toLowerCase(),
       pageLabel: labelOf(el), value: clean(value).slice(0, 100), required: required(el),
-      marked: el.getAttribute("data-smartpaste") || null });
+      marked: el.getAttribute("data-smartpaste") || null,
+      // The confidence is in the title the mark leaves ("... (0.62)"), which
+      // is the only place a run says how sure it was -- what a change to the
+      // auto-fill bar would newly let through.
+      confidence: Number((String(el.getAttribute("title") || "").match(/\(([01]\.\d+)\)\s*$/) || [])[1]) || null });
   }
   for (const g of groups.values()) {
     const box = g.el.closest("fieldset, [role=radiogroup], [role=group]");
