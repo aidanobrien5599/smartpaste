@@ -92,7 +92,7 @@ const ANSWERS = [
   [/Education 1: Degree/, "Undergraduate science degree"],
   [/Education 1: To/, "May 2027"],
   // workday-adobe-menus.html
-  [/able to work on a daily basis/i, "Yes"], [/^State$/, "Wisconsin"], [/^Country Phone Code$/, "United States of America (+1)"],
+  [/able to work on a daily basis/i, "Yes"], [/^Pronouns$/, "he/him"], [/^State$/, "Wisconsin"], [/^Country Phone Code$/, "United States of America (+1)"],
   [/authori[sz]ed/i, "Yes"],
   [/sponsorship/i, "No"],
   [/relocat/i, "Yes"],

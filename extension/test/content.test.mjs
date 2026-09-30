@@ -681,6 +681,15 @@ test("labels: a checkbox group deep in a grid still finds its legend", { skip },
     assert.ok(capacity.multi, JSON.stringify(capacity));
   }));
 
+test("fill: a dropdown whose menu never opens is left empty, not typed into", { skip }, () =>
+  withPage("rippling.html", async (page) => {
+    // Rippling's Pronouns, live: with the menu slow, "he/him" was typed into
+    // a box that only takes a choice -- so it looked filled and submitted
+    // empty. The same page a moment later picked "He/him/his" correctly.
+    await autofill(page);
+    assert.equal(await page.eval(value("#pronouns-slow")), "");
+  }));
+
 test("fill: Workday Self Identify -- one question over three checkboxes", { skip }, () =>
   withPage("workday-questions.html", async (page) => {
     await page.waitFor(asked);
