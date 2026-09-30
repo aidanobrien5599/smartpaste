@@ -14,7 +14,7 @@ import {
   readHomeLocation, EDUCATION_KINDS, EXPERIENCE_KINDS, headingCandidates, isBullet,
   parseDates, SECTION_KINDS, sectionise, splitDegreeField, splitPieces,
 } from "./lib/draft.ts";
-import { AUTO, isYesNo, isYesNoQuestion, resolve, ticks, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.ts";
+import { AUTO, isYesNo, isYesNoQuestion, resolve, ticks, unanswerableDemographic, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "./lib/resolve.ts";
 import { ASK_HISTORY, isPriorEmploymentQuestion, workHistory } from "./lib/history.ts";
 import { fillPlaceholders, hasPlaceholders, pageCandidates } from "./lib/answers.ts";
 
@@ -286,6 +286,11 @@ async function answerFields(fields, page = {}) {
   return fields.map((field, i) => withPlaceholders(answerFor(field, i), known));
 
   function answerFor(field, i) {
+    // Asked who I am, with nothing in the profile that says: no answer, by
+    // any path. A dropdown's own options are not evidence about a person.
+    if (unanswerableDemographic(field.label, options)) {
+      return { label: field.label, status: "none", value: null, confidence: 0, alternatives: [] };
+    }
     if (field.multi) {
       return ticks(field.label, field.options,
         field.options.map((_, j) => answers[`f${i}_m${j}`]), answers[`f${i}_pick`]);

@@ -219,7 +219,56 @@ const THEIR_OFFICE = /\b(?:what|which|where)\b[^?]*\b(?:city|town|location|offic
 const THIS_JOB = /\bthis (?:position|role|job|internship)\b|\bif (?:you are|you're) (?:accepted|hired|offered|selected)\b/i;
 const PREFERENCE = new Set(["work_locations", "top_work_location", "open_to_any_location"]);
 
+// A question about who someone IS. The profile has a field for each, and
+// only that field may answer it: live at the 0.55 bar, "Do you identify as
+// transgender?" came back No at 0.52-0.59 from the gender entry, on a
+// profile that says nothing about it. An invented answer about a protected
+// characteristic is worse than a blank, and blank is what the form means by
+// "prefer not to say".
+const DEMOGRAPHIC: [RegExp, string[]][] = [
+  [/\btransgender\b/i, ["transgender"]],
+  [/\bsexual orientation\b|\blgbtq/i, ["orientation", "lgbtq"]],
+  [/\bdisabilit(?:y|ies)\b|\bchronic condition\b/i, ["disability"]],
+  [/\bveteran\b|\barmed forces\b|\bmilitary service\b/i, ["veteran"]],
+  [/\bhispanic\b|\blatino\b/i, ["hispanic_latino", "race"]],
+  [/\brace\b|\bethnicit(?:y|ies)\b|\bracial\b/i, ["race", "hispanic_latino"]],
+  [/\bgender identity\b|\bgender\b|\bpronouns?\b/i, ["gender", "pronouns"]],
+];
+
+// "Current or most recent employer" wants the most recent one. The entry
+// that says there is no current employer answered it "None -- I am a
+// full-time student", which is not what was asked.
+const OR_MOST_RECENT = /\b(?:most recent|previous|last|prior)\b/i;
+
+/**
+ * Whether the question asks who someone is, and the profile does not say.
+ *
+ * Live at the 0.55 bar, "Do you identify as transgender?" was answered No at
+ * 0.52-0.62 on a profile that holds no such field -- inferred from the
+ * gender entry. Nobody's protected characteristics should be guessed from a
+ * neighbouring one, and a blank is what "prefer not to say" looks like.
+ */
+export function unanswerableDemographic(label: string, options: Options): boolean {
+  for (const [asks, fields] of DEMOGRAPHIC) {
+    if (!asks.test(label)) continue;
+    return !fields.some((key) => String(valueOf(options[key]) ?? "").trim());
+  }
+  return false;
+}
+
 export function resolve(label: string, answer: Answer, options: Options): Resolution {
+  const chose = String(answer?.choice ?? "");
+  if (unanswerableDemographic(label, options)) {
+    return { label, status: "none", value: null, confidence: 0, alternatives: [] };
+  }
+  for (const [asks, fields] of DEMOGRAPHIC) {
+    if (asks.test(label) && chose && !fields.includes(chose)) {
+      return { label, status: "none", value: null, confidence: 0, alternatives: [] };
+    }
+  }
+  if (chose === "current_employer" && OR_MOST_RECENT.test(label)) {
+    return { label, status: "none", value: null, confidence: 0, alternatives: [] };
+  }
   if (PREFERENCE.has(String(answer?.choice)) && THEIR_OFFICE.test(label) && THIS_JOB.test(label)) {
     return { label, status: "none", value: null, confidence: 0, alternatives: [] };
   }

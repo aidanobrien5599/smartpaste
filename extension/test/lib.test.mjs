@@ -1,7 +1,7 @@
 // Unit tests for extension/src/lib. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AUTO, isYesNo, isYesNoQuestion, maxTicks, MENU, refine, resolve, ticks, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
+import { AUTO, isYesNo, isYesNoQuestion, maxTicks, MENU, refine, resolve, ticks, unanswerableDemographic, yesNoAnswer, yesNoCertainty, yesNoFromEntry } from "../src/lib/resolve.ts";
 import { placeSaysYes } from "../src/lib/places.ts";
 import { isPriorEmploymentQuestion } from "../src/lib/history.ts";
 import { LABELS } from "../src/lib/schema.ts";
@@ -249,6 +249,37 @@ test("buildOptions: work authorization says it can show the documents", () => {
   // right to work?" -- a different question from "are you authorized?", and
   // the entry has to answer both. Live it went 0.46 -> 1.00 when it said so.
   assert.match(buildOptions({ work_auth: "Yes" }).work_auth.field, /documents proving my identity and right to work/i);
+});
+
+test("who I am is answered from its own field or not at all", () => {
+  // At the 0.55 bar, "Do you identify as transgender?" came back No at
+  // 0.52-0.62 on a profile that holds no such field -- inferred from the
+  // gender entry. A guess about a protected characteristic is worse than the
+  // blank the form reads as "prefer not to say".
+  const profile = { gender: "Male", race: "White", hispanic_latino: "No", veteran: "None", disability: "None" };
+  const options = buildOptions(profile);
+  assert.ok(unanswerableDemographic("Do you identify as transgender?", options));
+  assert.ok(unanswerableDemographic("What is your sexual orientation?", options));
+  assert.ok(!unanswerableDemographic("Gender", options));
+  assert.ok(!unanswerableDemographic("Please identify your race", options));
+  assert.ok(!unanswerableDemographic("Veteran Status", options));
+  assert.ok(!unanswerableDemographic("Do you have a disability?", options));
+  // Said outright, it is answered.
+  assert.ok(!unanswerableDemographic("Do you identify as transgender?", buildOptions({ ...profile, transgender: "No" })));
+  // And the gender entry cannot answer it even then.
+  const fromGender = { choice: "gender", confidence: 0.9, probabilities: { gender: 0.9 } };
+  assert.equal(resolve("Do you identify as transgender?", fromGender, buildOptions({ ...profile, transgender: "No" })).status, "none");
+  // A question about anything else is untouched.
+  assert.ok(!unanswerableDemographic("What is your expected graduation date?", options));
+});
+
+test("resolve: 'current or most recent employer' wants the most recent one", () => {
+  // The entry that says there is no current employer answered it "None -- I
+  // am a full-time student", which is not what was asked. Live: Netflix.
+  const options = buildOptions({ experience: [{ company: "Netflix", end_date: "August 2026" }] });
+  const none = { choice: "current_employer", confidence: 0.9, probabilities: { current_employer: 0.9 } };
+  assert.equal(resolve("Current or most recent employer", none, options).status, "none");
+  assert.equal(resolve("Current employer", none, options).status, "auto");
 });
 
 test("resolve: a preference does not answer where THIS job is based", () => {
