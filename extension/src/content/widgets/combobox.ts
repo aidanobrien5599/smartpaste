@@ -86,6 +86,13 @@ export function narrowingToken(want: string): string {
  * a school list opens on "Aalborg University" and will never show Wisconsin
  * on its own. Then one distinctive word narrows it, never the whole value.
  */
+/** A box that only takes a choice from a list it opens, never free text. */
+function picksFromAList(field: HTMLInputElement): boolean {
+  const popup = (field.getAttribute("aria-haspopup") || "").toLowerCase();
+  return ["listbox", "menu", "tree", "grid"].includes(popup) ||
+    (field.getAttribute("role") === "combobox" && field.readOnly);
+}
+
 export async function setCombobox(field: HTMLInputElement, want: string): Promise<boolean> {
   const ud = Boolean(field.closest(UD_SELECT));
   if (ud) {
@@ -148,7 +155,12 @@ async function pickCombobox(field: HTMLInputElement, want: string): Promise<bool
     // A plain autocomplete keeps what you typed, so leaving it is a real
     // answer. A React Select discards it on blur, so leaving it would only
     // look filled -- clear it and report the field as still needing you.
-    if (isReactSelect(field)) {
+    // ...and a box that says it opens a list is the same: it takes a choice
+    // from that list and nothing else, so text left in it looks filled and
+    // submits empty. Rippling's Pronouns did exactly that when its menu was
+    // slow -- "he/him" sat in the box while the form held no pronoun -- and
+    // the same page a moment later picked "He/him/his" correctly.
+    if (isReactSelect(field) || picksFromAList(field)) {
       nativeSet(field, "");
       field.blur();
       return false;

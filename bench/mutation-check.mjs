@@ -83,6 +83,8 @@ const MUTATIONS = [
   ["a preference is not where this job is based",
     "  if (PREFERENCE.has(String(answer?.choice)) && THEIR_OFFICE.test(label) && THIS_JOB.test(label)) {",
     "  if (false) {", "lib"],
+  ["a list-only box is never left holding typed text",
+    "    if (isReactSelect(field) || picksFromAList(field)) {", "    if (isReactSelect(field)) {"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],

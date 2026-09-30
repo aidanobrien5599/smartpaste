@@ -124,6 +124,14 @@ input{padding:4px;width:300px;display:block}
   <div class="css-drop"><div class="css-inner"><span>Total 0 file selected</span>
     <input type="file" accept=".doc,.docx,.pdf" style="width:0;height:0;opacity:0"></div>
     <span>Drop or select (.doc / .docx / .pdf)</span></div></div></div>
+
+<!-- Pronouns, as served: a searchable dropdown (role="combobox",
+     aria-haspopup="listbox"). This one never opens its menu, which is what
+     happened live when the page was slow: "he/him" was typed into the box,
+     the form held no pronoun, and the field counted as filled. -->
+<div class="css-field"><label for="pronouns-slow">Pronouns</label>
+  <input id="pronouns-slow" type="text" role="combobox" aria-haspopup="listbox" aria-expanded="false" autocomplete="off">
+</div>
 </form>
 
 <script>
