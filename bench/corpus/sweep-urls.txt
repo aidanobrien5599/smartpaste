@@ -48,4 +48,4 @@ https://ats.rippling.com/rippling/jobs/f255bf03-9173-4c0a-8a18-7cc43c27ded8/appl
 https://jobs.ashbyhq.com/ambrook/29ffbcea-17c3-4488-9d57-a9f7249b49a5/application
 https://careers-arccorp.icims.com/jobs/2471/software-engineer-intern/job
 https://job-boards.greenhouse.io/figma/jobs/6131089004
-https://jobs.lever.co/shieldai/8c850c75-081d-4d09-bebf-096379a93010/apply
+# duplicate of an URL above, dropped 2026-10-01 (it ran twice and the second visit scored no-pill)

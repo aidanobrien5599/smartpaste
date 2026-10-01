@@ -264,6 +264,13 @@ const PANEL = `(() => {
   return out.join(" || ").slice(0, 1200);
 })()`;
 
+// How long a rival may take over one form, and how many quiet seconds end
+// it. Simplify answers field by field with a model: 3 minutes on a 24-field
+// Greenhouse form is normal for it, and 20s of quiet is well under the
+// gaps it leaves between fields.
+const FILL_CAP = Number(process.env.FILL_CAP || 420000);
+const STILL_FOR = Number(process.env.STILL_FOR || 20);
+
 const CONTROL = { simplify: "/autofill this page/i", huntr: "/autofill/i" }[which];
 const urls = readFileSync(rest[0], "utf8").split("\n").map((l) => l.replace(/#.*/, "").trim()).filter(Boolean);
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
@@ -292,18 +299,27 @@ for (const [i, url] of urls.entries()) {
   // Its panel reloads per page, and clicking the moment the button appears
   // is often too early -- the fill then does nothing. So: click, watch for
   // any value to land, and try again a couple of times, as a person would.
+  //
+  // How long to watch is the whole measurement. Simplify answers a form
+  // with a model, field by field, and takes MINUTES: its panel says
+  // "Autofilling this page... Generating Answers" the entire time, and one
+  // page that this harness scored 0/24 after 37 seconds came back 6/24
+  // when watched for 192. Giving up early does not measure a rival, it
+  // measures my patience, so the wait here is in minutes and the rival is
+  // only called finished when it says so or stops changing anything.
   const clickedAt = Date.now();
   let clicked = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     await sleep(attempt ? 4000 : 1500);
     const hit = await evaluate(SEEK(CONTROL, true));
     if (typeof hit === "string") clicked = hit;
-    let filledAny = false;
-    for (let t = 0; t < 16 && !filledAny; t++) {
+    let working = false;
+    for (let t = 0; t < 20 && !working; t++) {
       await sleep(500);
-      filledAny = (await evaluate(`[...document.querySelectorAll("input,textarea,select")].some((e) => e.value)`)) === true;
+      working = (await evaluate(`[...document.querySelectorAll("input,textarea,select")].some((e) => e.value)`)) === true ||
+        /autofilling|generating answers|detecting questions/i.test(String(await evaluate(PANEL)));
     }
-    if (filledAny) break;
+    if (working) break;
     // Nothing yet: acknowledge whatever it is asking first, then try again.
     await evaluate(SEEK("/^(?:got it|continue|accept|i agree|agree|ok)$/i", true));
   }
@@ -311,16 +327,23 @@ for (const [i, url] of urls.entries()) {
   if (!result.control) {
     result.status = "no-control";
   } else {
-    // No note to watch, so wait for the page to stop changing: three reads
-    // the same in a row, or twenty seconds.
-    let last = "", still = 0;
-    for (let t = 0; t < 40 && still < 3; t++) {
-      await sleep(500);
+    // Finished when its own panel stops saying it is working AND the
+    // page's values stop changing for STILL_FOR. Both, because the panel
+    // goes quiet between fields and the values pause while it thinks.
+    let last = "", still = 0, finishedAt = 0;
+    const cap = Date.now() + FILL_CAP;
+    while (Date.now() < cap && still < STILL_FOR) {
+      await sleep(1000);
       const now = await evaluate(`[...document.querySelectorAll("input,textarea,select")].map((e) => e.value).join("|")`);
-      if (typeof now === "string") { still = now === last ? still + 1 : 0; last = now; }
+      const busy = /autofilling|generating answers|detecting questions/i.test(String(await evaluate(PANEL)));
+      if (typeof now !== "string") continue;
+      if (now === last && !busy) { still++; if (!finishedAt) finishedAt = Date.now(); } else { still = 0; finishedAt = 0; }
+      last = now;
     }
-    result.fillMs = Date.now() - clickedAt;
-    result.status = "filled";
+    // Its fill took until it stopped changing things, not until this loop
+    // was satisfied: the quiet window is the harness's, not the tool's.
+    result.fillMs = (finishedAt || Date.now()) - clickedAt;
+    result.status = still >= STILL_FOR ? "filled" : "over-cap";
   }
   const rows = await evaluate(READOUT);
   result.controls = Array.isArray(rows) ? rows : [];
