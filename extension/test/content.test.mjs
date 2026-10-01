@@ -663,6 +663,23 @@ test("fill: each Workday menu is read and clicked inside its own popup", { skip 
     assert.ok(!Object.values(model).includes("Select One"), JSON.stringify(model));
   }));
 
+// workday-reload.html: "the page is forced to reload or something on
+// Workday with our script". A step that submits itself when a field loses
+// focus, and a step change by pushState. The fill cannot stop Workday
+// rebuilding its step, but it must not let the form go, and it must say
+// which field was in flight.
+test("fill: a page that moves under the fill is reported, and its submit cancelled", { skip }, () =>
+  withPage("workday-reload.html", async (page) => {
+    const note = await autofill(page, 60000);
+    assert.match(note, /the page (?:tried to submit \(cancelled\)|changed page)/, note);
+    assert.match(note, /while filling (?:First Name|Email)/, note);
+    // Cancelled, not merely noticed: the form never submitted.
+    assert.equal(await page.eval("window.__submits"), 0);
+    // And the fill still finished: every box holds its value.
+    assert.equal(await page.eval("document.getElementById('first').value"), "Aidan");
+    assert.ok(await page.eval("document.getElementById('email').value"), "email was left empty");
+  }));
+
 // workday-source-prompt.html: Adobe's "How Did You Hear About Us?" read 0
 // options live and was left blank, while every dropdown button on the same
 // page filled. Workday's prompt keeps aria-expanded="false" on the <input>

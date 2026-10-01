@@ -33,6 +33,7 @@ import { setDate } from "../widgets/date.ts";
 import { applyListbox, surveyListbox } from "../widgets/listbox.ts";
 import type { MenuTexts } from "../widgets/menus.ts";
 import { applyPrompt, promptChosen, setMultiPrompt, surveyPrompt } from "../widgets/prompt.ts";
+import { watchNavigation } from "./navigation.ts";
 import { selectChoices, setSelect } from "../widgets/select.ts";
 import { setValue } from "../widgets/set-value.ts";
 import { setChecks, setToggle } from "../widgets/toggle.ts";
@@ -86,6 +87,9 @@ function dropEndDatesOfOngoing(todo: KnownField[]): void {
 
 export async function fillFields(started: number, attached: number, prefix = "", only: Set<string> | null = null): Promise<void> {
   rebind();
+  // What is being filled right now, for when the page moves under the fill.
+  let inFlight = "";
+  const watch = watchNavigation(() => inFlight);
   let filled = 0;
   let skipped = 0;
   const count = (ok: boolean) => (ok ? filled++ : skipped++);
@@ -113,7 +117,9 @@ export async function fillFields(started: number, attached: number, prefix = "",
   const timed = async (entry: KnownField, kind: string, work: () => boolean | Promise<boolean>) => {
     const t = performance.now();
     live(entry);
+    inFlight = `${entry.label} (${kind})`;
     const ok = detached(entry) ? false : await work();
+    inFlight = "";
     timeline.push({ field: entry.label, kind, ms: Math.round(performance.now() - t), ok });
     count(ok);
     return ok;
@@ -171,8 +177,10 @@ export async function fillFields(started: number, attached: number, prefix = "",
     const want = entry.result.value as string;
     const t = performance.now();
     if (detached(live(entry))) { skipped++; continue; }
+    inFlight = `${entry.label} (reading its menu)`;
     const texts = entry.widget === "listbox"
       ? await surveyListbox(entry.element, want) : await surveyPrompt(entry.element as HTMLInputElement, want);
+    inFlight = "";
     // What the menu showed, for the console table: a failed dropdown is
     // then diagnosable from one paste ("read 0" = it never opened).
     const read = `${texts.length}: ${texts.slice(0, 4).join(" | ")}`.slice(0, 120);
@@ -223,6 +231,10 @@ export async function fillFields(started: number, attached: number, prefix = "",
   const parts = [`${prefix}filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
   if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
   if (skipped) parts.push(`left ${skipped} for you`);
+  // The page moved under the fill: say so where it will be seen, not only
+  // in the console.
+  const moved = watch.stop();
+  if (moved) parts.push(`the page ${moved.what} while filling ${moved.field.slice(0, 40)}`);
   // Name the slow fields right in the note, so a slow page can be
   // diagnosed from a screenshot.
   const slow = timeline.filter((t) => t.ms >= 700).sort((a, b) => b.ms - a.ms).slice(0, 3);

@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer|Workday prompt";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer|Workday prompt|moves under the fill";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -91,6 +91,10 @@ const MUTATIONS = [
     "  if (unanswerableDemographic(label, options)) {", "  if (false) {", "lib"],
   ["'current or most recent' is not the current one",
     '  if (chose === "current_employer" && OR_MOST_RECENT.test(label)) {', "  if (false) {", "lib"],
+  // "The page is forced to reload or something on Workday with our script."
+  ["a submit during a fill is cancelled and named",
+    "    event.preventDefault();\n    event.stopPropagation();\n    say(\"tried to submit (cancelled)\");",
+    "    say(\"tried to submit\");"],
   // Adobe's "How Did You Hear About Us?" read 0 options live: an empty
   // result list held the prompt's whole budget, so the categories its
   // answers live under were never opened.

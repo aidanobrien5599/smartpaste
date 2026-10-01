@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply - Workday</title>
+<style>body{font:14px system-ui;max-width:640px;margin:30px auto}label{display:block;font-size:12px}</style></head>
+<body>
+<!-- "There is this weird thing that happens where the page is forced to
+     reload or something on Workday with our script." Two ways a Workday step
+     takes itself away mid-fill, both reproduced here: a field that submits
+     its form when it loses focus (Workday's Enter key reaching the step's
+     primary button does the same), and a step change by pushState, which
+     fires no event at all. Neither is smartpaste's doing; what smartpaste
+     owes the user is to cancel the submit and to say which field was in
+     flight when it happened. -->
+<main data-automation-id="applyFlowPage">
+<form id="step" action="/next" method="post">
+  <div data-automation-id="formField-first"><label for="first">First Name<abbr>*</abbr></label>
+    <input type="text" id="first" data-automation-id="legalNameSection_firstName"></div>
+  <div data-automation-id="formField-email"><label for="email">Email<abbr>*</abbr></label>
+    <input type="email" id="email" data-automation-id="email"></div>
+  <div data-automation-id="formField-phone"><label for="phone">Phone Number<abbr>*</abbr></label>
+    <input type="tel" id="phone" data-automation-id="phone-number"></div>
+  <button type="submit" data-automation-id="bottom-navigation-next-button">Save and Continue</button>
+</form>
+</main>
+<script>
+window.__submits = 0;
+document.getElementById("step").addEventListener("submit", () => { window.__submits++; }, false);
+// The step rebuilds itself once a name is in: a pushState, no event, no load.
+document.getElementById("first").addEventListener("blur", () => {
+  if (document.getElementById("first").value) history.pushState({}, "", location.pathname + "?step=2");
+});
+// Losing focus here is what Workday treats as "go on to the next step".
+document.getElementById("email").addEventListener("blur", () => {
+  if (document.getElementById("email").value) document.getElementById("step").requestSubmit();
+});
+</script>
+</body></html>
