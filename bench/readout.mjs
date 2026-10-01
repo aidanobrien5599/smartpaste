@@ -4,7 +4,8 @@
 // A comparison where each side is measured by its own code is not one.
 // What the page shows, per visible control: the text THIS FILE can find for
 // it, its value, whether it is required. Radios and checkboxes are one line
-// per group.
+// per group. A box that is aria-hidden or a few pixels across belongs to a
+// widget, not to the applicant, and is left out.
 //
 // `pageLabel` is not the question the extension asks. The content script runs
 // in an isolated world, so its labelFor() is unreachable from here, and this
@@ -29,7 +30,13 @@ export const READOUT = `(() => {
     if (el.type === "hidden" || el.type === "submit" || el.type === "button") continue;
     const r = el.getBoundingClientRect();
     const hiddenChoice = (el.type === "radio" || el.type === "checkbox");
-    if (!hiddenChoice && (!r.width || !r.height)) continue;
+    // A box no person could type in is not a field any tool should be
+    // scored on. Workable's address autocomplete writes city, postcode and
+    // country into 1px aria-hidden boxes of its own, from the place you
+    // pick; counting them blank put three phantom misses on every Workable
+    // form in the corpus and made the site look half-filled.
+    if (!hiddenChoice && (!r.width || !r.height || r.width < 8 || r.height < 8 ||
+      el.getAttribute("aria-hidden") === "true")) continue;
     if (el.closest(".smartpaste-button, .smartpaste-note")) continue;
     if (hiddenChoice && el.name) {
       const g = groups.get(el.type + el.name) || { el, kind: el.type, picked: [], n: 0 };

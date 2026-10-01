@@ -26,7 +26,12 @@ const nameOf = (x) => x.pageLabel ?? x.label ?? "";
 const ats = (host) => /greenhouse/.test(host) ? "greenhouse" : /ashbyhq/.test(host) ? "ashby" : /lever\.co/.test(host) ? "lever"
   : /workable/.test(host) ? "workable" : /rippling/.test(host) ? "rippling" : /icims/.test(host) ? "icims" : host;
 // Fields nobody should fill: optional extras, the site's own search boxes.
-const IGNORE = /^(search|g-recaptcha|captcha)|cover letter|middle name|preferred (first )?name|pronoun|twitter|facebook|x \(fka/i;
+// Also: Workable's address autocomplete writes city / postcode / country
+// into 1px aria-hidden boxes of its own. The readout leaves those out now,
+// but runs recorded before it did still carry them, so they are ignored
+// here too -- otherwise two runs scored either side of that change are not
+// comparable.
+const IGNORE = /^(search|g-recaptcha|captcha|city$|postcode$|country$)|cover letter|middle name|preferred (first )?name|pronoun|twitter|facebook|x \(fka/i;
 
 console.log(dir);
 console.log("\nPAGE".padEnd(60), "status   filled/controls  req-blank  fill");

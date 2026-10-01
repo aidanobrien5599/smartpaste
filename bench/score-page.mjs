@@ -15,7 +15,12 @@ import { READOUT } from "./readout.mjs";
 
 // Fields nobody should be marked down for: the site's own search box, extras
 // no profile holds. Kept identical to bench/sweep-report.mjs.
-const IGNORE = /^(search|g-recaptcha|captcha)|cover letter|middle name|preferred (first )?name|pronoun|twitter|facebook|x \(fka/i;
+// Also: Workable's address autocomplete writes city / postcode / country
+// into 1px aria-hidden boxes of its own. The readout leaves those out now,
+// but runs recorded before it did still carry them, so they are ignored
+// here too -- otherwise two runs scored either side of that change are not
+// comparable.
+const IGNORE = /^(search|g-recaptcha|captcha|city$|postcode$|country$)|cover letter|middle name|preferred (first )?name|pronoun|twitter|facebook|x \(fka/i;
 
 if (process.argv.includes("--snippet")) {
   console.log(`(() => {
