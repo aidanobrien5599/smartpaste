@@ -663,6 +663,17 @@ test("fill: each Workday menu is read and clicked inside its own popup", { skip 
     assert.ok(!Object.values(model).includes("Select One"), JSON.stringify(model));
   }));
 
+// A required written answer is not a bug and not a gap: it is the user's to
+// write. The note names them, because a count sends them hunting.
+test("fill: the required questions only the user can answer are named", { skip }, () =>
+  withPage("written-answers.html", async (page) => {
+    const note = await autofill(page);
+    assert.match(note, /2 still need you/, note);
+    assert.match(note, /Why do you want to work at Acme/, note);
+    // Not the optional one: nothing is owed on "Anything else".
+    assert.ok(!/Anything else/.test(note), note);
+  }));
+
 // workday-reload.html: "the page is forced to reload or something on
 // Workday with our script". A step that submits itself when a field loses
 // focus, and a step change by pushState. The fill cannot stop Workday

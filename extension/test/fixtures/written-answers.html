@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply - Greenhouse</title>
+<style>body{font:14px system-ui;max-width:640px;margin:30px auto}
+label{display:block;font-size:12px;margin-top:14px}textarea{width:100%;height:70px}</style></head>
+<body>
+<!-- Across 42 live forms, about a dozen required blanks are questions no
+     model should invent an answer to: why this company, a challenge, a
+     strength. They are only answerable from what the user has written into
+     the profile, and while those fields are empty the fill can do nothing
+     but leave them -- so it has to say WHICH, by name. "Left 9 for you"
+     sends the user hunting; a name says which profile field to fill once. -->
+<form action="/applications" method="post"><main>
+<h2>Application</h2>
+<label for="first">First Name *<input type="text" id="first" name="first" required></label>
+<label for="email">Email *<input type="email" id="email" name="email" required></label>
+<label for="linkedin">LinkedIn Profile<input type="url" id="linkedin" name="linkedin"></label>
+<label for="school">School *<input type="text" id="school" name="school" required></label>
+<label for="why">Why do you want to work at Acme? *</label>
+<textarea id="why" name="why" required></textarea>
+<label for="challenge">Describe a challenge you faced and how you handled it. *</label>
+<textarea id="challenge" name="challenge" required></textarea>
+<label for="extra">Anything else you would like us to know?</label>
+<textarea id="extra" name="extra"></textarea>
+</main></form>
+</body></html>

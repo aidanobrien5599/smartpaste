@@ -60,6 +60,7 @@ changing how a dropdown is driven cannot change the order a page fills in.
 | `widgets/prompt.ts` | Workday's search prompts, including the multi-pick Skills box. |
 | `widgets/date.ts` | Date parsing, formatting for a box, and split month/day/year boxes. |
 | `fill/fill-fields.ts` | The fill itself, fastest first, with the console timeline and the summary note. |
+| `fill/report.ts` | What a fill says for itself: questions it could not place, and the required ones left for the user. |
 | `fill/navigation.ts` | Whether the page moved under a fill, and cancelling a submit it tried. |
 | `fill/entries.ts` | Clicking "Add" until each repeated section holds one entry per profile entry. |
 | `fill/documents.ts` | Attaching stored documents to upload inputs. |

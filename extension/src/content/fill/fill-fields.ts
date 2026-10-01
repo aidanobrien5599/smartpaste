@@ -34,6 +34,8 @@ import { applyListbox, surveyListbox } from "../widgets/listbox.ts";
 import type { MenuTexts } from "../widgets/menus.ts";
 import { applyPrompt, promptChosen, setMultiPrompt, surveyPrompt } from "../widgets/prompt.ts";
 import { watchNavigation } from "./navigation.ts";
+import { needsYou, reportGaps } from "./report.ts";
+import type { MenuRecord } from "./report.ts";
 import { selectChoices, setSelect } from "../widgets/select.ts";
 import { setValue } from "../widgets/set-value.ts";
 import { setChecks, setToggle } from "../widgets/toggle.ts";
@@ -44,8 +46,6 @@ interface Step { field: string; kind: string | null | undefined; ms: number; ok:
   // A field that ends up holding an answer it was never told to pick has
   // been answered from another menu, which no other column would show.
   chose?: string; became?: string }
-/** A menu surveyed in step 3, waiting on Jev's decision. */
-interface MenuRecord { entry: KnownField; texts: MenuTexts; read: string; decision: Promise<number>; failed?: boolean }
 
 export function isFilled(entry: KnownField): boolean {
   const { element } = entry;
@@ -231,6 +231,13 @@ export async function fillFields(started: number, attached: number, prefix = "",
   const parts = [`${prefix}filled ${filled} in ${((performance.now() - started) / 1000).toFixed(1)}s`];
   if (attached) parts.push(`attached ${attached} file${attached === 1 ? "" : "s"}`);
   if (skipped) parts.push(`left ${skipped} for you`);
+  // Which of them the site insists on, by name: these are the written
+  // answers, and a name is what tells the user which profile field to fill.
+  const mine = needsYou(isFilled);
+  if (mine.length) {
+    parts.push(`${mine.length} still need${mine.length === 1 ? "s" : ""} you: ` +
+      mine.slice(0, 3).map((label) => label.slice(0, 34)).join("; ") + (mine.length > 3 ? ", ..." : ""));
+  }
   // The page moved under the fill: say so where it will be seen, not only
   // in the console.
   const moved = watch.stop();
@@ -243,28 +250,4 @@ export async function fillFields(started: number, attached: number, prefix = "",
   // A follow-up round adds to the fill's summary rather than replacing it.
   state.lastSummary = only && state.lastSummary ? `${state.lastSummary} · ${summary}` : summary;
   note(state.lastSummary, false, why.length || only ? 12000 : 4000);
-}
-
-/**
- * For diagnosing a page from one console paste: questions on it that
- * smartpaste found no field in, with a trimmed copy of their markup, and
- * for each dropdown that failed, what it wanted and every option offered.
- */
-function reportGaps(menus: MenuRecord[] = []): void {
-  const handled = [...state.known.map((k) => k.element), ...collectFields().map((f) => f.element)];
-  const gaps = [];
-  for (const box of document.querySelectorAll('[data-automation-id^="formField"], .application-question, fieldset')) {
-    if (!nodeVisible(box) || box.querySelector('[data-automation-id^="formField"], input[type="file"]')) continue;
-    if (handled.some((el) => box.contains(el) || el.contains(box))) continue;
-    const label = clean(box.querySelector("label, legend")?.textContent || "");
-    if (!label) continue;
-    const html = box.outerHTML.replace(/\s(?:class|style)="[^"]*"/g, "").replace(/\s+/g, " ").slice(0, 700);
-    gaps.push({ question: label, markup: html });
-  }
-  const failed = menus.filter((m) => m.failed).map((m) => ({ field: m.entry.label, wanted: m.entry.result.value, options: m.texts.join(" | ").slice(0, 1500) }));
-  if (!gaps.length && !failed.length) return;
-  console.groupCollapsed(`smartpaste: ${gaps.length} question(s) not recognised, ${failed.length} dropdown(s) not matched -- paste this when reporting a problem`);
-  if (gaps.length) console.table(gaps);
-  if (failed.length) console.table(failed);
-  console.groupEnd();
 }
