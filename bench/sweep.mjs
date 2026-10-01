@@ -161,7 +161,7 @@ async function runOne(url, n) {
     // A closed posting redirects to the board ("/careers/open-roles",
     // "jobs/search?notFound=1"). Scoring that as a miss blames the extension
     // for a job that no longer exists.
-    if (/notFound=1|\/(?:open-roles|search|jobs)\/?$/i.test(page.href) && page.href !== url) {
+    if (/not_?found=(?:1|true)|\/(?:open-roles|search|jobs)\/?$/i.test(page.href) && page.href !== url) {
       result.status = "dead"; result.why = `redirected to ${page.href.slice(0, 80)}`; return result;
     }
 
@@ -179,7 +179,13 @@ async function runOne(url, n) {
     result.pill = pill;
     const before = await evaluate(READOUT);
     if (!pill) {
-      result.status = "no-pill";
+      // No pill AND no fields on the page is a closed posting, not a miss:
+      // Ashby serves a bare page titled "Jobs" once a job is gone, and
+      // scoring that as "no Autofill button" blames the extension for a job
+      // that no longer exists.
+      const rows = Array.isArray(before) ? before.filter((x) => x.pageLabel) : [];
+      result.status = rows.length ? "no-pill" : "dead";
+      if (!rows.length) result.why = "no form on the page";
       result.controls = Array.isArray(before) ? before : [];
       result.logs = logs;
       return result;

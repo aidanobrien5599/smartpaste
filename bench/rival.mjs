@@ -249,6 +249,21 @@ const SEEK = (words, click) => `(() => {
   return null;
 })()`;
 
+// Everything the rival's own UI says, for when it fills nothing: a sign-in
+// wall, a usage limit or an empty profile all look identical in the numbers
+// (0/24, three clicks, no error), and they are all over in one sentence of
+// its own text. A whole 42-form run came back 0/N, which without this would
+// have read as the rival being bad at these forms.
+const PANEL = `(() => {
+  const out = [];
+  for (const el of document.querySelectorAll("*")) {
+    if (!el.shadowRoot) continue;
+    const text = (el.shadowRoot.textContent || "").replace(/\\s+/g, " ").trim();
+    if (text) out.push(text.slice(0, 600));
+  }
+  return out.join(" || ").slice(0, 1200);
+})()`;
+
 const CONTROL = { simplify: "/autofill this page/i", huntr: "/autofill/i" }[which];
 const urls = readFileSync(rest[0], "utf8").split("\n").map((l) => l.replace(/#.*/, "").trim()).filter(Boolean);
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
@@ -309,6 +324,10 @@ for (const [i, url] of urls.entries()) {
   }
   const rows = await evaluate(READOUT);
   result.controls = Array.isArray(rows) ? rows : [];
+  // What its own panel says, always -- it is the only explanation of a page
+  // it filled nothing on.
+  const panel = await evaluate(PANEL);
+  if (typeof panel === "string") result.panel = panel;
   result.seconds = Math.round((Date.now() - started) / 1000);
   results.push(result);
   writeFileSync(join(outDir, `${String(START + i + 1).padStart(2, "0")}-${result.host}.json`), JSON.stringify(result, null, 1));
