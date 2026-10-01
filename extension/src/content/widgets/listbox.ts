@@ -5,7 +5,7 @@
  *
  * Depends on: answer/ask.ts (chooseAmong, localMatch), discover/labels.ts
  * (listboxLabel), discover/selectors.ts (EMPTY_BUTTON), dom/query.ts,
- * dom/text.ts, widgets/menus.ts.
+ * dom/text.ts, widgets/menus.ts, widgets/popups.ts.
  *
  * ATS quirks: some Workday buttons (Phone Device Type) open on mousedown
  * and toggle again on click, so a plain click is tried before the full
@@ -18,7 +18,8 @@ import { listboxLabel } from "../discover/labels.ts";
 import { EMPTY_BUTTON } from "../discover/selectors.ts";
 import { click, fire, sleep } from "../dom/query.ts";
 import { normalize } from "../dom/text.ts";
-import { closeMenu, findOption, pickOption, readMenu, settlePopups, waitForOptions , popupsNow, rememberPopup} from "./menus.ts";
+import { findOption, pickOption, readMenu, waitForOptions } from "./menus.ts";
+import { closeMenu, popupsNow, rememberPopup, settlePopups } from "./popups.ts";
 import type { MenuTexts } from "./menus.ts";
 
 /**

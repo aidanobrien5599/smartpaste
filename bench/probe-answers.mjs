@@ -6,12 +6,20 @@
 // content script sends, printing each field's result and the raw top picks.
 //
 //   node bench/probe-answers.mjs storage.json questions.json [--say-yes=0|1]
+//   node bench/probe-answers.mjs storage.json picks.json --choose
 //
 // storage.json holds { apiKey, profile, extraText, settings } as
 // chrome.storage.local does; questions.json is [[label, [options...]], ...]
 // (an empty options list asks the field as a text box; a third element
 // true makes it a group of checkboxes). The key is never
 // printed.
+//
+// --choose sends "choose-option" instead: the question smartpaste asks when
+// it already knows the answer and has to find it among a menu's rows. Then
+// picks.json is [[label, [options...], want], ...]. That is the question a
+// Workday prompt's categories turn on -- whether Jev, told the answer is
+// "LinkedIn", picks "Job Boards" to walk into -- and nothing but the real
+// model can say.
 import { readFileSync } from "node:fs";
 
 const [storePath, questionsPath] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -41,6 +49,20 @@ globalThis.fetch = async (...args) => {
 };
 
 await import("../extension/src/background.js");
+
+if (process.argv.includes("--choose")) {
+  for (const [label, options, want] of Q) {
+    const reply = await new Promise((resolve) =>
+      listener({ type: "choose-option", label, options, want }, {}, resolve));
+    const index = reply.ok ? reply.index : -1;
+    console.log(`${label.slice(0, 70)}\n  want ${JSON.stringify(want)} -> ` +
+      `${index >= 0 ? JSON.stringify(options[index]) : "(none)"} ` +
+      `conf ${reply.confidence === undefined ? "-" : Number(reply.confidence).toFixed(2)}` +
+      `${reply.ok ? "" : ` error: ${reply.error}`}`);
+  }
+  process.exit(0);
+}
+
 const fields = Q.map(([label, options, multi]) =>
   (options && options.length ? { label, options, multi: Boolean(multi) } : { label }));
 const reply = await new Promise((resolve) =>

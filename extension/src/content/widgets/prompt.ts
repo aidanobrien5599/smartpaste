@@ -7,7 +7,7 @@
  *
  * Depends on: answer/ask.ts (chooseAmong, localMatch), discover/labels.ts,
  * discover/selectors.ts (FIELD_ENTRY), dom/query.ts, dom/text.ts,
- * widgets/combobox.ts (narrowingToken), widgets/menus.ts,
+ * widgets/combobox.ts (narrowingToken), widgets/menus.ts, widgets/popups.ts,
  * widgets/text.ts (nativeSet).
  *
  * ATS quirks: Workday's prompt list is never empty -- an empty one says "0
@@ -23,7 +23,8 @@ import { FIELD_ENTRY } from "../discover/selectors.ts";
 import { click, press } from "../dom/query.ts";
 import { normalize, optionText } from "../dom/text.ts";
 import { narrowingToken } from "./combobox.ts";
-import { closeMenu, findOption, optionPicked, optionsNear, pickOption, readMenu, settlePopups, waitForOptions } from "./menus.ts";
+import { findOption, optionPicked, optionsNear, pickOption, readMenu, waitForOptions } from "./menus.ts";
+import { closeMenu, settlePopups } from "./popups.ts";
 import type { MenuTexts } from "./menus.ts";
 import { nativeSet } from "./text.ts";
 
@@ -94,7 +95,8 @@ export function promptChosen(input: Element): boolean {
 // levels of re-asking with the menu open -- the page froze for ~20s.
 const PROMPT_BUDGET = 6000;
 
-const PROMPT_ASKS = 2;
+// An ask per level, and a category that was the wrong way in doubles that.
+const PROMPT_ASKS = 4;
 
 /** Whether the menu still shows exactly `texts`: a click changed nothing. */
 function sameMenu(anchor: Element, texts: string[]): boolean {
@@ -107,37 +109,72 @@ function sameMenu(anchor: Element, texts: string[]): boolean {
  * text is not an answer; it only searches, on Enter. Pick from the results,
  * and when nothing matches, open the prompt empty and walk its categories
  * ("Job Board" > "LinkedIn Jobs") instead.
+ *
+ * A category can be the wrong one. Asked cold which of Adobe's categories
+ * expresses "LinkedIn", Jev says Social Media (0.86-0.88 over three runs);
+ * Workday keeps LinkedIn under Job Boards, whose children are Glassdoor,
+ * Indeed, LinkedIn, ZipRecruiter. So a category whose children turn out not
+ * to hold the answer is remembered, and the top level is asked again without
+ * it. Walking in and giving up is what left the question blank.
  */
 export async function setPrompt(input: HTMLInputElement, want: string): Promise<boolean> {
   if (promptChosen(input)) return true;
   const label = labelFor(input);
   const deadline = Date.now() + PROMPT_BUDGET;
-  let asks = 0;
+  const state = { asks: 0, tried: new Set<string>() };
   const done = (ok: boolean) => { closeMenu(input); if (!ok) nativeSet(input, ""); return ok; };
-  for (const probe of [want, narrowingToken(want), ""]) {
-    if (Date.now() > deadline || asks >= PROMPT_ASKS) break;
-    if (probe) searchPrompt(input, probe);
-    else { nativeSet(input, ""); click(input); }
-    for (let depth = 0; depth < 3 && Date.now() < deadline; depth++) {
-      if (!(await waitForOptions(input, 2500)).length) break;
-      const texts = await readMenu(input, want);
-      const exact = texts.findIndex((t) => normalize(t) === normalize(want));
-      if (exact < 0 && asks >= PROMPT_ASKS) return done(false);
-      if (exact < 0) asks++;
-      const index = exact >= 0 ? exact : await chooseAmong(label, want, texts);
-      if (index < 0) return done(false); // Jev saw the options: none fits
-      const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
-      if (!node) break;
-      await pickOption(node, () => promptChosen(input));
-      if (promptChosen(input) || optionPicked(node)) return done(true);
-      // A category opens its children in place; anything else means the
-      // click did not take, and asking again would only click again.
-      if (sameMenu(input, texts)) return done(false);
-    }
+  for (const probe of [want, narrowingToken(want)]) {
+    if (!probe || Date.now() > deadline || state.asks >= PROMPT_ASKS) break;
+    searchPrompt(input, probe);
+    if (await walk(input, want, label, deadline, state)) return done(true);
     closeMenu(input);
     await settlePopups(input);
   }
+  // Nothing is findable by name: open it empty and walk its categories,
+  // once per category that turns out to be the wrong way in.
+  for (let attempt = 0; attempt < 3 && Date.now() < deadline && state.asks < PROMPT_ASKS; attempt++) {
+    const before = state.tried.size;
+    nativeSet(input, "");
+    click(input);
+    if (await walk(input, want, label, deadline, state)) return done(true);
+    closeMenu(input);
+    await settlePopups(input);
+    if (state.tried.size === before) break; // a dead end with nothing to blame: no retry
+  }
   return done(false);
+}
+
+/**
+ * One walk into an open prompt: pick the row that is the answer, or the
+ * category that should hold it, down to three levels. A category that turns
+ * out not to hold the answer goes into `tried`, so the next walk asks the
+ * top level again without it.
+ */
+async function walk(input: HTMLInputElement, want: string, label: string,
+                    deadline: number, state: { asks: number; tried: Set<string> }): Promise<boolean> {
+  let entered = "";
+  const deadEnd = () => { if (entered) state.tried.add(entered); return false; };
+  for (let depth = 0; depth < 3 && Date.now() < deadline; depth++) {
+    if (!(await waitForOptions(input, 2500)).length) return deadEnd();
+    const all = await readMenu(input, want);
+    // A category already walked into is not offered again.
+    const texts = all.filter((t) => !state.tried.has(t)) as MenuTexts;
+    texts.at = all.at;
+    const exact = texts.findIndex((t) => normalize(t) === normalize(want));
+    if (exact < 0 && state.asks >= PROMPT_ASKS) return deadEnd();
+    if (exact < 0) state.asks++;
+    const index = exact >= 0 ? exact : await chooseAmong(label, want, texts);
+    if (index < 0) return deadEnd(); // Jev saw the options: none of them fits
+    const node = await findOption(input, texts[index], texts.at?.get(texts[index]));
+    if (!node) return deadEnd();
+    await pickOption(node, () => promptChosen(input));
+    if (promptChosen(input) || optionPicked(node)) return true;
+    // A category opens its children in place; anything else means the click
+    // did not take, and asking again would only click again.
+    if (sameMenu(input, texts)) return deadEnd();
+    entered = texts[index];
+  }
+  return deadEnd();
 }
 
 /** "Languages: Python, Java\nFrameworks: React" -> ["Python", "Java", "React"]. */

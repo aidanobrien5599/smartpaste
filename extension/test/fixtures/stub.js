@@ -103,7 +103,13 @@ const ANSWERS = [
   [/location/i, "Madison, WI"],
   [/gpa/i, "3.9"],
 ];
-const JEV = { "None": "Not a Protected Veteran", "B.S.": "Bachelor of Science", "Undergraduate science degree": "Bachelor of Science", "May 2027": "Spring 2027", "Prefer not to say": "I do not wish to answer",
+// workday-source-prompt.html: Workday keeps these answers behind
+// categories, so the answer is reached by walking in. Real Jev, asked which
+// of Adobe's categories expresses "LinkedIn", says Social Media -- 0.86-0.88
+// over three runs (bench/probe-answers.mjs --choose) -- and Workday keeps
+// LinkedIn under Job Boards. Matching in list order reproduces that: Social
+// Media first, then, once it has been walked into and dropped, Job Boards.
+const JEV = { "LinkedIn": /^(Social Media|LinkedIn|Job Boards)$/, "None": "Not a Protected Veteran", "B.S.": "Bachelor of Science", "Undergraduate science degree": "Bachelor of Science", "May 2027": "Spring 2027", "Prefer not to say": "I do not wish to answer",
   "Yes": /^yes/i, "Madison, WI": "Madison, Wisconsin, United States",
   "San Jose": /^United States of America \/ California \/ San Jose$/ };
 const words = (t) => t.toLowerCase().match(/[a-z0-9]+/g) || [];

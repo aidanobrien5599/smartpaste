@@ -83,6 +83,10 @@ function freshProfile() {
   return dir;
 }
 
+// A command that goes unanswered, and the whole of one page.
+const COMMAND_BUDGET = 30000;
+const PAGE_BUDGET = 240000;
+
 async function runOne(url, n) {
   const profile = freshProfile();
   const result = { n, url, host: (() => { try { return new URL(url).hostname; } catch { return "?"; } })(), status: "error" };
@@ -92,15 +96,22 @@ async function runOne(url, n) {
     "--window-size=1280,1400", `--load-extension=${EXT}`, `--disable-extensions-except=${EXT}`, "about:blank",
   ], { stdio: "ignore" });
   const cleanup = () => { try { chrome.kill(); } catch {} setTimeout(() => rmSync(profile, { recursive: true, force: true }), 1500); };
+  // No page may hold a worker longer than this: a loop of 90 reads, each
+  // able to wait out its own 15s, is 23 minutes if every read times out.
+  const deadline = Date.now() + PAGE_BUDGET;
   try {
     let port;
     for (let i = 0; i < 150 && !port; i++) {
       try { port = readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]; } catch { await sleep(100); }
     }
     if (!port) throw new Error("Chrome did not start");
-    const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" })).json();
+    const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`,
+      { method: "PUT", signal: AbortSignal.timeout(COMMAND_BUDGET) })).json();
     const socket = new WebSocket(target.webSocketDebuggerUrl);
-    await new Promise((r, j) => { socket.onopen = r; socket.onerror = j; });
+    await Promise.race([
+      new Promise((r, j) => { socket.onopen = r; socket.onerror = j; }),
+      sleep(COMMAND_BUDGET).then(() => { throw new Error("debugger socket never opened"); }),
+    ]);
     let nextId = 0;
     const pending = new Map();
     const logs = [];
@@ -116,7 +127,14 @@ async function runOne(url, n) {
       }
       if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result || m); pending.delete(m.id); }
     };
-    const send = (method, params = {}) => new Promise((r) => { const id = ++nextId; pending.set(id, r); socket.send(JSON.stringify({ id, method, params })); });
+    // Every command gets a timeout. Page.navigate on a site that never
+    // commits its navigation does not answer at all, and a sweep sat on one
+    // Greenhouse page for 34 minutes with no Chrome killed and nothing
+    // written -- the two chunks before it had finished in two minutes.
+    const send = (method, params = {}) => Promise.race([
+      new Promise((r) => { const id = ++nextId; pending.set(id, r); socket.send(JSON.stringify({ id, method, params })); }),
+      sleep(COMMAND_BUDGET).then(() => ({ timedOut: method })),
+    ]);
     const evaluate = async (expression) => {
       const r = await Promise.race([send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }),
         sleep(15000).then(() => ({ exceptionDetails: { exception: { description: "evaluate timed out" } } }))]);
@@ -151,7 +169,7 @@ async function runOne(url, n) {
     // 45s: a page loading beside two others can take half a minute to render
     // its form, and a short wait scored Exa's Ashby form as "no button" three
     // sweeps running -- on its own it offers "Autofill 10 fields + 1 file".
-    for (let i = 0; i < 90 && !pill; i++) {
+    for (let i = 0; i < 90 && !pill && Date.now() < deadline; i++) {
       // iCIMS keeps the form in an iframe; read every same-origin frame.
       pill = await evaluate(`(() => { const find = (w) => { try { const b = w.document.querySelector(".smartpaste-button"); if (b) return b.textContent;
         for (let i = 0; i < w.frames.length; i++) { const t = find(w.frames[i]); if (t) return t; } } catch {} return null; }; return find(window); })()`);
@@ -170,7 +188,7 @@ async function runOne(url, n) {
     await evaluate(`(() => { const find = (w) => { try { const b = w.document.querySelector(".smartpaste-button"); if (b) return b;
       for (let i = 0; i < w.frames.length; i++) { const t = find(w.frames[i]); if (t) return t; } } catch {} return null; }; find(window)?.click(); })()`);
     let last = "";
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 90 && Date.now() < deadline; i++) {
       await sleep(1000);
       const note = await evaluate("document.querySelector('.smartpaste-note')?.textContent || ''");
       if (typeof note !== "string") continue;
@@ -198,6 +216,10 @@ async function runOne(url, n) {
     result.error = String(error?.message || error);
     return result;
   } finally {
+    if (Date.now() >= deadline && result.status === "error") {
+      result.status = "timeout";
+      result.why = `gave up after ${PAGE_BUDGET / 1000}s`;
+    }
     result.seconds = Math.round((Date.now() - started) / 1000);
     cleanup();
   }

@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer|Workday prompt";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -91,6 +91,18 @@ const MUTATIONS = [
     "  if (unanswerableDemographic(label, options)) {", "  if (false) {", "lib"],
   ["'current or most recent' is not the current one",
     '  if (chose === "current_employer" && OR_MOST_RECENT.test(label)) {', "  if (false) {", "lib"],
+  // Adobe's "How Did You Hear About Us?" read 0 options live: an empty
+  // result list held the prompt's whole budget, so the categories its
+  // answers live under were never opened.
+  ["an open popup holding nothing is not a slow load",
+    "    if (emptySince !== null && Date.now() - emptySince >= EMPTY_POPUP_HOLDS) return [];",
+    ""],
+  ["a wrong category is backed out of, not given up on",
+    "    const texts = all.filter((t) => !state.tried.has(t)) as MenuTexts;",
+    "    const texts = all;"],
+  ["a prompt's expanded flag may sit on its wrapper",
+    "  for (let up = 0; node && up < 3; up++, node = node.parentElement) {",
+    "  for (let up = 0; node && up < 1; up++, node = node.parentElement) {"],
   ["'If yes' follow-ups left empty", "&& !FOLLOW_UP.test(f.label))", ")"],
   ["a signature is asked as my full legal name", "? `${label} (type your full legal name)` : label;", "? label : label;"],
   ["'Save my answers' is a preference", "|save my (?:answers|information|details|profile)", ""],

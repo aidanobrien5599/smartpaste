@@ -50,7 +50,8 @@ changing how a dropdown is driven cannot change the order a page fills in.
 | `answer/known.ts` | Keeping answered fields bound to live elements when the page rebuilds (`rebind`, `forget`, `detached`). |
 | `widgets/set-value.ts` | `setValue`: picks the driver for a field and puts the value in. |
 | `widgets/text.ts` | Typing: the native setter React listens to, key-by-key typing, shown URL prefixes. |
-| `widgets/menus.ts` | Reading any open menu: finding it, waiting for it, scrolling it, clicking an option, closing it. |
+| `widgets/menus.ts` | Reading any open menu: finding it, waiting for it, scrolling it, clicking an option. |
+| `widgets/popups.ts` | Which popup belongs to which field, whether it is open, and closing it again. |
 | `widgets/select.ts` | Native `<select>`. |
 | `widgets/toggle.ts` | Clicking toggle/radio groups and ticking checkbox groups. |
 | `widgets/autocomplete.ts` | Plain-text autocompletes that only count once a suggestion is clicked. |
@@ -106,6 +107,7 @@ on, and which ATS quirks live in it.
 | A question is not collected at all | `discover/collect/` |
 | An application page is not detected, or a non-application page is | `discover/gate.ts` |
 | A menu opens but its options are misread or the click misses | `widgets/menus.ts` |
+| A menu is open but reads 0 options, or another field's menu answers this one | `widgets/popups.ts` |
 | The order or timing of a fill | `fill/` |
 | A new message to the background | `shared/messages.ts` and `background.js` (the drift test checks both) |
 | A field is collected and driven right but answered wrong | how it is asked, in `background.js`; what the answer means, in `lib/resolve.ts` |

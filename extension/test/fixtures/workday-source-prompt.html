@@ -1,0 +1,122 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply - Adobe - Workday</title>
+<style>body{font:14px system-ui;max-width:640px;margin:30px auto}
+label{display:block;font-size:12px;color:#444}
+input{width:280px;padding:5px}
+.pop{position:absolute;background:#fff;border:1px solid #999;z-index:9;width:280px}
+.pop ul{list-style:none;margin:0;padding:0;max-height:220px;overflow-y:auto}
+.pop li{height:22px;padding:0 6px;cursor:pointer}
+.pill{display:inline-block;background:#eef;border:1px solid #99a;padding:1px 5px;margin-right:4px}</style></head>
+<body>
+<!-- adobe.wd5.myworkdayjobs.com, "How Did You Hear About Us?", from the live
+     console log: the field read 0 options and was left blank, while every
+     dropdown button on the same page was read and filled.
+
+     The difference is where Workday puts the expanded flag. A dropdown
+     BUTTON carries aria-expanded itself. This prompt's <input> carries
+     aria-expanded="false" forever; the container around it is what flips to
+     true. Reading options refused to look inside an active popup whose
+     anchor said it was not expanded, so the popup that was right there,
+     marked data-automation-activepopup="true", was never read.
+
+     The answer is also not searchable: "LinkedIn" finds nothing, because
+     Workday keeps these behind categories -- "Job Boards" > "LinkedIn" --
+     and the first category Jev reads it as is the wrong one. -->
+<main data-automation-id="applyFlowPage">
+<h2>Application Questions</h2>
+<div data-automation-id="formField-legalName"><label for="first">First Name<abbr title="required">*</abbr></label>
+  <input type="text" id="first" data-automation-id="legalNameSection_firstName"></div>
+<div data-automation-id="formField-email"><label for="email">Email<abbr title="required">*</abbr></label>
+  <input type="email" id="email" data-automation-id="email"></div>
+<div data-automation-id="formField-source">
+  <label for="source">How Did You Hear About Us?<abbr title="required">*</abbr></label>
+  <div data-automation-id="multiSelectContainer">
+    <div data-automation-id="selectedItemList"></div>
+    <div data-automation-id="multiselectInputContainer" aria-expanded="false">
+      <input type="text" id="source" data-automation-id="searchBox" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false" aria-autocomplete="list" autocomplete="off">
+    </div>
+    <div data-automation-id="selectedItemsCount">0 items selected</div>
+  </div>
+</div>
+</main>
+<script>
+window.__model = {};
+// Workday keeps LinkedIn under Job Boards. Asked cold which category
+// expresses "LinkedIn", real Jev says Social Media (0.86-0.88 over three
+// runs, bench/probe-answers.mjs --choose), whose children are Facebook,
+// Instagram and X -- so the right answer is only reached by backing out of
+// a category and asking again without it.
+const CATEGORIES = {
+  "": ["Social Media", "Job Boards", "Adobe Employee Referral", "University / Career Fair"],
+  "Job Boards": ["Glassdoor", "Indeed", "LinkedIn", "ZipRecruiter"],
+  "Social Media": ["Facebook", "Instagram", "X"],
+};
+const input = document.getElementById("source");
+const box = input.closest('[data-automation-id="multiSelectContainer"]');
+const holder = input.closest('[data-automation-id="multiselectInputContainer"]');
+const pillList = box.querySelector('[data-automation-id="selectedItemList"]');
+const count = box.querySelector('[data-automation-id="selectedItemsCount"]');
+
+function closePopup() {
+  for (const p of document.querySelectorAll(".pop")) p.remove();
+  // Only the container's flag ever changes. The input's stays "false" --
+  // this is the Workday markup, not a simplification.
+  holder.setAttribute("aria-expanded", "false");
+}
+
+function pick(name) {
+  const pill = document.createElement("span");
+  pill.className = "pill";
+  pill.setAttribute("data-automation-id", "selectedItem");
+  pill.textContent = name;
+  pillList.appendChild(pill);
+  count.textContent = pillList.children.length + " items selected";
+  window.__model.source = name;
+  input.value = "";
+  closePopup();
+}
+
+function show(rows) {
+  closePopup();
+  const pop = document.createElement("div");
+  pop.className = "pop";
+  pop.setAttribute("data-automation-id", "activeListContainer");
+  pop.setAttribute("data-automation-activepopup", "true");
+  const ul = document.createElement("ul");
+  ul.setAttribute("role", "listbox");
+  for (const name of rows) {
+    const li = document.createElement("li");
+    li.setAttribute("role", "option");
+    li.setAttribute("data-automation-id", "promptLeafNode");
+    const inner = document.createElement("div");
+    inner.setAttribute("data-automation-id", "promptOption");
+    inner.textContent = name;
+    li.appendChild(inner);
+    li.addEventListener("click", () => {
+      // A category opens its children in place; a leaf is a choice.
+      if (CATEGORIES[name]) show(CATEGORIES[name]);
+      else pick(name);
+    });
+    ul.appendChild(li);
+  }
+  pop.appendChild(ul);
+  const r = input.getBoundingClientRect();
+  pop.style.left = (scrollX + r.left) + "px";
+  pop.style.top = (scrollY + r.bottom + 2) + "px";
+  document.body.appendChild(pop);
+  holder.setAttribute("aria-expanded", "true");
+}
+
+// Clicking the empty box opens the top-level categories.
+input.addEventListener("click", () => { if (!input.value.trim()) show(CATEGORIES[""]); });
+// Enter searches. Nothing here is found by name: these answers live behind
+// their categories, so a search for "LinkedIn" comes back with no rows at
+// all -- Workday shows an empty list, never a "no results" notice.
+input.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  const term = input.value.trim().toLowerCase();
+  show(term ? [] : CATEGORIES[""]);
+});
+</script>
+</body></html>

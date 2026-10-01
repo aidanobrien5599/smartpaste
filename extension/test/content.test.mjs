@@ -663,6 +663,19 @@ test("fill: each Workday menu is read and clicked inside its own popup", { skip 
     assert.ok(!Object.values(model).includes("Select One"), JSON.stringify(model));
   }));
 
+// workday-source-prompt.html: Adobe's "How Did You Hear About Us?" read 0
+// options live and was left blank, while every dropdown button on the same
+// page filled. Workday's prompt keeps aria-expanded="false" on the <input>
+// forever and flips the container around it instead, so reading refused to
+// look inside the active popup that was open in front of it.
+test("fill: a Workday prompt is read from its popup, not from the input's expanded flag", { skip }, () =>
+  withPage("workday-source-prompt.html", async (page) => {
+    await autofill(page, 60000);
+    // "LinkedIn" is not searchable here -- it lives under "Job Boards" --
+    // so this also proves the categories are still walked.
+    assert.equal(await page.eval("window.__model.source"), "LinkedIn");
+  }));
+
 // workday-checkbox-grid.html: Adobe's questionnaire puts a checkbox group
 // in a role="grid" inside a CheckboxGroup fieldset inside the fieldset whose
 // legend asks the question -- about twelve levels above the boxes.

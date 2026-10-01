@@ -6,7 +6,8 @@
  * this file.
  *
  * Depends on: discover/selectors.ts, dom/controls.ts, dom/query.ts,
- * dom/text.ts, state.ts (staleMenus).
+ * dom/text.ts, state.ts (staleMenus), widgets/popups.ts (which popup is
+ * whose, and closing them).
  *
  * ATS quirks:
  * - Greenhouse (React Select): scope a menu by aria-controls, since a bare
@@ -31,6 +32,7 @@ import { SELECT_SHELL, nodeVisible } from "../dom/controls.ts";
 import { click, frames, press, scroller, sleep } from "../dom/query.ts";
 import { normalize, optionText } from "../dom/text.ts";
 import { staleMenus } from "../state.ts";
+import { ACTIVE_POPUP, openPopup, ownPopup, saysOpen } from "./popups.ts";
 
 /**
  * A menu's option texts, read in order. It also carries where each option
@@ -190,10 +192,11 @@ export function optionsNear(anchor: Element): Element[] {
   // closed stays on screen for a moment as it animates out, and reading
   // by position picked up its options -- State's list when opening Phone
   // Device Type, so "Mobile" was never there to be chosen.
-  if (anchor.hasAttribute("aria-expanded")) {
+  const open = saysOpen(anchor);
+  if (open !== null) {
     const popups = [...document.querySelectorAll('[data-automation-activepopup="true"]')].filter(nodeVisible);
     if (popups.length) {
-      if (anchor.getAttribute("aria-expanded") !== "true") return [];
+      if (!open) return [];
       return leafOptions(popups[popups.length - 1]);
     }
   }
@@ -217,11 +220,31 @@ function leafOptions(root: ParentNode): Element[] {
   });
 }
 
+// How long an open-but-empty popup must stand before it counts as "nothing
+// found" rather than a list still loading.
+const EMPTY_POPUP_HOLDS = 800;
+
+/**
+ * Wait for a menu's options.
+ *
+ * A popup that stands open holding nothing is an answer -- nothing was
+ * found -- not a list still loading. Adobe's "How Did You Hear About Us?"
+ * finds nothing by name, because its answers live under categories ("Job
+ * Boards" > "LinkedIn"), and Workday answers that search with an empty
+ * result list. Waiting the full timeout out on each search spent the
+ * prompt's whole budget before the categories were ever opened, and the
+ * question was left blank. A popup still saying "Loading" is not empty.
+ */
 export async function waitForOptions(anchor: Element, timeout = 2500): Promise<Element[]> {
   const deadline = Date.now() + timeout;
+  let emptySince: number | null = null;
   while (Date.now() < deadline) {
     const nodes = optionsNear(anchor);
     if (nodes.length) return nodes;
+    const popup = openPopup(anchor);
+    const loading = popup && /loading|searching/i.test(popup.textContent || "");
+    emptySince = popup && !loading ? emptySince ?? Date.now() : null;
+    if (emptySince !== null && Date.now() - emptySince >= EMPTY_POPUP_HOLDS) return [];
     await sleep(40);
   }
   return [];
@@ -298,47 +321,6 @@ export async function findOption(anchor: Element, text: string, seenAt?: number)
   return null;
 }
 
-// Every container a menu can be drawn in. Used to tell which popup a button
-// opened: the one that was not on screen before it was clicked.
-const POPUP = '[data-automation-activepopup], [data-automation-id="activeListContainer"], ' +
-  '[role="listbox"], [role="grid"], [class*="popup" i], [class*="menu" i]';
-const ownPopup = new WeakMap<Element, Element>();
-
-/** The popups on screen right now, to compare against after opening one. */
-export function popupsNow(): Set<Element> {
-  return new Set([...document.querySelectorAll(POPUP)].filter(nodeVisible));
-}
-
-/**
- * Remember the popup this anchor just opened.
- *
- * Adobe's Workday marks no popup data-automation-activepopup, so reading
- * fell back to position -- and a menu near the field answered for it. State
- * came back "United States of America (+1) | Select One | Alabama...", the
- * phone's country-code list merged into it, and a Yes/No menu was answered
- * by clicking a row belonging to the question above it.
- */
-export function rememberPopup(anchor: Element, before: Set<Element>): void {
-  const fresh = [...document.querySelectorAll(POPUP)].filter((p) => nodeVisible(p) && !before.has(p));
-  // The innermost of the new ones: a popup often sits inside a wrapper that
-  // is new too, and the rows live in the innermost.
-  const own = fresh.filter((p) => !fresh.some((other) => other !== p && p.contains(other))).pop();
-  if (own) ownPopup.set(anchor, own);
-}
-
-const ACTIVE_POPUP =
-  '[data-automation-activepopup="true"], [data-automation-id="activeListContainer"]';
-
-/** Close a menu. Workday's popups can ignore Escape; a click outside shuts them. */
-export function closeMenu(field: Element): void {
-  press(document.activeElement || field, "Escape", 27);
-  (field as HTMLElement).blur();
-  if ([...document.querySelectorAll(ACTIVE_POPUP)].some(nodeVisible)) {
-    const outside = document.querySelector("#mainContent, main");
-    if (outside) click(outside);
-  }
-}
-
 // How long a clicked row is given to show that it took the click.
 const TOOK_THE_CLICK = 240;
 
@@ -377,12 +359,4 @@ export async function pickOption(node: Element, took: () => boolean = () => fals
   }
   const box = target.querySelector<HTMLInputElement>('input[type="radio"], input[type="checkbox"]');
   if (box && !box.checked) { click(box); await sleep(200); }
-}
-
-/** Close whatever popup is open and let it go before opening another. */
-export async function settlePopups(field: Element): Promise<void> {
-  const open = () => [...document.querySelectorAll('[data-automation-activepopup="true"]')].some(nodeVisible);
-  if (!open()) return;
-  closeMenu(field);
-  for (let i = 0; i < 20 && open(); i++) await sleep(25);
 }
