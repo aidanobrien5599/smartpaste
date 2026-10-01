@@ -17,3 +17,4 @@ bench/sweeps/
 node_modules/
 extension/dist/
 .superpowers/
+bench/.rival-profile/
