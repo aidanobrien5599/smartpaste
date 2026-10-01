@@ -48,7 +48,9 @@ const label = arg("--label", "sweep");
 const urls = readFileSync(list, "utf8").split("\n").map((l) => l.replace(/#.*/, "").trim()).filter(Boolean)
   .filter((u) => !only || only.test(u));
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
-const outDir = join(here, "sweeps", `${stamp}-${label}`);
+// See bench/rival.mjs: chunks of a long corpus accumulate into one set.
+const outDir = join(here, "sweeps", process.env.SWEEP_OUT || `${stamp}-${label}`);
+const START = Number(process.env.START || 0);
 mkdirSync(outDir, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -214,11 +216,11 @@ let next = 0;
 async function worker() {
   while (next < urls.length) {
     const n = next++;
-    const r = await runOne(urls[n], n + 1);
+    const r = await runOne(urls[n], START + n + 1);
     Object.assign(r, score(r));
     results.push(r);
-    writeFileSync(join(outDir, `${String(n + 1).padStart(2, "0")}-${r.host}.json`), JSON.stringify(r, null, 1));
-    console.log(`[${n + 1}/${urls.length}] ${r.status.padEnd(8)} ${String(r.filled ?? "-").padStart(3)}/${String(r.nControls ?? "-").padEnd(3)} req-blank ${String(r.requiredBlank ?? "-").padEnd(3)} ${r.host} ${r.why || r.error || ""}`);
+    writeFileSync(join(outDir, `${String(START + n + 1).padStart(2, "0")}-${r.host}.json`), JSON.stringify(r, null, 1));
+    console.log(`[${START + n + 1}/${START + urls.length}] ${r.status.padEnd(8)} ${String(r.filled ?? "-").padStart(3)}/${String(r.nControls ?? "-").padEnd(3)} req-blank ${String(r.requiredBlank ?? "-").padEnd(3)} ${r.host} ${r.why || r.error || ""}`);
   }
 }
 await build();

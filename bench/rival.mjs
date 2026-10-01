@@ -252,12 +252,16 @@ const SEEK = (words, click) => `(() => {
 const CONTROL = { simplify: "/autofill this page/i", huntr: "/autofill/i" }[which];
 const urls = readFileSync(rest[0], "utf8").split("\n").map((l) => l.replace(/#.*/, "").trim()).filter(Boolean);
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
-const outDir = join(here, "sweeps", `${stamp}-${which}`);
+// SWEEP_OUT and START let a long corpus run in chunks that accumulate into
+// one result set: a 42-form rival run takes ~30 minutes, longer than one
+// background window.
+const outDir = join(here, "sweeps", process.env.SWEEP_OUT || `${stamp}-${which}`);
+const START = Number(process.env.START || 0);
 mkdirSync(outDir, { recursive: true });
 
 const results = [];
 for (const [i, url] of urls.entries()) {
-  const result = { n: i + 1, url, host: new URL(url).hostname, tool: which, status: "error" };
+  const result = { n: START + i + 1, url, host: new URL(url).hostname, tool: which, status: "error" };
   const started = Date.now();
   await send("Page.navigate", { url });
   // Wait for its own control to appear rather than guessing how long it
@@ -307,9 +311,9 @@ for (const [i, url] of urls.entries()) {
   result.controls = Array.isArray(rows) ? rows : [];
   result.seconds = Math.round((Date.now() - started) / 1000);
   results.push(result);
-  writeFileSync(join(outDir, `${String(i + 1).padStart(2, "0")}-${result.host}.json`), JSON.stringify(result, null, 1));
+  writeFileSync(join(outDir, `${String(START + i + 1).padStart(2, "0")}-${result.host}.json`), JSON.stringify(result, null, 1));
   const real = result.controls.filter((c) => c.pageLabel);
-  console.log(`[${i + 1}/${urls.length}] ${result.status.padEnd(10)} ${real.filter((c) => c.value).length}/${real.length} fields  ${result.fillMs ? (result.fillMs / 1000).toFixed(1) + "s" : "-"}  ${result.host}`);
+  console.log(`[${START + i + 1}/${START + urls.length}] ${result.status.padEnd(10)} ${real.filter((c) => c.value).length}/${real.length} fields  ${result.fillMs ? (result.fillMs / 1000).toFixed(1) + "s" : "-"}  ${result.host}`);
 }
 writeFileSync(join(outDir, "summary.json"), JSON.stringify(results.map(({ controls, ...rest }) => rest), null, 1));
 console.log(`\n${outDir}`);
