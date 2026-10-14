@@ -105,6 +105,10 @@ box.addEventListener("input", () => {
   if (!typing) { typing = true; window.__searches++; }
   const query = box.value.trim();
   const nth = window.__searches;
+  // A geocode is a server call. The second search here takes 2.2s and says
+  // "Loading" meanwhile, as Lever's did live on SEP and CesiumAstro: the
+  // fill ended with the menu still loading and the required box cleared.
+  places.innerHTML = '<div class="no-results">Loading</div>';
   setTimeout(() => {
     if (box.value.trim() !== query || !query) return;
     const hits = nth < 2 ? [] : ["Madison, WI, USA", "Madison, AL, USA"].filter((p) =>
@@ -119,7 +123,7 @@ box.addEventListener("input", () => {
         places.innerHTML = "";
       });
     }
-  }, 60);
+  }, nth < 2 ? 60 : 2200);
 });
 // Typing into an empty box starts the next search.
 box.addEventListener("keydown", () => { if (!box.value) typing = false; });

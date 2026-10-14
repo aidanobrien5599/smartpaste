@@ -11,7 +11,9 @@
  * selectedLocation set only by clicking a suggestion, and live, four of
  * eight Lever forms met the first search with "No location found", so a
  * second, shorter search ("Madison" for "Madison, WI") runs before giving
- * up. Workday's "Address", "City", "Postal code" and "Location" are plain
+ * up. That search is a server call: on two forms the fill ended with the
+ * menu still reading "Loading" and the required field cleared, so a menu
+ * that says it is working is waited out. Workday's "Address", "City", "Postal code" and "Location" are plain
  * boxes, so only a location/hometown name hints at an autocomplete, and a
  * box that never offers suggestions keeps the typed text.
  */
@@ -78,11 +80,35 @@ function suggestionsNear(field: Element): Suggestion[] {
   return items;
 }
 
+// A geocoder is a server call, and its answer can take longer than any
+// wait worth paying on a box that will never answer. So the wait is only
+// extended while the menu itself says it is working: Lever's box still read
+// "No location found... Loading" at the end of the fill on two of nine
+// forms, and the field was cleared with the search still in flight.
+const WORKING = /loading|searching/i;
+const WHILE_WORKING = 40; // rounds of 100ms, on top of `rounds`
+
+/** What the menu under the field says, suggestions or not. */
+function menuTextNear(field: Element): string {
+  const box = field.getBoundingClientRect();
+  for (const list of document.querySelectorAll(SUGGESTION_BOX)) {
+    const rect = list.getBoundingClientRect();
+    if (!rect.height || rect.top < box.top - 4 || rect.top > box.bottom + 400) continue;
+    const text = list.textContent!.trim();
+    if (text) return text;
+  }
+  return "";
+}
+
 /** One search: type `probe`, then wait for the suggestions it brings back. */
 async function searchSuggestions(field: HTMLInputElement, probe: string, rounds = 12): Promise<Suggestion[]> {
   await typeLikeAPerson(field, probe);
   let items: Suggestion[] = [];
   for (let i = 0; i < rounds && !items.length; i++) {
+    await sleep(100);
+    items = suggestionsNear(field);
+  }
+  for (let i = 0; i < WHILE_WORKING && !items.length && WORKING.test(menuTextNear(field)); i++) {
     await sleep(100);
     items = suggestionsNear(field);
   }

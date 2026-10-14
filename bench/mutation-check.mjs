@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer|Workday prompt|moves under the fill|only the user can answer";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer|Workday prompt|moves under the fill|only the user can answer|location search is run again";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
@@ -91,6 +91,11 @@ const MUTATIONS = [
     "  if (unanswerableDemographic(label, options)) {", "  if (false) {", "lib"],
   ["'current or most recent' is not the current one",
     '  if (chose === "current_employer" && OR_MOST_RECENT.test(label)) {', "  if (false) {", "lib"],
+  // Two Lever forms ended with the location menu still reading "Loading"
+  // and the required box cleared.
+  ["a menu that says it is loading is waited out",
+    "  for (let i = 0; i < WHILE_WORKING && !items.length && WORKING.test(menuTextNear(field)); i++) {\n    await sleep(100);\n    items = suggestionsNear(field);\n  }\n",
+    ""],
   // Across 42 live forms about a dozen required blanks are written answers:
   // "left 9 for you" sends the user hunting for which.
   ["the required questions left for the user are named",
