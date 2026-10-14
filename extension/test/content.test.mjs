@@ -489,6 +489,17 @@ test("fill: Ashby radios with no legend, orphan labels, and Month/Year selects",
     assert.deepEqual(await page.eval("['em','ey'].map(id => document.getElementById(id).value)"), ["", ""]);
   }));
 
+test("fill: an Ashby EEO question is its title, not the description under it", { skip }, () =>
+  withPage("ashby-eeo-description.html", async (page) => {
+    // Gender was asked as "Input gender" and Race as the EEOC's definitions:
+    // the description sits between the title and the first option.
+    const labels = await page.waitFor(asked);
+    for (const label of ["Gender", "Race", "Veteran Status"]) {
+      assert.ok(labels.includes(label), `missing ${label}: ${labels.join(" | ")}`);
+    }
+    assert.ok(!labels.some((l) => /Input gender|Hispanic or Latino -/.test(l)), labels.join(" | "));
+  }));
+
 test("fill: SmartRecruiters -- inputs inside web components, labelled on the host", { skip }, () =>
   withPage("smartrecruiters.html", async (page) => {
     const labels = await page.waitFor(asked);

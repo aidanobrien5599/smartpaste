@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { bundleContent } from "../extension/build.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer|Workday prompt|moves under the fill|only the user can answer|location search is run again";
+const TESTS = "C3|ByteDance|Eightfold|Workable|Rippling|iCIMS|Lever|Adobe|grid|year|consent box|search|documents|Greenhouse's checkbox|timer|Workday prompt|moves under the fill|only the user can answer|location search is run again|EEO question is its title";
 
 // [name, the fixed code, the code before the fix]
 const MUTATIONS = [
